@@ -39,9 +39,8 @@ export default function ReelsFeedLive() {
   // Observer to control single video playback
   const playObserverRef = useRef<IntersectionObserver | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const isSteppingRef = useRef(false)
-  const stepUnlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const touchStartYRef = useRef<number | null>(null)
+  const activeIndexRef = useRef<number>(0)
+  const scrollDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const attachVideoObservers = useCallback(() => {
     if (playObserverRef.current) playObserverRef.current.disconnect()
@@ -52,7 +51,7 @@ export default function ReelsFeedLive() {
       (entries) => {
         // Find the most visible entry over threshold
         const visible = entries
-          .filter((e) => e.isIntersecting && e.intersectionRatio >= 0.9)
+          .filter((e) => e.isIntersecting && e.intersectionRatio >= 0.6)
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
         if (visible.length > 0) {
           const target = visible[0].target as HTMLVideoElement
@@ -79,6 +78,25 @@ export default function ReelsFeedLive() {
     )
     playObserverRef.current = io
     vids.forEach((v) => io.observe(v))
+  }, [])
+
+  const playOnlyIndex = useCallback((idx: number) => {
+    const root = containerRef.current
+    if (!root) return
+    const vids = Array.from(root.querySelectorAll<HTMLVideoElement>('video[data-reel]'))
+    vids.forEach((v, i) => {
+      if (i === idx) {
+        try {
+          // ensure playback of the active one
+          v.play().catch(() => {})
+        } catch {}
+      } else {
+        try {
+          v.pause()
+        } catch {}
+      }
+    })
+    activeIndexRef.current = Math.max(0, Math.min(idx, vids.length - 1))
   }, [])
 
   const fetchInitial = useCallback(async () => {
@@ -298,98 +316,26 @@ export default function ReelsFeedLive() {
   // Re-attach video observers when list length changes (fallback)
   useEffect(() => {
     setTimeout(attachVideoObservers, 0)
-  }, [items.length, attachVideoObservers])
+    // enforce playback for first slide on initial load
+    if (items.length > 0) setTimeout(() => playOnlyIndex(0), 0)
+  }, [items.length, attachVideoObservers, playOnlyIndex])
 
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (stepUnlockTimerRef.current) clearTimeout(stepUnlockTimerRef.current)
-    }
-  }, [])
-
-  // Programmatic step navigation with loop behavior
-  const scrollToIndex = useCallback(
-    (idx: number) => {
-      const el = containerRef.current
-      if (!el) return
-      const h = el.getBoundingClientRect().height
-      el.scrollTo({ top: Math.max(0, Math.floor(idx) * h), behavior: 'smooth' })
-    },
-    [],
-  )
-
-  const stepBy = useCallback(
-    (delta: 1 | -1) => {
-      if (isSteppingRef.current) return
-      const count = items.length
-      if (count === 0) return
-      const el = containerRef.current
-      if (!el) return
-      isSteppingRef.current = true
-
-      const h = el.getBoundingClientRect().height || 1
-      const current = Math.round(el.scrollTop / h)
-
-      // Prefetch older when approaching tail
-      if (delta > 0 && hasMore && !loadingMore && current >= count - 3) {
-        fetchOlder()
-      }
-
-      let next = current + delta
-      if (next >= count) {
-        next = hasMore ? count - 1 : 0 // if more items expected, stay on last; else loop
-      } else if (next < 0) {
-        next = hasMore ? 0 : Math.max(0, count - 1)
-      }
-      scrollToIndex(next)
-      if (stepUnlockTimerRef.current) clearTimeout(stepUnlockTimerRef.current)
-      stepUnlockTimerRef.current = setTimeout(() => {
-        isSteppingRef.current = false
-      }, 750)
-    },
-    [items.length, hasMore, loadingMore, fetchOlder, scrollToIndex],
-  )
-
-  const onWheel = useCallback(
-    (e: React.WheelEvent<HTMLDivElement>) => {
-      // prevent multi-skip: force single step on strong wheel
-      if (isSteppingRef.current) {
-        e.preventDefault()
-        return
-      }
-      if (Math.abs(e.deltaY) < 10) return
-      e.preventDefault()
-      stepBy(e.deltaY > 0 ? 1 : -1)
-    },
-    [stepBy],
-  )
-
-  const onTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
-    touchStartYRef.current = e.touches[0]?.clientY ?? null
-  }, [])
-
-  const onTouchEnd = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>) => {
-      const start = touchStartYRef.current
-      if (start == null) return
-      const endY = e.changedTouches[0]?.clientY ?? start
-      const dy = endY - start
-      const threshold = 40
-      if (Math.abs(dy) >= threshold) {
-        stepBy(dy < 0 ? 1 : -1)
-      }
-      touchStartYRef.current = null
-    },
-    [stepBy],
-  )
 
   return (
     <div
       ref={containerRef}
       className="h-screen w-screen bg-black text-white overflow-y-auto snap-y snap-mandatory overscroll-contain"
-      onWheel={onWheel}
-      onTouchStart={onTouchStart}
-      onTouchEnd={onTouchEnd}
+      onScroll={() => {
+        // debounce and enforce active playback on rest
+        if (scrollDebounceRef.current) clearTimeout(scrollDebounceRef.current)
+        scrollDebounceRef.current = setTimeout(() => {
+          const el = containerRef.current
+          if (!el) return
+          const h = el.getBoundingClientRect().height || 1
+          const idx = Math.round(el.scrollTop / h)
+          if (idx !== activeIndexRef.current) playOnlyIndex(idx)
+        }, 120)
+      }}
     >
       {loading ? (
         <div className="h-screen flex items-center justify-center text-sm text-gray-300">Loading…</div>
@@ -409,6 +355,7 @@ export default function ReelsFeedLive() {
                 muted
                 playsInline
                 preload="metadata"
+                autoPlay
                 className="w-full h-full object-cover"
               />
               {/* simple bottom overlay for title */}
