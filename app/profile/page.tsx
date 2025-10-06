@@ -4,8 +4,14 @@ import { Star, Settings, Store, Bell, Shield, HelpCircle } from "lucide-react"
 import Navigation from "@/components/navigation"
 import { useState } from "react"
 import { mockUserStats } from "@/lib/mock-data"
+import { useAuth } from "@/components/auth-provider"
+import { useRouter } from "next/navigation"
+import { useUserProfile } from "@/hooks/useUserProfile"
 
 export default function ProfilePage() {
+  const router = useRouter()
+  const { signOut } = useAuth()
+  const { userProfile, loading, error, updateProfile } = useUserProfile()
   const [showReviews, setShowReviews] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showVisitedStores, setShowVisitedStores] = useState(false)
@@ -34,6 +40,11 @@ export default function ProfilePage() {
   const [showPosts, setShowPosts] = useState(false)
   const [selectedStatsTab, setSelectedStatsTab] = useState("followers")
 
+  const [selectedVideo, setSelectedVideo] = useState(null)
+  const [emailAddress, setEmailAddress] = useState("")
+  const [isLinking, setIsLinking] = useState(false)
+  const [showStoreDetails, setShowStoreDetails] = useState<number | null>(null)
+
   // Add a new state variable for showing the notification permission modal
   const [showNotificationPermission, setShowNotificationPermission] = useState(false)
 
@@ -41,6 +52,49 @@ export default function ProfilePage() {
   const [showGenderAgeModal, setShowGenderAgeModal] = useState(false)
   const [selectedGender, setSelectedGender] = useState("")
   const [selectedAge, setSelectedAge] = useState("")
+
+  // プロフィール編集用のstate
+  const [editedName, setEditedName] = useState("")
+  const [editedUsername, setEditedUsername] = useState("")
+  const [isUpdating, setIsUpdating] = useState(false)
+
+  // プロフィールデータの初期化
+  useState(() => {
+    if (userProfile) {
+      setEditedName(userProfile.name)
+      setEditedUsername(userProfile.username)
+      setSelectedGender(userProfile.gender)
+      setSelectedAge(userProfile.age)
+    }
+  }, [userProfile])
+
+  // プロフィールが存在しない場合の処理
+  if (error === 'PROFILE_NOT_FOUND') {
+    router.push('/register')
+    return null
+  }
+
+  // プロフィール編集画面を開く際の処理
+  const handleOpenProfileEdit = () => {
+    if (userProfile) {
+      // 最新のプロフィール情報をフォームに設定
+      setEditedName(userProfile.name || "")
+      setEditedUsername(userProfile.username || "")
+      setSelectedGender(userProfile.gender || "")
+      setSelectedAge(userProfile.age || "")
+    }
+    setShowProfileEdit(true)
+  }
+
+  // 性別・年齢モーダルを開く際の処理
+  const handleOpenGenderAgeModal = () => {
+    if (userProfile) {
+      // 現在の値をモーダルに設定
+      setSelectedGender(userProfile.gender || "")
+      setSelectedAge(userProfile.age || "")
+    }
+    setShowGenderAgeModal(true)
+  }
 
   const visitHistory = [
     {
@@ -134,13 +188,87 @@ export default function ProfilePage() {
   }
 
   const confirmLogout = async () => {
-    // Instagram連携の場合はInstagram APIからもログアウト
-    // 実装例: await instagramAuth.logout()
+    try {
+      // Supabaseからログアウト
+      await signOut() 
+      // ログアウト成功後、ログインページに移動
+      router.push("/")
+    } catch (error) {
+      console.error("ログアウトエラー:", error)
+      alert("ログアウトに失敗しました。もう一度お試しください。")
+    } finally {
+      setShowLogoutConfirmation(false)
+    }
+  }
 
-    // 通常のログアウト処理
-    console.log("ログアウト処理")
-    // 実際の実装では認証プロバイダーのログアウト処理を呼び出す
-    setShowLogoutConfirmation(false)
+  // プロフィール編集の保存処理
+  const handleSaveProfile = async () => {
+    const updates = {
+      name: editedName.trim(),
+      username: editedUsername.trim(),
+    }
+
+    if (!updates.name || !updates.username) {
+      alert("名前とユーザーネームを入力してください")
+      return
+    }
+
+    setIsUpdating(true)
+    const success = await updateProfile(updates)
+    setIsUpdating(false)
+    
+    if (success) {
+      alert("プロフィールを更新しました")
+      setShowProfileEdit(false)
+    }
+  }
+
+  // 性別・年齢の保存処理
+  const handleSaveGenderAge = async () => {
+    if (!selectedGender || !selectedAge) {
+      alert("性別と年齢を選択してください")
+      return
+    }
+
+    const updates = {
+      gender: selectedGender as '男性' | '女性' | 'その他',
+      age: selectedAge as '10代' | '20代' | '30代' | '40代' | '50代以上',
+    }
+
+    setIsUpdating(true)
+    const success = await updateProfile(updates)
+    setIsUpdating(false)
+    
+    if (success) {
+      alert("性別と年齢を更新しました")
+      setShowGenderAgeModal(false)
+    }
+  }
+
+  // ローディング中の表示
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">プロフィールを読み込み中...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // エラー時の表示
+  if (error && !userProfile) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()} className="bg-orange-600 hover:bg-orange-700 text-white">
+            再試行
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   const menuItems = [
@@ -237,11 +365,6 @@ export default function ProfilePage() {
     },
   ]
 
-  const [selectedVideo, setSelectedVideo] = useState(null)
-  const [emailAddress, setEmailAddress] = useState("")
-  const [isLinking, setIsLinking] = useState(false)
-  const [showStoreDetails, setShowStoreDetails] = useState<number | null>(null)
-
   const handleLinkVideo = async (video) => {
     if (!emailAddress.trim()) {
       alert("メールアドレスを入力してください")
@@ -258,6 +381,184 @@ export default function ProfilePage() {
     setSelectedVideo(null)
     setEmailAddress("")
     setIsLinking(false)
+  }
+
+  // 性別・年齢モーダル（データベースから取得した値を表示）
+  if (showGenderAgeModal) {
+    return (
+      <div className="min-h-screen bg-white pb-20">
+        <div className="px-6 py-4 flex items-center gap-4">
+          <Button variant="ghost" onClick={() => setShowGenderAgeModal(false)} className="text-black">
+            ＜
+          </Button>
+          <h1 className="text-xl font-semibold">性別と年齢</h1>
+        </div>
+
+        <div className="px-6 py-4 space-y-6">
+          <div className="space-y-6">
+            {/* Gender Selection */}
+            <div>
+              <h4 className="font-medium text-gray-800 mb-3">性別</h4>
+              <div className="space-y-3">
+                {["男性", "女性", "その他"].map((gender) => (
+                  <button
+                    key={gender}
+                    onClick={() => setSelectedGender(gender)}
+                    className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        selectedGender === gender ? "border-orange-500 bg-orange-500" : "border-gray-300"
+                      }`}
+                    >
+                      {selectedGender === gender && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                    </div>
+                    <span className="text-gray-800">{gender}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Age Selection */}
+            <div>
+              <h4 className="font-medium text-gray-800 mb-3">年齢</h4>
+              <div className="space-y-3">
+                {["10代", "20代", "30代", "40代", "50代以上"].map((age) => (
+                  <button
+                    key={age}
+                    onClick={() => setSelectedAge(age)}
+                    className="w-full flex items-center gap-3 p-3 text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <div
+                      className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        selectedAge === age ? "border-orange-500 bg-orange-500" : "border-gray-300"
+                      }`}
+                    >
+                      {selectedAge === age && <div className="w-2 h-2 bg-white rounded-full"></div>}
+                    </div>
+                    <span className="text-gray-800">{age}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {error && (
+              <div className="text-red-500 text-sm text-center">{error}</div>
+            )}
+
+            {/* Save Button */}
+            <Button
+              onClick={handleSaveGenderAge}
+              disabled={isUpdating || !selectedGender || !selectedAge}
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold disabled:bg-gray-300"
+            >
+              {isUpdating ? "保存中..." : "保存する"}
+            </Button>
+          </div>
+        </div>
+
+        <Navigation />
+      </div>
+    )
+  }
+
+  // プロフィール編集画面（データベースから取得した値を表示）
+  if (showProfileEdit) {
+    return (
+      <div className="min-h-screen bg-white pb-20">
+        <div className="px-6 py-4 flex items-center gap-4">
+          <Button variant="ghost" onClick={() => setShowProfileEdit(false)} className="text-black">
+            ＜
+          </Button>
+          <h1 className="text-xl font-semibold flex-1 text-center">プロフィール</h1>
+          <div className="w-10"></div>
+        </div>
+
+        <div className="px-6 py-4 space-y-6">
+          <div className="space-y-6">
+            {/* Profile Icon */}
+            <div className="text-center">
+              <img
+                src={userProfile?.avatar_url || "/images/misecle-mascot.png"}
+                alt="Profile Icon"
+                className="w-24 h-24 rounded-full object-cover mx-auto mb-2"
+              />
+              <button className="text-blue-600 hover:text-blue-700 transition-colors text-sm">写真を設定</button>
+            </div>
+
+            {/* Name - データベースから取得した値を表示 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">名前</label>
+              <input
+                type="text"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                placeholder={userProfile?.name || "名前を入力してください"}
+              />
+            </div>
+            
+            {/* Username - データベースから取得した値を表示 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ユーザーネーム</label>
+              <input
+                type="text"
+                value={editedUsername}
+                onChange={(e) => setEditedUsername(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                placeholder={userProfile?.username || "ユーザーネームを入力してください"}
+              />
+            </div>
+
+            {/* Gender and Age - データベースから取得した値を表示 */}
+            <div>
+              <button
+                onClick={handleOpenGenderAgeModal}
+                className="w-full flex items-center justify-between p-4 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+              >
+                <div>
+                  <p className="font-medium text-gray-800">性別と年齢</p>
+                  <p className="text-sm text-gray-500">
+                    {userProfile?.gender && userProfile?.age 
+                      ? `${userProfile.gender} • ${userProfile.age}`
+                      : "未設定 - 公開プロフィールには表示されません"
+                    }
+                  </p>
+                </div>
+                <span className="text-black">＞</span>
+              </button>
+            </div>
+
+            {/* プロフィール作成日時の表示 */}
+            {userProfile?.created_at && (
+              <div className="text-center">
+                <p className="text-xs text-gray-500">
+                  アカウント作成日: {new Date(userProfile.created_at).toLocaleDateString('ja-JP', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <div className="text-red-500 text-sm text-center">{error}</div>
+            )}
+
+            <Button 
+              onClick={handleSaveProfile}
+              disabled={isUpdating || !editedName.trim() || !editedUsername.trim()}
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold disabled:bg-gray-300"
+            >
+              {isUpdating ? "保存中..." : "保存する"}
+            </Button>
+          </div>
+        </div>
+
+        <Navigation />
+      </div>
+    )
   }
 
   if (showLogoutConfirmation) {
@@ -1787,612 +2088,27 @@ export default function ProfilePage() {
     )
   }
 
-  if (showProfileDetails) {
-    return (
-      <div className="min-h-screen bg-white pb-20">
-        <div className="px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setShowProfileDetails(false)
-              setShowAccountSettings(true)
-            }}
-            className="text-black"
-          >
-            ＜
-          </Button>
-          <h1 className="text-xl font-semibold">あなたのプロフィール</h1>
-        </div>
-
-        <div className="px-6 py-4 space-y-6">
-          <div className="space-4">
-            {/* Name Fields */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">姓</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="田中"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">名</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="太郎"
-                />
-              </div>
-            </div>
-
-            {/* Kana Name Fields */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">セイ</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="タナカ"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">メイ</label>
-                <input
-                  type="text"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="タロウ"
-                />
-              </div>
-            </div>
-
-            {/* Birth Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">生年月日</label>
-              <input
-                type="date"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              />
-            </div>
-
-            {/* Gender */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">性別</label>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="male"
-                    className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                  />
-                  <label htmlFor="male" className="text-sm text-gray-700">
-                    男性
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="female"
-                    className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                  />
-                  <label htmlFor="female" className="text-sm text-gray-700">
-                    女性
-                  </label>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="other"
-                    className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                  />
-                  <label htmlFor="other" className="text-sm text-gray-700">
-                    その他
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <Button className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold">
-              保存する
-            </Button>
-          </div>
-        </div>
-
-        <Navigation />
-      </div>
-    )
-  }
-
-  if (showOtherProfile) {
-    return (
-      <div className="min-h-screen bg-white pb-20">
-        <div className="px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setShowOtherProfile(false)
-              setShowAccountSettings(true)
-            }}
-            className="text-black"
-          >
-            ＜
-          </Button>
-          <h1 className="text-xl font-semibold">その他のプロフィール</h1>
-        </div>
-
-        <div className="px-6 py-4 space-y-6">
-          <div className="space-y-4">
-            {/* Privacy Notice */}
-            <div className="text-center">
-              <p className="text-xs text-gray-500">
-                ここで入力した内容は外部には公開されず、サービスの改善にのみ使用します。
-              </p>
-            </div>
-
-            {/* Occupation */}
-            <div>
-              <button
-                onClick={() => setExpandedOccupation(!expandedOccupation)}
-                className="w-full flex items-center justify-between p-3 text-left hover:bg-gray-50 transition"
-              >
-                <span className="text-sm font-medium text-gray-700">所属</span>
-                <span className="text-black">{expandedOccupation ? "−" : "＞"}</span>
-              </button>
-
-              {expandedOccupation && (
-                <div className="mt-3 space-y-3 border-l-2 border-gray-200 pl-4">
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="highschool"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="highschool" className="text-sm text-gray-700">
-                      高校生
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="vocational"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="vocational" className="text-sm text-gray-700">
-                      専門学生
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="university"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="university" className="text-sm text-gray-700">
-                      大学生・大学院生
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="parttime"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="parttime" className="text-sm text-gray-700">
-                      パート・アルバイト
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="fulltime"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="fulltime" className="text-sm text-gray-700">
-                      会社員（正社員）
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="contract"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="contract" className="text-sm text-gray-700">
-                      会社員（契約社員/派遣社員）
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="selfemployed"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="selfemployed" className="text-sm text-gray-700">
-                      自営業・フリーランス
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="housewife"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="housewife" className="text-sm text-gray-700">
-                      専業主婦・主夫
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="unemployed"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="unemployed" className="text-sm text-gray-700">
-                      無職
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <input
-                      type="checkbox"
-                      id="notapplicable"
-                      className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-500"
-                    />
-                    <label htmlFor="notapplicable" className="text-sm text-gray-700">
-                      該当なし
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <Button className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold">
-              保存する
-            </Button>
-          </div>
-        </div>
-
-        <Navigation />
-      </div>
-    )
-  }
-
-  // Stats Page (Followers/Following/Posts)
-  if (showFollowers || showFollowing || showPosts) {
-    const mockFollowers = [
-      {
-        id: 1,
-        name: "田中花子",
-        username: "@hanako_tanaka",
-        avatar: "/placeholder.svg?height=40&width=40",
-        isFollowing: true,
-      },
-      {
-        id: 2,
-        name: "佐藤太郎",
-        username: "@taro_sato",
-        avatar: "/placeholder.svg?height=40&width=40",
-        isFollowing: false,
-      },
-      {
-        id: 3,
-        name: "山田美咲",
-        username: "@misaki_yamada",
-        avatar: "/placeholder.svg?height=40&width=40",
-        isFollowing: true,
-      },
-      {
-        id: 4,
-        name: "鈴木健太",
-        username: "@kenta_suzuki",
-        avatar: "/placeholder.svg?height=40&width=40",
-        isFollowing: false,
-      },
-    ]
-
-    const mockFollowing = [
-      {
-        id: 1,
-        type: "user",
-        name: "グルメ太郎",
-        username: "@gourmet_taro",
-        avatar: "/placeholder.svg?height=40&width=40",
-      },
-      {
-        id: 2,
-        type: "restaurant",
-        name: "カフェ・ド・パリ",
-        username: "@cafe_de_paris",
-        avatar: "/placeholder.svg?height=40&width=40",
-      },
-      {
-        id: 3,
-        type: "user",
-        name: "料理好き花子",
-        username: "@cooking_hanako",
-        avatar: "/placeholder.svg?height=40&width=40",
-      },
-      {
-        id: 4,
-        type: "restaurant",
-        name: "焼肉 炭火亭",
-        username: "@yakiniku_sumibiya",
-        avatar: "/placeholder.svg?height=40&width=40",
-      },
-    ]
-
-    const mockPosts = [
-      {
-        id: 1,
-        thumbnail: "/placeholder.svg?height=120&width=120",
-        title: "美味しい焼き鳥",
-        views: "1.2k",
-        likes: "89",
-        date: "2024年1月15日",
-      },
-      {
-        id: 2,
-        thumbnail: "/placeholder.svg?height=120&width=120",
-        title: "カフェのパンケーキ",
-        views: "856",
-        likes: "67",
-        date: "2024年1月12日",
-      },
-      {
-        id: 3,
-        thumbnail: "/placeholder.svg?height=120&width=120",
-        title: "ラーメンの作り方",
-        views: "2.1k",
-        likes: "134",
-        date: "2024年1月10日",
-      },
-      {
-        id: 4,
-        thumbnail: "/placeholder.svg?height=120&width=120",
-        title: "寿司職人の技",
-        views: "3.4k",
-        likes: "256",
-        date: "2024年1月8日",
-      },
-      {
-        id: 5,
-        thumbnail: "/placeholder.svg?height=120&width=120",
-        title: "イタリアンパスタ",
-        views: "945",
-        likes: "78",
-        date: "2024年1月5日",
-      },
-      {
-        id: 6,
-        thumbnail: "/placeholder.svg?height=120&width=120",
-        title: "デザート作り",
-        views: "1.8k",
-        likes: "123",
-        date: "2024年1月3日",
-      },
-    ]
-
-    return (
-      <div className="min-h-screen bg-white pb-20">
-        {/* Header */}
-        <div className="px-6 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setShowFollowers(false)
-              setShowFollowing(false)
-              setShowPosts(false)
-            }}
-            className="text-black"
-          >
-            ＜
-          </Button>
-          <h1 className="text-xl font-semibold">Misecle-Users</h1>
-        </div>
-
-        {/* Stats Tabs */}
-        <div className="px-6">
-          <div className="flex">
-            <button
-              onClick={() => setSelectedStatsTab("followers")}
-              className={`flex-1 text-center py-3 relative ${
-                selectedStatsTab === "followers" ? "text-black" : "text-gray-600"
-              }`}
-            >
-              <span className="font-medium">フォロワー</span>
-              <span className="ml-2 text-sm">128</span>
-              {selectedStatsTab === "followers" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setSelectedStatsTab("following")}
-              className={`flex-1 text-center py-3 relative ${
-                selectedStatsTab === "following" ? "text-black" : "text-gray-600"
-              }`}
-            >
-              <span className="font-medium">フォロー中</span>
-              <span className="ml-2 text-sm">56</span>
-              {selectedStatsTab === "following" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"></div>
-              )}
-            </button>
-            <button
-              onClick={() => setSelectedStatsTab("posts")}
-              className={`flex-1 text-center py-3 relative ${
-                selectedStatsTab === "posts" ? "text-black" : "text-gray-600"
-              }`}
-            >
-              <span className="font-medium">投稿数</span>
-              <span className="ml-2 text-sm">{mockUserStats.totalReviews}</span>
-              {selectedStatsTab === "posts" && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500"></div>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="px-6 py-4">
-          {selectedStatsTab === "followers" && (
-            <div className="space-y-4">
-              {mockFollowers.map((follower) => (
-                <div key={follower.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold">
-                      {follower.name.charAt(0)}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm">{follower.name}</h4>
-                      <p className="text-xs text-gray-500">{follower.username}</p>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant={follower.isFollowing ? "outline" : "default"}
-                    className={follower.isFollowing ? "bg-transparent" : "bg-orange-600 hover:bg-orange-700 text-white"}
-                  >
-                    {follower.isFollowing ? "フォロー中" : "フォローする"}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {selectedStatsTab === "following" && (
-            <div className="space-y-4">
-              {mockFollowing.map((following) => (
-                <div key={following.id} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold">
-                      {following.name.charAt(0)}
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm">{following.name}</h4>
-                      <p className="text-xs text-gray-500">{following.username}</p>
-                      <p className="text-xs text-orange-600">{following.type === "restaurant" ? "店舗" : "ユーザー"}</p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline" className="bg-transparent">
-                    フォロー中
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {selectedStatsTab === "posts" && (
-            <div className="grid grid-cols-3 gap-2">
-              {mockPosts.map((post) => (
-                <div
-                  key={post.id}
-                  className="relative aspect-[9/16] bg-gray-200 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
-                >
-                  <video src="/placeholder-video.mp4" className="w-full h-full object-cover" muted loop playsInline />
-                  <div className="absolute inset-0 bg-black bg-opacity-20"></div>
-                  <div className="absolute bottom-2 left-2 right-2">
-                    <p className="text-white text-xs font-medium line-clamp-2 mb-1">{post.title}</p>
-                    <div className="flex items-center justify-between text-white text-xs">
-                      <span>{post.views} 回再生</span>
-                      <span>♡ {post.likes}</span>
-                    </div>
-                  </div>
-                  {/* Play icon overlay */}
-                  <div className="absolute top-2 right-2">
-                    <div className="w-6 h-6 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
-                      <div className="w-0 h-0 border-l-[6px] border-l-white border-t-[3px] border-t-transparent border-b-[3px] border-b-transparent ml-0.5"></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <Navigation />
-      </div>
-    )
-  }
-
-  if (showNotificationPermission) {
-    return (
-      <div className="min-h-screen bg-white pb-20">
-        <div className="px-6 py-4 flex items-center gap-4">
-          <Button variant="ghost" onClick={() => setShowNotificationPermission(false)} className="text-black">
-            ＜
-          </Button>
-          <h1 className="text-xl font-semibold">通知設定</h1>
-        </div>
-
-        <div className="px-6 py-4 space-y-6">
-          <div className="text-center space-y-6">
-            <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Bell className="w-10 h-10 text-orange-600" />
-            </div>
-
-            <div className="space-y-3">
-              <h2 className="text-xl font-semibold text-gray-800">ミセクルからのお知らせを許可しますか？</h2>
-              <p className="text-sm text-gray-600 leading-relaxed">
-                新しい店舗情報、お得なクーポン、予約確認などの重要な通知をお送りします。 いつでも設定から変更できます。
-              </p>
-            </div>
-
-            <div className="space-y-3">
-              <Button
-                onClick={() => {
-                  // Here you would typically request notification permission
-                  // navigator.serviceWorker.ready.then(registration => {
-                  //   return registration.pushManager.subscribe({...})
-                  // })
-                  alert("通知を許可しました！")
-                  setShowNotificationPermission(false)
-                }}
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold"
-              >
-                許可する
-              </Button>
-
-              <Button
-                variant="outline"
-                onClick={() => {
-                  alert("通知を許可しませんでした。後で設定から変更できます。")
-                  setShowNotificationPermission(false)
-                }}
-                className="w-full py-3 text-lg font-semibold"
-              >
-                後で決める
-              </Button>
-            </div>
-
-            <p className="text-xs text-gray-500">※ 端末の設定からも通知のオン・オフを変更できます</p>
-          </div>
-        </div>
-
-        <Navigation />
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-white pb-20">
       <div className="bg-white px-6 py-4">
-        {/* Updated Header Section */}
         <div className="relative flex items-center justify-center">
           <h1 className="text-xl font-semibold">マイページ</h1>
         </div>
       </div>
 
       <div className="px-6 py-4 space-y-4 bg-white">
-        {/* User Profile Card */}
+        {/* User Profile Card - データベースから取得した情報を表示 */}
         <div className="p-8">
           <div className="flex flex-col items-center justify-center gap-4">
             <div className="flex items-center justify-center gap-4">
               <img
-                src="/images/misecle-mascot.png"
+                src={userProfile?.avatar_url || "/images/misecle-mascot.png"}
                 alt="Profile Icon"
                 className="w-24 h-24 rounded-full object-cover"
               />
               <div>
-                <h3 className="font-semibold text-xl">Misecle_Users</h3>
+                <h3 className="font-semibold text-xl">{userProfile?.username || "ユーザー"}</h3>
+                <p className="text-gray-600 text-sm">{userProfile?.name || ""}</p>
               </div>
             </div>
             <Button
