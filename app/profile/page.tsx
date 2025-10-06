@@ -1,16 +1,19 @@
 "use client"
 import { Button } from "@/components/ui/button"
-import { Star, Settings, Store, Bell, Shield, HelpCircle } from "lucide-react"
+import { Star, Settings, Store, Bell, Shield, HelpCircle, CheckCircle } from "lucide-react"
 import Navigation from "@/components/navigation"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { mockUserStats } from "@/lib/mock-data"
 import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { sendSupportInquiryAction, sendBugReportAction } from "@/app/actions/email-actions"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ProfilePage() {
   const router = useRouter()
   const { signOut } = useAuth()
+  const { toast } = useToast()
   const { userProfile, loading, error, updateProfile } = useUserProfile()
   const [showReviews, setShowReviews] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
@@ -47,6 +50,8 @@ export default function ProfilePage() {
 
   // Add a new state variable for showing the notification permission modal
   const [showNotificationPermission, setShowNotificationPermission] = useState(false)
+  const [contactSending, setContactSending] = useState(false)
+  const [bugSending, setBugSending] = useState(false)
 
   // Add new state variables for gender and age selection
   const [showGenderAgeModal, setShowGenderAgeModal] = useState(false)
@@ -57,6 +62,11 @@ export default function ProfilePage() {
   const [editedName, setEditedName] = useState("")
   const [editedUsername, setEditedUsername] = useState("")
   const [isUpdating, setIsUpdating] = useState(false)
+
+  // メール送信完了メッセージ用のstate
+  const [showEmailSuccess, setShowEmailSuccess] = useState(false)
+  const [emailSuccessMessage, setEmailSuccessMessage] = useState("")
+  const [emailSuccessType, setEmailSuccessType] = useState<"contact" | "bug">("contact")
 
   // プロフィールデータの初期化
   useState(() => {
@@ -69,9 +79,22 @@ export default function ProfilePage() {
   }, [userProfile])
 
   // プロフィールが存在しない場合の処理
-  if (error === 'PROFILE_NOT_FOUND') {
-    router.push('/register')
-    return null
+  useEffect(() => {
+    if (error === 'PROFILE_NOT_FOUND') {
+      router.push('/register')
+    }
+  }, [error, router])
+
+  // メール送信成功メッセージの表示関数
+  const showEmailSuccessMessage = (type: "contact" | "bug", message: string) => {
+    setEmailSuccessType(type)
+    setEmailSuccessMessage(message)
+    setShowEmailSuccess(true)
+    
+    // 5秒後に自動的に非表示
+    setTimeout(() => {
+      setShowEmailSuccess(false)
+    }, 5000)
   }
 
   // プロフィール編集画面を開く際の処理
@@ -94,6 +117,64 @@ export default function ProfilePage() {
       setSelectedAge(userProfile.age || "")
     }
     setShowGenderAgeModal(true)
+  }
+
+  // メール送信成功画面
+  if (showEmailSuccess) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-6 pb-20">
+        <div className="text-center space-y-6 max-w-md mx-auto">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle className="w-12 h-12 text-green-600" />
+          </div>
+          
+          <div className="space-y-3">
+            <h2 className="text-2xl font-bold text-gray-900">送信完了</h2>
+            <p className="text-gray-600 leading-relaxed">
+              {emailSuccessMessage}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <p className="text-sm text-blue-800">
+                {emailSuccessType === "contact" 
+                  ? "お問い合わせ内容を確認後、必要に応じてご連絡いたします。"
+                  : "開発チームが内容を確認し、アプリの改善に活用させていただきます。"
+                }
+              </p>
+            </div>
+
+            <Button
+              onClick={() => {
+                setShowEmailSuccess(false)
+                if (emailSuccessType === "contact") {
+                  setShowContactForm(false)
+                } else {
+                  setShowBugReportForm(false)
+                }
+              }}
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold"
+            >
+              マイページに戻る
+            </Button>
+
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowEmailSuccess(false)
+                // フォームをそのまま表示（別のメッセージを送信したい場合）
+              }}
+              className="w-full py-3 text-lg font-semibold"
+            >
+              {emailSuccessType === "contact" ? "別のお問い合わせを送信" : "別の報告を送信"}
+            </Button>
+          </div>
+        </div>
+        
+        <Navigation />
+      </div>
+    )
   }
 
   const visitHistory = [
@@ -1123,6 +1204,43 @@ export default function ProfilePage() {
   }
 
   if (showContactForm) {
+    async function handleContactSubmit(e: React.FormEvent<HTMLFormElement>) {
+      e.preventDefault()
+      if (contactSending) return
+      const formEl = e.currentTarget          
+      setContactSending(true)
+      try {
+        const form = new FormData(formEl)
+        const name = (form.get("name") as string) || ""
+        const email = (form.get("email") as string) || ""
+        const category = (form.get("category") as string) || ""
+        const message = (form.get("message") as string) || ""
+        const res = await sendSupportInquiryAction({ name, email, category, message })
+        if (res.success) {
+          formEl.reset()
+          showEmailSuccessMessage(
+            "contact",
+            "お問い合わせを正常に送信いたしました。内容を確認次第、ご登録いただいたメールアドレスにご連絡いたします。"
+          )
+        } else {
+          toast({
+            title: "送信失敗",
+            description: res.error || "エラーが発生しました。",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Contact form error:", error)
+        toast({
+          title: "送信失敗",
+          description: "予期しないエラーが発生しました。",
+          variant: "destructive",
+        })
+      } finally {
+        setContactSending(false)
+      }
+    }
+    
     return (
       <div className="min-h-screen bg-white pb-20">
         <div className="px-6 py-4 flex items-center gap-4">
@@ -1134,17 +1252,13 @@ export default function ProfilePage() {
 
         <div className="px-6 py-4 space-y-6">
           <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              // Here you would typically send the form data to your backend
-              // which would then send an email to support@newce.co.jp
-              alert("お問い合わせを送信しました。support@newce.co.jpに届きます。")
-            }}
+            onSubmit={handleContactSubmit}
             className="space-y-4"
           >
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">お名前</label>
               <input
+                name="name"
                 type="text"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 placeholder="お名前を入力してください"
@@ -1154,6 +1268,7 @@ export default function ProfilePage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">メールアドレス</label>
               <input
+                name="email"
                 type="email"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 placeholder="メールアドレスを入力してください"
@@ -1162,7 +1277,7 @@ export default function ProfilePage() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">お問い合わせ種別</label>
-              <select className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+              <select name="category" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
                 <option value="">選択してください</option>
                 <option value="bug">アプリの不具合</option>
                 <option value="store">店舗情報について</option>
@@ -1174,9 +1289,11 @@ export default function ProfilePage() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">お問い合わせ内容</label>
               <textarea
+                name="message"
                 rows={6}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 placeholder="お問い合わせ内容を詳しくご記入ください"
+                required
               />
               <p className="text-xs text-gray-500 mt-2">※ お問い合わせは support@newce.co.jp に送信されます</p>
             </div>
@@ -1197,9 +1314,10 @@ export default function ProfilePage() {
 
             <Button
               type="submit"
+              disabled={contactSending}
               className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold"
             >
-              送信する
+              {contactSending ? "送信中..." : "送信する"}
             </Button>
           </form>
         </div>
@@ -1210,6 +1328,43 @@ export default function ProfilePage() {
   }
 
   if (showBugReportForm) {
+    async function handleBugSubmit(e: React.FormEvent<HTMLFormElement>) {
+      e.preventDefault()
+      if (bugSending) return
+      const formEl = e.currentTarget
+      setBugSending(true)
+      try {
+        const form = new FormData(formEl)
+        const message = (form.get("bugMessage") as string) || ""
+        console.log("Sending bug report:", { message })
+        const res = await sendBugReportAction({ message })
+        console.log("Bug report response:", res.success)
+        if (res.success) {
+          formEl.reset()
+          console.log("Bug report sent successfully")
+          showEmailSuccessMessage(
+            "bug",
+            "不具合・改善要望を正常に送信いたしました。開発チームが内容を確認し、アプリの改善に活用させていただきます。"
+          )
+        } else {
+          toast({
+            title: "送信失敗",
+            description: res.error || "エラーが発生しました。",
+            variant: "destructive",
+          })
+        }
+      } catch (error) {
+        console.error("Bug report error:", error)
+        toast({
+          title: "送信失敗",
+          description: "予期しないエラーが発生しました。",
+          variant: "destructive",
+        })  
+      } finally {
+        setBugSending(false)
+      }
+    }
+
     return (
       <div className="min-h-screen bg-white pb-20">
         <div className="px-6 py-4 flex items-center gap-4">
@@ -1236,20 +1391,17 @@ export default function ProfilePage() {
             </p>
 
             <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                // Here you would typically send the form data to your backend
-                // which would then send an email to support@newce.co.jp
-                alert("不具合・改善要望を送信しました。support@newce.co.jpに届きます。")
-              }}
+              onSubmit={handleBugSubmit}
               className="space-y-4"
             >
               <div className="bg-gray-200 p-6 rounded-lg">
                 <div className="bg-white rounded-md">
                   <textarea
+                    name="bugMessage"
                     rows={8}
                     className="w-full px-4 py-3 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
                     placeholder="こちらにご記入ください..."
+                    required
                   />
                 </div>
               </div>
@@ -1262,9 +1414,10 @@ export default function ProfilePage() {
 
               <Button
                 type="submit"
+                disabled={bugSending}
                 className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold"
               >
-                送信する
+                {bugSending ? "送信中..." : "メッセージの送信"}
               </Button>
             </form>
           </div>
