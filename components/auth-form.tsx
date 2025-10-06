@@ -2,12 +2,12 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Eye, EyeOff, Lock, ArrowLeft, Check, X, User } from "lucide-react"
+import { Eye, EyeOff, Lock, ArrowLeft, Check, X, User, Mail } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 
 export function AuthForm() {
@@ -15,14 +15,12 @@ export function AuthForm() {
   const [showPassword, setShowPassword] = useState(false)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   const [showRegistration, setShowRegistration] = useState(false)
-  const [showNameSetup, setShowNameSetup] = useState(false) // Added name setup state
-  const [showIconSetup, setShowIconSetup] = useState(false)
-  const [showPhotoOptions, setShowPhotoOptions] = useState(false) // Added photo options state
-  const [showSurvey, setShowSurvey] = useState(false)
+  const [showEmailVerification, setShowEmailVerification] = useState(false) // メール認証画面
   const [registrationStep, setRegistrationStep] = useState<1 | 2>(1)
   const [resetMethod, setResetMethod] = useState<"username" | "phone">("username")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+  const [pendingEmail, setPendingEmail] = useState("") // 認証待ちのメールアドレス
   const [formData, setFormData] = useState({
     loginField: "",
     password: "",
@@ -34,15 +32,28 @@ export function AuthForm() {
     contact: "",
     password: "",
   })
-  const [nameData, setNameData] = useState({
-    name: "",
-    username: "",
-  })
-  const [surveyData, setSurveyData] = useState({
-    gender: "",
-    age: "",
-  })
-  const [iconChoice, setIconChoice] = useState("")
+
+  // URL パラメータをチェックして認証フローを処理
+  useEffect(() => {
+    const handleAuthFlow = async () => {
+      // URLハッシュから認証情報を取得
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      const accessToken = hashParams.get('access_token')
+      const type = hashParams.get('type')
+
+      console.log('AuthForm: URL parameters:', { type, accessToken: !!accessToken })
+
+      if (type === 'signup' && accessToken) {
+        console.log('AuthForm: Email verification detected, redirecting to register page')
+        
+        // /registerページにリダイレクト（ハッシュパラメータを含む）
+        router.push(`/register${window.location.hash}`)
+        return
+      }
+    }
+
+    handleAuthFlow()
+  }, [router])
 
   const validatePassword = (password: string) => {
     return {
@@ -64,14 +75,6 @@ export function AuthForm() {
 
   const handleRegistrationInputChange = (field: string, value: string) => {
     setRegistrationData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleSurveyInputChange = (field: string, value: string) => {
-    setSurveyData((prev) => ({ ...prev, [field]: value }))
-  }
-
-  const handleNameInputChange = (field: string, value: string) => {
-    setNameData((prev) => ({ ...prev, [field]: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,60 +153,61 @@ export function AuthForm() {
         throw new Error("現在はメールアドレスでの登録のみサポートしています")
       }
 
+      console.log("Attempting to sign up with:", registrationData.contact)
+
       const { data, error } = await supabase.auth.signUp({
         email: registrationData.contact,
         password: registrationData.password,
+        options: {
+          // リダイレクト先を/registerページに設定
+          emailRedirectTo: `${window.location.origin}/register`
+        }
       })
+
+      console.log("Sign up result:", { data, error })
 
       if (error) throw error
 
-      // ユーザープロフィールの作成は後で行う
-      setShowNameSetup(true)
+      if (!data.user) {
+        throw new Error("ユーザー登録に失敗しました")
+      }
+
+      // メール確認が必要な場合
+      if (!data.session && data.user && !data.user.email_confirmed_at) {
+        console.log("Email verification required")
+        setPendingEmail(registrationData.contact)
+        setShowEmailVerification(true)
+        setShowRegistration(false)
+        return
+      }
+
+      // メール確認が不要な場合（自動確認設定の場合）
+      console.log("Registration completed, proceeding to name setup")
       setShowRegistration(false)
     } catch (error: any) {
+      console.error("Registration error:", error)
       setError(error.message)
     } finally {
       setLoading(false)
     }
   }
 
-  const handleNameSetupComplete = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (nameData.name && nameData.username) {
-      setShowIconSetup(true)
-      setShowNameSetup(false)
-    }
-  }
-
-  const handleIconSetupComplete = () => {
-    console.log("Icon setup completed:", iconChoice)
-    setShowSurvey(true)
-    setShowIconSetup(false)
-  }
-
-  const handleSurveyComplete = async () => {
+  const handleResendVerificationEmail = async () => {
     setLoading(true)
     setError("")
 
     try {
-      // 現在のユーザーを取得
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
-        // ユーザープロフィールを作成
-        const { error } = await supabase.from("user_profiles").insert({
-          id: user.id,
-          name: nameData.name,
-          username: nameData.username,
-          gender: surveyData.gender,
-          age: surveyData.age,
-        })
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: pendingEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}${window.location.pathname}`
+        }
+      })
 
-        if (error) throw error
-      }
+      if (error) throw error
 
-      // メインアプリに移動
-      router.push("/search")
+      alert("確認メールを再送信しました")
     } catch (error: any) {
       setError(error.message)
     } finally {
@@ -214,164 +218,45 @@ export function AuthForm() {
   const passwordValidation = registrationStep === 2 ? validatePassword(registrationData.password) : null
   const isPasswordValid = passwordValidation ? Object.values(passwordValidation).every(Boolean) : false
 
-  if (showNameSetup) {
+  // メール認証画面
+  if (showEmailVerification) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-foreground mb-8">プロフィールの設定</h2>
-          </div>
-
-          <Card className="bg-white border-0 shadow-none">
-            <CardContent className="space-y-6 pt-6">
-              <form onSubmit={handleNameSetupComplete} className="space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="name" className="block text-sm font-medium text-foreground">
-                    名前
-                  </label>
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="ミセクルユーザー"
-                    value={nameData.name}
-                    onChange={(e) => handleNameInputChange("name", e.target.value)}
-                    className="h-12"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="username" className="block text-sm font-medium text-foreground">
-                    ユーザーネーム
-                  </label>
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="Misecle_Users"
-                    value={nameData.username}
-                    onChange={(e) => handleNameInputChange("username", e.target.value)}
-                    className="h-12"
-                    required
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white font-bold text-base"
-                >
-                  次へ
-                </Button>
-              </form>
-
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => {
-                    setShowNameSetup(false)
-                    setShowRegistration(true)
-                    setRegistrationStep(2)
-                    setNameData({ name: "", username: "" })
-                  }}
-                  className="text-muted-foreground hover:text-foreground p-0 h-auto font-normal flex items-center gap-1"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  戻る
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Footer */}
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">
-              from
+            <div className="flex justify-center mb-4">
+              <Mail className="h-12 w-12 text-orange-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-foreground mb-4">メールを確認してください</h2>
+            <p className="text-muted-foreground">
+              <span className="font-medium">{pendingEmail}</span>
               <br />
-              <span className="font-medium">Newce</span>
+              に確認メールを送信しました
             </p>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Icon setup screen
-  if (showIconSetup) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-foreground mb-8">アイコンの設定</h2>
-          </div>
 
           <Card className="bg-white border-0 shadow-none">
             <CardContent className="space-y-6 pt-6">
-              {/* Circular icon placeholder */}
-              <div className="flex flex-col items-center space-y-6">
-                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
-                  <User className="w-12 h-12 text-gray-400" />
+              <div className="space-y-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  メール内のリンクをクリックして、アカウントの確認を完了してください。
+                </p>
+                
+                <div className="space-y-3">
+                  <Button
+                    type="button"
+                    onClick={handleResendVerificationEmail}
+                    disabled={loading}
+                    variant="outline"
+                    className="w-full h-12 border-orange-500 text-orange-500 hover:bg-orange-50"
+                  >
+                    {loading ? "送信中..." : "確認メールを再送信"}
+                  </Button>
+
+                  {error && (
+                    <div className="text-red-500 text-sm text-center">{error}</div>
+                  )}
                 </div>
-
-                {!showPhotoOptions ? (
-                  <div className="space-y-4 w-full">
-                    <button
-                      type="button"
-                      onClick={() => setShowPhotoOptions(true)}
-                      className="w-full text-center py-3 text-orange-500 hover:text-orange-600 font-medium text-base transition-colors"
-                    >
-                      プロフィール写真を設定
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setIconChoice("later")}
-                      className="w-full text-center py-3 text-orange-500 hover:text-orange-600 font-medium text-base transition-colors"
-                    >
-                      後で設定する
-                    </button>
-
-                    <Button
-                      type="button"
-                      onClick={handleIconSetupComplete}
-                      disabled={!iconChoice}
-                      className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white font-bold text-base disabled:bg-gray-300 disabled:text-gray-500"
-                    >
-                      次へ
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4 w-full">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIconChoice("preset")
-                        setShowPhotoOptions(false)
-                      }}
-                      className="w-full text-center py-3 text-orange-500 hover:text-orange-600 font-medium text-base transition-colors"
-                    >
-                      写真から選ぶ
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIconChoice("upload")
-                        setShowPhotoOptions(false)
-                      }}
-                      className="w-full text-center py-3 text-orange-500 hover:text-orange-600 font-medium text-base transition-colors"
-                    >
-                      ファイルから選ぶ
-                    </button>
-
-                    <Button
-                      type="button"
-                      onClick={() => setShowPhotoOptions(false)}
-                      className="w-full h-12 bg-gray-300 hover:bg-gray-400 text-gray-700 font-bold text-base"
-                    >
-                      戻る
-                    </Button>
-                  </div>
-                )}
               </div>
 
               <div className="flex justify-center">
@@ -379,116 +264,18 @@ export function AuthForm() {
                   type="button"
                   variant="link"
                   onClick={() => {
-                    setShowIconSetup(false)
-                    setShowNameSetup(true)
-                    setIconChoice("")
+                    // 最初のログイン画面に戻る
+                    setShowEmailVerification(false)
+                    setShowRegistration(false)
+                    setRegistrationStep(1)
+                    setPendingEmail("")
+                    setRegistrationData({ contact: "", password: "" })
+                    setError("")
                   }}
                   className="text-muted-foreground hover:text-foreground p-0 h-auto font-normal flex items-center gap-1"
                 >
                   <ArrowLeft className="h-4 w-4" />
-                  戻る
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Footer */}
-          <div className="text-center">
-            <p className="text-sm text-muted-foreground">
-              from
-              <br />
-              <span className="font-medium">Newce</span>
-            </p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (showSurvey) {
-    return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md space-y-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-foreground mb-8">性別と年齢を設定する</h2>
-          </div>
-
-          <Card className="bg-white border-0 shadow-none">
-            <CardContent className="space-y-6 pt-6">
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-foreground">性別</h3>
-                  <div className="space-y-3">
-                    {["男性", "女性", "その他"].map((gender) => (
-                      <button
-                        key={gender}
-                        type="button"
-                        onClick={() => handleSurveyInputChange("gender", gender)}
-                        className="w-full flex items-center gap-3 p-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
-                      >
-                        <div
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            surveyData.gender === gender ? "border-orange-500 bg-orange-500" : "border-gray-300"
-                          }`}
-                        >
-                          {surveyData.gender === gender && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                        </div>
-                        <span className="text-base text-foreground">{gender}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <h3 className="text-lg font-semibold text-foreground">年齢</h3>
-                  <div className="space-y-3">
-                    {["10代", "20代", "30代", "40代", "50代以上"].map((age) => (
-                      <button
-                        key={age}
-                        type="button"
-                        onClick={() => handleSurveyInputChange("age", age)}
-                        className="w-full flex items-center gap-3 p-2 text-left hover:bg-gray-50 rounded-lg transition-colors"
-                      >
-                        <div
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            surveyData.age === age ? "border-orange-500 bg-orange-500" : "border-gray-300"
-                          }`}
-                        >
-                          {surveyData.age === age && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                        </div>
-                        <span className="text-base text-foreground">{age}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {error && (
-                  <div className="text-red-500 text-sm text-center">{error}</div>
-                )}
-
-                <Button
-                  type="button"
-                  onClick={handleSurveyComplete}
-                  disabled={!surveyData.gender || !surveyData.age || loading}
-                  className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white font-bold text-base disabled:bg-gray-300 disabled:text-gray-500"
-                >
-                  {loading ? "作成中..." : "アカウントを作成"}
-                </Button>
-              </div>
-
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => {
-                    setShowSurvey(false)
-                    setShowIconSetup(true)
-                    setSurveyData({ gender: "", age: "" })
-                  }}
-                  className="text-muted-foreground hover:text-foreground p-0 h-auto font-normal flex items-center gap-1"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  戻る
+                  ログイン画面に戻る
                 </Button>
               </div>
             </CardContent>
@@ -525,7 +312,7 @@ export function AuthForm() {
                     <Input
                       id="contact"
                       type="text"
-                      placeholder="電話番号、またはメールアドレス"
+                      placeholder="メールアドレス"
                       value={registrationData.contact}
                       onChange={(e) => handleRegistrationInputChange("contact", e.target.value)}
                       className="h-12"
@@ -700,7 +487,7 @@ export function AuthForm() {
           <Card className="bg-white border-0 shadow-none">
             <CardContent className="space-y-6 pt-6">
               {/* Method Toggle */}
-              <div className="flex justify-center space-x-8">
+              {/* <div className="flex justify-center space-x-8">
                 <button
                   type="button"
                   onClick={() => setResetMethod("username")}
@@ -719,7 +506,7 @@ export function AuthForm() {
                 >
                   電話番号
                 </button>
-              </div>
+              </div> */}
 
               <form onSubmit={handlePasswordResetSubmit} className="space-y-4">
                 <div className="space-y-2">
@@ -775,7 +562,7 @@ export function AuthForm() {
         {/* Logo/Title */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-3 mb-8">
-            <img src="/images/misecle-logo.png" alt="Misecle Logo" className="w-12 h-12" />
+            <img src="/images/misecle-mascot.png" alt="Misecle Logo" className="w-12 h-12" />
             <h1 className="text-5xl font-bold text-foreground">Misecle</h1>
           </div>
         </div>
@@ -790,7 +577,7 @@ export function AuthForm() {
                 <Input
                   id="loginField"
                   type="text"
-                  placeholder="電話番号、またはメールアドレス"
+                  placeholder="メールアドレス"
                   value={formData.loginField}
                   onChange={(e) => handleInputChange("loginField", e.target.value)}
                   className="h-12"
@@ -856,7 +643,7 @@ export function AuthForm() {
                   className="text-orange-500 hover:text-orange-600 p-0 h-auto font-normal"
                   onClick={() => setShowRegistration(true)}
                 >
-                  登録する
+                  新規登録
                 </Button>
               </div>
             </form>
