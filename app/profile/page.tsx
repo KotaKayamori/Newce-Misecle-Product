@@ -1,6 +1,9 @@
 "use client"
 import { Button } from "@/components/ui/button"
-import { Star, Settings, Store, Bell, Shield, HelpCircle, CheckCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import VideoUploader from "@/components/uploader/VideoUploader"
+import MyVideosPanel from "@/components/my-videos/MyVideosPanel"
+import { Star, Settings, Store, Bell, Shield, HelpCircle, CheckCircle, Upload, Play } from "lucide-react"
 import Navigation from "@/components/navigation"
 import { useState, useEffect } from "react"
 import { mockUserStats } from "@/lib/mock-data"
@@ -57,6 +60,10 @@ export default function ProfilePage() {
   const [showGenderAgeModal, setShowGenderAgeModal] = useState(false)
   const [selectedGender, setSelectedGender] = useState("")
   const [selectedAge, setSelectedAge] = useState("")
+
+  // 動画アップロード/自分の動画 モーダル
+  const [showUploadModal, setShowUploadModal] = useState(false)
+  const [showMyVideosModal, setShowMyVideosModal] = useState(false)
 
   // プロフィール編集用のstate
   const [editedName, setEditedName] = useState("")
@@ -356,6 +363,8 @@ export default function ProfilePage() {
     {
       category: "アカウント",
       items: [
+        { icon: Upload, label: "動画をアップロード", onClick: () => setShowUploadModal(true) },
+        { icon: Play, label: "自分の動画", onClick: () => setShowMyVideosModal(true) },
         { icon: Settings, label: "パスワード設定", onClick: () => setShowAccountSettings(true) },
         { icon: Settings, label: "ログアウト", onClick: () => handleLogout() },
       ],
@@ -2304,6 +2313,26 @@ export default function ProfilePage() {
       </div>
 
       <Navigation />
+
+      {/* 動画アップロード モーダル */}
+      <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
+        <DialogContent className="sm:max-w-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>動画をアップロード</DialogTitle>
+          </DialogHeader>
+          <VideoUploader />
+        </DialogContent>
+      </Dialog>
+
+      {/* 自分の動画 モーダル */}
+      <Dialog open={showMyVideosModal} onOpenChange={setShowMyVideosModal}>
+        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle>自分の動画</DialogTitle>
+          </DialogHeader>
+          <MyVideosPanel />
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
