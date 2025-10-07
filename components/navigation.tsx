@@ -10,7 +10,7 @@ export default function Navigation() {
   const navItems = [
     { label: "探す", icon: Search, href: "/search" },
     { label: "予約履歴", icon: Calendar, href: "/reservations" },
-    { label: "動画", icon: Play, href: "/bookmarks" },
+    { label: "動画", icon: Play, href: "/reels" },
     { label: "お気に入り", icon: Heart, href: "/favorites" },
     { label: "マイページ", icon: User, href: "/profile" },
   ]
@@ -26,7 +26,7 @@ export default function Navigation() {
             <Link
               key={item.href}
               href={item.href}
-              prefetch={true}
+              prefetch={false}
               scroll={false}
               replace={false}
               className={`flex-1 flex flex-col items-center py-2 px-1 transition-colors duration-150 ${
