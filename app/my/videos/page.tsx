@@ -66,30 +66,18 @@ export default function MyVideosPage() {
   const handleDelete = async (item: Item) => {
     if (!confirm("この動画を削除しますか？")) return
     try {
-      // Ensure authenticated and get user id (extra guard in addition to RLS)
       const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (!user) throw new Error("ログインが必要です")
-
-      // 1) Delete DB row first (SSOT: public.videos) and return storage_path
-      const { data: deleted, error: delErr } = await supabase
-        .from("videos")
-        .delete()
-        .eq("id", item.id)
-        .eq("owner_id", user.id)
-        .select("storage_path")
-        .single()
-      if (delErr) throw delErr
-
-      // 2) Remove storage object (best effort)
-      const storagePath = (deleted as any)?.storage_path as string | undefined
-      if (storagePath) {
-        const { error: rmErr } = await supabase.storage.from("videos").remove([storagePath])
-        if (rmErr) console.warn("storage remove failed", rmErr)
+        data: { session },
+      } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const res = await fetch(`/api/videos/${item.id}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j?.error || `削除に失敗しました (${res.status})`)
       }
-
-      // 3) Update local state
       setItems((prev) => prev.filter((x) => x.id !== item.id))
     } catch (e: any) {
       alert(e?.message || "削除に失敗しました")

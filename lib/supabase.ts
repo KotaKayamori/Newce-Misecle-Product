@@ -1,20 +1,9 @@
 import { createClient } from "@supabase/supabase-js"
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // Prevent hard crash in local/dev without env vars
-  // The app will use mock data paths when requests fail.
-  console.warn(
-    "[Misecle] NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY are not set. Using placeholder keys; features requiring Supabase may not work. Configure .env.local to remove this warning.",
-  )
-}
-
-export const supabase = createClient(
-  supabaseUrl ?? "https://example.supabase.co",
-  supabaseAnonKey ?? "public-anon-key",
-)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Database types
 export type Restaurant = {
