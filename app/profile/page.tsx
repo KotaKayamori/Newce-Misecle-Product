@@ -85,12 +85,12 @@ export default function ProfilePage() {
   const [uploadProgress, setUploadProgress] = useState<number>(0)
 
   // プロフィールデータの初期化
-  useState(() => {
+  useEffect(() => {
     if (userProfile) {
-      setEditedName(userProfile.name)
-      setEditedUsername(userProfile.username)
-      setSelectedGender(userProfile.gender)
-      setSelectedAge(userProfile.age)
+      setEditedName(userProfile.name || "")
+      setEditedUsername(userProfile.username || "")
+      setSelectedGender(userProfile.gender || "")
+      setSelectedAge(userProfile.age || "")
     }
   }, [userProfile])
 
@@ -435,6 +435,65 @@ export default function ProfilePage() {
       })
     } finally {
       setIsUpdating(false)
+    }
+  }
+
+  const handleSaveGenderAge = async () => {
+    const updates: any = {
+      gender: selectedGender,
+      age: selectedAge,
+    }
+
+    if (!updates.gender || !updates.age) {
+      toast({
+        title: "入力エラー",
+        description: "性別と年齢を選択してください",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsUpdating(true)
+    
+    try {
+      // プロフィール情報を更新
+      const success = await updateProfile(updates)
+      
+      if (success) {
+        toast({
+          title: "更新完了",
+          description: "性別と年齢を更新しました",
+        })
+        
+        setShowGenderAgeModal(false)
+      }
+    } catch (error) {
+      console.error('Gender/Age update error:', error)
+      toast({
+        title: "更新エラー",
+        description: "性別と年齢の更新に失敗しました",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleLogout = () => {
+    setShowLogoutConfirmation(true)
+  }
+
+  const confirmLogout = async () => {
+    try {
+      await signOut()
+      router.push('/')
+    } catch (error) {
+      console.error('Logout error:', error)
+      toast({
+        title: "ログアウトエラー",
+        description: "ログアウトに失敗しました",
+        variant: "destructive",
+      })
     }
   }
 
