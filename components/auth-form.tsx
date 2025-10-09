@@ -1,26 +1,32 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
-import { Eye, EyeOff, Lock, ArrowLeft, Check, X, User, Mail } from "lucide-react"
+import { Eye, EyeOff, Lock, ArrowLeft, Check, X, User, Mail, AlertCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase"
+import { checkEmailExistsRPC } from "@/lib/api/auth"
 
 export function AuthForm() {
   const router = useRouter()
   const [showPassword, setShowPassword] = useState(false)
   const [showPasswordReset, setShowPasswordReset] = useState(false)
   const [showRegistration, setShowRegistration] = useState(false)
-  const [showEmailVerification, setShowEmailVerification] = useState(false) // メール認証画面
+  const [showEmailVerification, setShowEmailVerification] = useState(false)
   const [registrationStep, setRegistrationStep] = useState<1 | 2>(1)
   const [resetMethod, setResetMethod] = useState<"username" | "phone">("username")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
-  const [pendingEmail, setPendingEmail] = useState("") // 認証待ちのメールアドレス
+  const [pendingEmail, setPendingEmail] = useState("")
+  
+  // メールアドレス重複チェック用のstate
+  const [emailCheckLoading, setEmailCheckLoading] = useState(false)
+  const [emailExists, setEmailExists] = useState(false)
+  const [emailCheckComplete, setEmailCheckComplete] = useState(false)
+
   const [formData, setFormData] = useState({
     loginField: "",
     password: "",
@@ -36,7 +42,6 @@ export function AuthForm() {
   // URL パラメータをチェックして認証フローを処理
   useEffect(() => {
     const handleAuthFlow = async () => {
-      // URLハッシュから認証情報を取得
       const hashParams = new URLSearchParams(window.location.hash.substring(1))
       const accessToken = hashParams.get('access_token')
       const type = hashParams.get('type')
@@ -45,8 +50,6 @@ export function AuthForm() {
 
       if (type === 'signup' && accessToken) {
         console.log('AuthForm: Email verification detected, redirecting to register page')
-        
-        // /registerページにリダイレクト（ハッシュパラメータを含む）
         router.push(`/register${window.location.hash}`)
         return
       }
@@ -54,6 +57,39 @@ export function AuthForm() {
 
     handleAuthFlow()
   }, [router])
+
+  // メールアドレス重複チェック用のuseEffect
+  useEffect(() => {
+    const checkEmailDuplicate = async () => {
+      const email = registrationData.contact.trim()
+      
+      // メールアドレス形式でない場合はチェックしない
+      if (!email || !email.includes('@')) {
+        setEmailExists(false)
+        setEmailCheckComplete(false)
+        return
+      }
+
+      setEmailCheckLoading(true)
+      setEmailCheckComplete(false)
+
+      try {
+        const exists = await checkEmailExistsRPC(email)
+        setEmailExists(exists)
+        setEmailCheckComplete(true)
+      } catch (error) {
+        console.error('Email check failed:', error)
+        setEmailExists(false)
+        setEmailCheckComplete(false)
+      } finally {
+        setEmailCheckLoading(false)
+      }
+    }
+
+    // デバウンス処理（500ms後に実行）
+    const timeoutId = setTimeout(checkEmailDuplicate, 500)
+    return () => clearTimeout(timeoutId)
+  }, [registrationData.contact])
 
   const validatePassword = (password: string) => {
     return {
@@ -75,6 +111,10 @@ export function AuthForm() {
 
   const handleRegistrationInputChange = (field: string, value: string) => {
     setRegistrationData((prev) => ({ ...prev, [field]: value }))
+    // エラーをクリア
+    if (field === 'contact') {
+      setError("")
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,7 +123,6 @@ export function AuthForm() {
     setError("")
 
     try {
-      // メールアドレスかどうかをチェック
       const isEmail = formData.loginField.includes("@")
       
       if (!isEmail) {
@@ -97,7 +136,6 @@ export function AuthForm() {
 
       if (error) throw error
 
-      // ログイン成功後は自動的にリダイレクトされる
       router.push("/search")
     } catch (error: any) {
       setError(error.message)
@@ -127,9 +165,33 @@ export function AuthForm() {
 
   const handleRegistrationStep1Submit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (registrationData.contact) {
-      setRegistrationStep(2)
+    
+    // メールアドレスの基本バリデーション
+    const email = registrationData.contact.trim()
+    if (!email) {
+      setError("メールアドレスを入力してください")
+      return
     }
+
+    if (!email.includes('@')) {
+      setError("有効なメールアドレスを入力してください")
+      return
+    }
+
+    // メールアドレス重複チェックが完了していない場合
+    if (emailCheckLoading) {
+      setError("メールアドレスの確認中です。しばらくお待ちください。")
+      return
+    }
+
+    // メールアドレスが既に存在する場合
+    if (emailExists) {
+      setError("このメールアドレスは既に登録されています。ログインするか、別のメールアドレスをお試しください。")
+      return
+    }
+
+    // 全てのチェックが通った場合、次のステップへ
+    setRegistrationStep(2)
   }
 
   const handleRegistrationStep2Submit = async (e: React.FormEvent) => {
@@ -142,11 +204,16 @@ export function AuthForm() {
       return
     }
 
+    // 最終的な重複チェック
+    if (emailExists) {
+      setError("このメールアドレスは既に登録されています")
+      return
+    }
+
     setLoading(true)
     setError("")
 
     try {
-      // メールアドレスかどうかをチェック
       const isEmail = registrationData.contact.includes("@")
       
       if (!isEmail) {
@@ -159,20 +226,24 @@ export function AuthForm() {
         email: registrationData.contact,
         password: registrationData.password,
         options: {
-          // リダイレクト先を/registerページに設定
           emailRedirectTo: `${window.location.origin}/register`
         }
       })
 
       console.log("Sign up result:", { data, error })
 
-      if (error) throw error
+      if (error) {
+        // Supabaseからの重複エラーもキャッチ
+        if (error.message.includes('already registered') || error.message.includes('User already registered')) {
+          throw new Error("このメールアドレスは既に登録されています。ログインするか、別のメールアドレスをお試しください。")
+        }
+        throw error
+      }
 
       if (!data.user) {
         throw new Error("ユーザー登録に失敗しました")
       }
 
-      // メール確認が必要な場合
       if (!data.session && data.user && !data.user.email_confirmed_at) {
         console.log("Email verification required")
         setPendingEmail(registrationData.contact)
@@ -181,7 +252,6 @@ export function AuthForm() {
         return
       }
 
-      // メール確認が不要な場合（自動確認設定の場合）
       console.log("Registration completed, proceeding to name setup")
       setShowRegistration(false)
     } catch (error: any) {
@@ -264,7 +334,6 @@ export function AuthForm() {
                   type="button"
                   variant="link"
                   onClick={() => {
-                    // 最初のログイン画面に戻る
                     setShowEmailVerification(false)
                     setShowRegistration(false)
                     setRegistrationStep(1)
@@ -309,27 +378,63 @@ export function AuthForm() {
               {registrationStep === 1 ? (
                 <form onSubmit={handleRegistrationStep1Submit} className="space-y-4">
                   <div className="space-y-2">
-                    <Input
-                      id="contact"
-                      type="text"
-                      placeholder="メールアドレス"
-                      value={registrationData.contact}
-                      onChange={(e) => handleRegistrationInputChange("contact", e.target.value)}
-                      className="h-12"
-                      required
-                    />
+                    <div className="relative">
+                      <Input
+                        id="contact"
+                        type="email"
+                        placeholder="メールアドレス"
+                        value={registrationData.contact}
+                        onChange={(e) => handleRegistrationInputChange("contact", e.target.value)}
+                        className="h-12"
+                        required
+                      />
+                      
+                      {/* メールアドレスチェック状態表示 */}
+                      {registrationData.contact && registrationData.contact.includes('@') && (
+                        <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                          {emailCheckLoading ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-500"></div>
+                          ) : emailCheckComplete ? (
+                            emailExists ? (
+                              <X className="h-4 w-4 text-red-500" />
+                            ) : (
+                              <Check className="h-4 w-4 text-green-500" />
+                            )
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* メールアドレス状態メッセージ */}
+                    {registrationData.contact && registrationData.contact.includes('@') && emailCheckComplete && (
+                      <div className={`text-xs ${emailExists ? 'text-red-600' : 'text-green-600'} flex items-center gap-1`}>
+                        {emailExists ? (
+                          <>
+                            <AlertCircle className="h-3 w-3" />
+                            このメールアドレスは既に登録されています
+                          </>
+                        ) : (
+                          <>
+                            <Check className="h-3 w-3" />
+                            このメールアドレスは利用可能です
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
 
-                  {error && registrationStep === 1 && (
-                    <div className="text-red-500 text-sm text-center">{error}</div>
+                  {error && (
+                    <div className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg border border-red-200">
+                      {error}
+                    </div>
                   )}
 
                   <Button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || emailCheckLoading || emailExists}
                     className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white font-bold text-base disabled:bg-gray-300 disabled:text-gray-500"
                   >
-                    {loading ? "確認中..." : "次へ"}
+                    {loading ? "確認中..." : emailCheckLoading ? "確認中..." : "次へ"}
                   </Button>
                 </form>
               ) : (
@@ -424,12 +529,14 @@ export function AuthForm() {
                   )}
 
                   {error && (
-                    <div className="text-red-500 text-sm text-center">{error}</div>
+                    <div className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg border border-red-200">
+                      {error}
+                    </div>
                   )}
 
                   <Button
                     type="submit"
-                    disabled={!isPasswordValid || loading}
+                    disabled={!isPasswordValid || loading || emailExists}
                     className="w-full h-12 bg-orange-500 hover:bg-orange-600 text-white font-bold text-base disabled:bg-gray-300 disabled:text-gray-500"
                   >
                     {loading ? "登録中..." : "次へ"}
@@ -447,8 +554,11 @@ export function AuthForm() {
                     } else {
                       setShowRegistration(false)
                       setRegistrationStep(1)
-                      setRegistrationData({ contact: "", password: "" }) // Updated reset for single contact field
+                      setRegistrationData({ contact: "", password: "" })
+                      setEmailExists(false)
+                      setEmailCheckComplete(false)
                     }
+                    setError("")
                   }}
                   className="text-muted-foreground hover:text-foreground p-0 h-auto font-normal flex items-center gap-1"
                 >
@@ -486,28 +596,6 @@ export function AuthForm() {
 
           <Card className="bg-white border-0 shadow-none">
             <CardContent className="space-y-6 pt-6">
-              {/* Method Toggle */}
-              {/* <div className="flex justify-center space-x-8">
-                <button
-                  type="button"
-                  onClick={() => setResetMethod("username")}
-                  className={`text-base font-medium text-foreground pb-3 px-2 border-b-2 transition-colors ${
-                    resetMethod === "username" ? "border-foreground" : "border-transparent"
-                  }`}
-                >
-                  メールアドレス
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setResetMethod("phone")}
-                  className={`text-base font-medium text-foreground pb-3 px-2 border-b-2 transition-colors ${
-                    resetMethod === "phone" ? "border-foreground" : "border-transparent"
-                  }`}
-                >
-                  電話番号
-                </button>
-              </div> */}
-
               <form onSubmit={handlePasswordResetSubmit} className="space-y-4">
                 <div className="space-y-2">
                   <Input
@@ -556,10 +644,10 @@ export function AuthForm() {
     )
   }
 
+  // メインログイン画面
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
-        {/* Logo/Title */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-3 mb-8">
             <img src="/images/misecle-mascot.png" alt="Misecle Logo" className="w-12 h-12" />
@@ -567,12 +655,10 @@ export function AuthForm() {
           </div>
         </div>
 
-        {/* Auth Form */}
         <Card className="bg-white border-0 shadow-none">
           <CardHeader className="space-y-1 pb-4"></CardHeader>
           <CardContent className="space-y-4">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Login Form */}
               <div className="space-y-2">
                 <Input
                   id="loginField"
@@ -650,7 +736,6 @@ export function AuthForm() {
           </CardContent>
         </Card>
 
-        {/* Footer */}
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
             from

@@ -8,14 +8,6 @@ export async function createServerClient() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
 }
 
-// export async function getCurrentUser() {
-//   const supabase = await createServerClient()
-//   const {
-//     data: { user },
-//   } = await supabase.auth.getUser()
-//   return user
-// }
-
 export async function getCurrentUser(request: NextRequest) {
   const token = request.cookies.get('sb-access-token')?.value ||
                 request.cookies.get('supabase-auth-token')?.value

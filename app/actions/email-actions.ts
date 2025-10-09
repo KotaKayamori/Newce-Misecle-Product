@@ -88,13 +88,19 @@ async function getUserProfile(userId: string) {
   }
 }
 
-// sendEmail を複数宛先対応 (to: string | string[]) に拡張し、CC なしでもまとめ送信できるよう更新
 export async function sendEmail(
   to: string | string[],
   subject: string,
   text: string,
   html?: string,
-  extra?: { cc?: string | string[] }
+  extra?: { 
+    cc?: string | string[]
+    attachments?: Array<{
+      filename: string
+      content: string
+      type: string
+    }>
+  }
 ) {
   const from = process.env.SENDGRID_VERIFIED_SENDER_EMAIL
   if (!from) {
@@ -112,10 +118,28 @@ export async function sendEmail(
     text,
     ...(html ? { html } : {}),
   }
+  
   if (extra?.cc) msg.cc = extra.cc
+  
+  // 複数添付ファイルの追加
+  if (extra?.attachments && extra.attachments.length > 0) {
+    msg.attachments = extra.attachments.map(attachment => ({
+      filename: attachment.filename,
+      content: attachment.content,
+      type: attachment.type,
+      disposition: 'attachment'
+    }))
+  }
 
-  console.log("Sending email:", { to, subject, from, cc: msg.cc })
-
+  console.log("Sending email:", { 
+    to, 
+    subject, 
+    from, 
+    cc: msg.cc,
+    attachmentCount: msg.attachments?.length || 0,
+    attachmentNames: msg.attachments?.map((a: any) => a.filename) || []
+  })
+  
   try {
     await sgMail.send(msg)
     console.log("Email sent successfully")
@@ -124,7 +148,6 @@ export async function sendEmail(
     let detail = "Failed to send email"
     if (error.response?.body) {
       console.error("SendGrid error detail:", JSON.stringify(error.response.body))
-      // 代表的に最初のエラーを抽出
       if (Array.isArray(error.response.body.errors) && error.response.body.errors[0]?.message) {
         detail = error.response.body.errors[0].message
       }
@@ -140,12 +163,18 @@ export async function sendSupportInquiryAction(params: {
   email: string
   category: string
   message: string
+  imageDataArray?: Array<{
+    filename: string
+    content: string
+    type: string
+  }> | undefined
 }) {
   console.log("Support inquiry action called with:", {
     name: params.name ? "provided" : "empty",
     email: params.email ? "provided" : "empty",
     category: params.category ? "provided" : "empty",
-    message: params.message ? `${params.message.length} chars` : "empty"
+    message: params.message ? `${params.message.length} chars` : "empty",
+    imageCount: params.imageDataArray?.length || 0
   })
 
   const support = process.env.SENDGRID_SUPPORT_EMAIL
@@ -154,30 +183,39 @@ export async function sendSupportInquiryAction(params: {
     return { success: false, error: "サポート宛メールアドレス未設定" }
   }
   
-  const { name, email, category, message } = params
+  const { name, email, category, message, imageDataArray } = params
   const subject = `【Misecle】お問い合わせを受け付けました`
+  
+  // メール本文（複数添付ファイルの情報も含める）
+  const imageInfo = imageDataArray && imageDataArray.length > 0 
+    ? `\n※ 以下の画像ファイルが添付されています：\n${imageDataArray.map((img, i) => `${i + 1}. ${img.filename}`).join('\n')}\n`
+    : ''
+  
   const body = `平素よりMisecleをご利用いただきありがとうございます。
-お問い合わせ内容を以下の通り受け付けました。
+  お問い合わせ内容を以下の通り受け付けました。
 
-お名前: ${name || "(未入力)"} 様
-メールアドレス: ${email || "(未入力)"} 
-お問い合わせ種別: ${category || "(未選択)"} 
-お問い合わせ内容:
-${message}
+  お名前: ${name || "(未入力)"} 様
+  メールアドレス: ${email || "(未入力)"} 
+  お問い合わせ種別: ${category || "(未選択)"} 
+  お問い合わせ内容:
+  ${message}${imageInfo}
 
-今後ともMisecleをよろしくお願いいたします。
+  今後ともMisecleをよろしくお願いいたします。
 
-※本メールは送信専用です。直接のご返信には対応しておりません。
-追加情報やご要望がございましたら、別途「お問い合わせ」フォームよりお送りください。
+  ※本メールは送信専用です。直接のご返信には対応しておりません。
+  追加情報やご要望がございましたら、別途「お問い合わせ」フォームよりお送りください。
 
-――――――――――――――――――
-株式会社Newce
-――――――――――――――――――`
+  ――――――――――――――――――
+  株式会社Newce
+  ――――――――――――――――――`
 
   const recipients: string[] = [support]
   if (email) recipients.push(email)
 
-  return await sendEmail(recipients, subject, body)
+  // 複数添付ファイルの準備
+  const attachments = imageDataArray && imageDataArray.length > 0 ? imageDataArray : undefined
+
+  return await sendEmail(recipients, subject, body, undefined, { attachments })
 }
 
 export async function sendBugReportAction(params: { message: string; name?: string }) {
@@ -222,20 +260,20 @@ export async function sendBugReportAction(params: { message: string; name?: stri
 
   const subject = `【Misecle】不具合・改善要望を受け付けました`
   const body = `平素よりMisecleをご利用いただきありがとうございます。
-以下の内容で不具合報告・改善要望を受け付けました。
+  以下の内容で不具合報告・改善要望を受け付けました。
 
-受付日時: ${receivedAt}
-報告者名: ${effectiveName}
-${userEmail ? `報告者メール: ${userEmail}` : ''}
-報告内容:
-${message}
+  受付日時: ${receivedAt}
+  報告者名: ${effectiveName}
+  ${userEmail ? `報告者メール: ${userEmail}` : ''}
+  報告内容:
+  ${message}
 
-※本メールは送信専用です。直接のご返信には対応しておりません。
-追加情報がございましたら、再度フォームよりご連絡ください。
+  ※本メールは送信専用です。直接のご返信には対応しておりません。
+  追加情報がございましたら、再度フォームよりご連絡ください。
 
-――――――――――――――――――
-株式会社Newce
-――――――――――――――――――`
+  ――――――――――――――――――
+  株式会社Newce
+  ――――――――――――――――――`
 
   const recipients: string[] = [support]
   if (userEmail) {
