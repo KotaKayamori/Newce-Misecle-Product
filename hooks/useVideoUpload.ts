@@ -5,9 +5,17 @@ import { supabase } from "@/lib/supabase"
 
 type UploadState = "idle" | "uploading" | "success" | "error"
 
+export type VideoCategory = 
+  | "today_recommended" 
+  | "popular_now" 
+  | "sns_popular" 
+  | "gen_z_popular" 
+  | "date_recommended"
+
 export type VideoMeta = {
-  title?: string
-  description?: string
+  title: string
+  category: VideoCategory
+  caption?: string
 }
 
 export function useVideoUpload() {
@@ -16,7 +24,7 @@ export function useVideoUpload() {
   const [publicUrl, setPublicUrl] = useState<string>("")
   const [path, setPath] = useState<string>("")
 
-  const upload = useCallback(async (file: File, meta?: VideoMeta) => {
+  const upload = useCallback(async (file: File, meta: VideoMeta) => {
     setError("")
     setPublicUrl("")
     setPath("")
@@ -28,6 +36,18 @@ export function useVideoUpload() {
     }
     if (!file.type || !file.type.startsWith("video/")) {
       setError("動画ファイルを選択してください（mp4, webm など）")
+      setState("error")
+      return
+    }
+
+    if (!meta.title?.trim()) {
+      setError("動画タイトルを入力してください")
+      setState("error")
+      return
+    }
+
+    if (!meta.category) {
+      setError("振り分けカテゴリを選択してください")
       setState("error")
       return
     }
@@ -85,8 +105,9 @@ export function useVideoUpload() {
         const body = {
           path,
           publicUrl: pub.publicUrl,
-          title: meta?.title || undefined,
-          caption: meta?.description || undefined,
+          title: meta.title.trim(),
+          category: meta.category,
+          caption: meta.caption?.trim() || undefined,
         }
         const {
           data: { session },
