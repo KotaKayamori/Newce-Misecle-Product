@@ -2439,6 +2439,23 @@ export default function ProfilePage() {
     )
   }
 
+  if (showUploadModal) {
+    return (
+      <div className="min-h-screen bg-white pb-20">
+        <div className="px-6 py-4 flex items-center gap-4">
+          <Button variant="ghost" onClick={() => setShowUploadModal(false)} className="text-black">
+            ＜
+          </Button>
+          <h1 className="text-xl font-semibold">動画をアップロード</h1>
+        </div>
+        <div className="px-6 py-4">
+          <VideoUploader />
+        </div>
+        <Navigation />
+      </div>
+    )
+  }
+
   // Stats Page (Followers/Following/Posts)
   if (showFollowers || showFollowing || showPosts) {
     const mockFollowers = [
@@ -2821,14 +2838,14 @@ export default function ProfilePage() {
       <Navigation />
 
       {/* 動画アップロード モーダル */}
-      <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
+      {/* <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
         <DialogContent className="sm:max-w-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>動画をアップロード</DialogTitle>
           </DialogHeader>
           <VideoUploader />
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* 自分の動画 モーダル */}
       <Dialog open={showMyVideosModal} onOpenChange={setShowMyVideosModal}>
