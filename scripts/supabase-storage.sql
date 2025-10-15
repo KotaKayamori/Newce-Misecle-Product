@@ -2,7 +2,7 @@
 -- Usage: Run in Supabase SQL Editor (or supabase CLI) on your project.
 
 -- 1) Ensure RLS is enabled on storage.objects
-alter table storage.objects enable row level security;
+-- alter table storage.objects enable row level security;
 
 -- 2) Create public bucket `videos` if it does not exist
 insert into storage.buckets (id, name, public)

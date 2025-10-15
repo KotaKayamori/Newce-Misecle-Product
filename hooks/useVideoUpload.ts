@@ -101,6 +101,32 @@ export function useVideoUpload() {
       setPublicUrl(pub.publicUrl)
       setPath(path)
 
+      // Try to create poster (non-blocking)
+      let posterPublicUrl: string | undefined
+      try {
+        const posterBlob = await extractPosterFromFile(file, 0.6)
+        if (posterBlob) {
+          const posterPath = path.replace(/\.[^.]+$/, ".webp")
+          const signPoster = await fetch("/api/videos/create-signed-upload", {
+            method: "POST",
+            headers: { "content-type": "application/json", Authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify({ fileName: posterPath.split("/").pop(), contentType: "image/webp", pathOverride: posterPath }),
+          })
+          if (signPoster.ok) {
+            const { bucket: pBucket, path: pPath, token: pToken, cacheControl: pCache } = await signPoster.json()
+            const { error: upPosterErr } = await supabase.storage
+              .from(pBucket)
+              .uploadToSignedUrl(pPath, pToken, posterBlob, { contentType: "image/webp", cacheControl: pCache || "31536000", upsert: false })
+            if (!upPosterErr) {
+              const { data: pPub } = supabase.storage.from(pBucket).getPublicUrl(pPath)
+              posterPublicUrl = pPub.publicUrl
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("poster generation failed", e)
+      }
+
       // Save metadata to server (videos table) and keep user_videos for migration
       try {
         const body = {
@@ -149,4 +175,53 @@ export function useVideoUpload() {
   }, [])
 
   return { state, error, publicUrl, path, upload, reset }
+}
+
+async function extractPosterFromFile(file: File, seconds = 0.6): Promise<Blob | null> {
+  try {
+    const video = document.createElement("video")
+    video.src = URL.createObjectURL(file)
+    video.muted = true
+    video.playsInline = true
+
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = () => {
+        try { URL.revokeObjectURL(video.src) } catch {}
+      }
+      video.onloadedmetadata = () => {
+        try {
+          const dur = Math.max(0.1, video.duration || 1)
+          const t = Math.min(Math.max(0.5, seconds), dur - 0.05)
+          video.currentTime = t
+        } catch {}
+      }
+      video.onseeked = () => { cleanup(); resolve() }
+      video.onerror = () => { cleanup(); reject(new Error("video load error")) }
+      // iOS Safari fallback
+      video.oncanplay = () => {
+        try {
+          const dur = Math.max(0.1, video.duration || 1)
+          const t = Math.min(Math.max(0.5, seconds), dur - 0.05)
+          if (Math.abs(video.currentTime - t) > 0.01) video.currentTime = t
+        } catch {}
+      }
+    })
+
+    const maxWidth = 720
+    const vw = video.videoWidth || maxWidth
+    const vh = video.videoHeight || Math.round((maxWidth * 16) / 9)
+    const r = Math.min(1, maxWidth / vw)
+    const w = Math.round(vw * r)
+    const h = Math.round(vh * r)
+
+    const canvas = document.createElement("canvas")
+    canvas.width = w
+    canvas.height = h
+    const ctx = canvas.getContext("2d")!
+    ctx.drawImage(video, 0, 0, w, h)
+
+    return await new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/webp", 0.8))
+  } catch {
+    return null
+  }
 }

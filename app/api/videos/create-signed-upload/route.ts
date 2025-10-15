@@ -1,99 +1,123 @@
-import { NextResponse } from "next/server"
-import { randomUUID } from "crypto"
-import { createServerClient } from "@/lib/auth"
+import { NextRequest, NextResponse } from "next/server"
+import { createClient } from "@supabase/supabase-js"
 
-// Helper to derive extension from content type or filename
-function getExt(fileName: string | undefined, contentType: string): string {
-  const byName = (fileName || "").split(".").pop()?.toLowerCase()
-  const nameOk = byName && /^(mp4|webm|mov|m4v|ogg)$/.test(byName) ? byName : undefined
-  if (nameOk) return nameOk
+// 環境変数：Anon を使う（SRKは絶対使わない。RLSでユーザー権限評価したい）
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-  const map: Record<string, string> = {
-    "video/mp4": "mp4",
-    "video/webm": "webm",
-    "video/quicktime": "mov",
-    "video/x-m4v": "m4v",
-    "video/ogg": "ogg",
-  }
-  return map[contentType.toLowerCase()] ?? "mp4"
+// 相対キー正規化
+function normalizeKey(input: string) {
+  let k = String(input || "")
+    .replace(/^https?:\/\/[^]+?\/object\/(public|sign)\/videos\//, "")
+    .replace(/^videos\//, "")
+    .replace(/^\/+/, "")
+  try { k = decodeURIComponent(k) } catch {}
+  try { k = decodeURIComponent(k) } catch {}
+  if (!k || k.includes("..")) throw new Error("invalid key")
+  return k
 }
 
-export async function POST(request: Request) {
+// content-type の許可判定（video/* または image/webp）
+function isAllowedContentType(ct: string | undefined | null) {
+  if (!ct) return false
+  const lc = String(ct).toLowerCase()
+  return lc === "image/webp" || lc.startsWith("video/")
+}
+
+function extFromContentType(ct: string | undefined | null): string | null {
+  if (!ct) return null
+  const lc = String(ct).toLowerCase()
+  if (lc === "image/webp") return "webp"
+  if (lc === "video/mp4") return "mp4"
+  if (lc === "video/quicktime") return "mov"
+  if (lc === "video/x-m4v") return "m4v"
+  if (lc === "video/webm") return "webm"
+  if (lc === "video/ogg") return "ogg"
+  return null
+}
+
+function extFromFilename(name: string | undefined | null): string | null {
+  if (!name) return null
+  const m = String(name).toLowerCase().match(/\.([a-z0-9]+)$/)
+  return m?.[1] || null
+}
+
+function pad2(n: number) { return n < 10 ? `0${n}` : String(n) }
+
+export async function POST(req: NextRequest) {
   try {
-    const body = await request.json().catch(() => ({}))
-    const fileName = typeof body?.fileName === "string" ? body.fileName : undefined
-    const contentType = typeof body?.contentType === "string" ? body.contentType : ""
-
-    if (!contentType || !contentType.toLowerCase().startsWith("video/")) {
-      return NextResponse.json({ error: "Invalid contentType. Expected video/*" }, { status: 400 })
+    // 1) Bearer を取得
+    const authHeader = req.headers.get("authorization") || ""
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : ""
+    if (!token) {
+      return NextResponse.json({ error: "missing bearer" }, { status: 401 })
     }
 
-    const supabase = await createServerClient()
+    // 2) Bearer を Supabase クライアントへ橋渡し
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: `Bearer ${token}` } },
+    })
 
-    // Authenticate: Authorization Bearer token (preferred), fallback to cookies
-    let userId: string | null = null
-    const authHeader = request.headers.get("authorization") || request.headers.get("Authorization")
-    const bearer = authHeader?.startsWith("Bearer ") ? authHeader.substring(7) : undefined
-    if (bearer) {
-      const { data } = await supabase.auth.getUser(bearer)
-      userId = data.user?.id ?? null
+    // 3) USER を取得（ここが null なら 401）
+    const { data: userData, error: userErr } = await supabase.auth.getUser()
+    if (userErr || !userData?.user) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 })
     }
-    if (!userId) {
-      const { data } = await supabase.auth.getUser()
-      userId = data.user?.id ?? null
+    const user = userData.user
+
+    // 4) 入力バリデーション（4xx で返す）
+    const body = await req.json().catch(() => ({}))
+    const filename: string | undefined = body?.filename ?? body?.fileName ?? body?.name
+    const contentType: string | undefined = body?.contentType
+    const pathOverrideRaw: string | undefined = body?.pathOverride
+    if (!filename || typeof filename !== "string") {
+      return NextResponse.json({ error: "filename required" }, { status: 400 })
     }
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    if (!isAllowedContentType(contentType)) {
+      return NextResponse.json({ error: "invalid contentType" }, { status: 400 })
     }
 
-    // Upload allowlist: only users present in allowed_uploaders can request signed upload
-    try {
-      const { data: allow } = await supabase
-        .from("allowed_uploaders")
-        .select("user_id")
-        .eq("user_id", userId)
-        .single()
-      if (!allow) {
-        return NextResponse.json({ error: "Forbidden: uploader not allowed" }, { status: 403 })
+    // 5) キー決定
+    let key: string
+    if (pathOverrideRaw && typeof pathOverrideRaw === "string") {
+      // クライアント指定（例: poster の .webp を動画キーから派生）
+      key = normalizeKey(pathOverrideRaw)
+      const uidFromKey = key.split("/")[0]
+      if (uidFromKey !== user.id) {
+        return NextResponse.json({ error: "forbidden path (uid mismatch)" }, { status: 403 })
       }
-    } catch (e) {
-      // If the table doesn't exist yet, fail closed for safety
-      return NextResponse.json({ error: "Forbidden: uploader not allowed" }, { status: 403 })
+    } else {
+      // サーバ生成（動画など pathOverride 未指定のケース）
+      const now = new Date()
+      const yyyy = now.getFullYear()
+      const mm = pad2(now.getMonth() + 1)
+      const uuid = (globalThis as any).crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+      const extByName = extFromFilename(filename)
+      const extByCt = extFromContentType(contentType)
+      const ext = (extByName && /^(mp4|mov|m4v|webm|ogg|webp)$/.test(extByName) ? extByName : extByCt) || "bin"
+      key = `${user.id}/${yyyy}/${mm}/${uuid}.${ext}`
     }
 
-    const now = new Date()
-    const yyyy = now.getFullYear()
-    const mm = String(now.getMonth() + 1).padStart(2, "0")
-    const ext = getExt(fileName, contentType)
-    const objectPath = `${userId}/${yyyy}/${mm}/${randomUUID()}.${ext}`
+    // 6) 署名URLの発行（ユーザー権限で評価。SRKは使わない）
+    const { data: signed, error: signErr } = await supabase.storage
+      .from("videos")
+      .createSignedUploadUrl(key)
 
-    const { data, error } = await supabase.storage.from("videos").createSignedUploadUrl(objectPath)
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 })
+    if (signErr) {
+      // ここで 403 が来る場合 → Storage RLS を確認：
+      // INSERT: bucket_id='videos' AND foldername(name)[1] = auth.uid()
+      return NextResponse.json({ error: signErr.message }, { status: 403 })
     }
-
-    // supabase-js returns signedUrl (and/or token depending on version)
-    const signedUrl = (data as any)?.signedUrl as string | undefined
-    let token = (data as any)?.token as string | undefined
-    if (!token && signedUrl) {
-      try {
-        const u = new URL(signedUrl)
-        token = u.searchParams.get("token") ?? undefined
-      } catch {}
-    }
-
-    const { data: publicUrlData } = supabase.storage.from("videos").getPublicUrl(objectPath)
 
     return NextResponse.json({
       bucket: "videos",
-      path: objectPath,
-      token,
-      signedUrl,
-      publicUrl: publicUrlData.publicUrl,
-      cacheControl: "31536000",
-      upsert: false,
+      path: signed.path,
+      token: signed.token,
+      cacheControl: "31536000, immutable",
     })
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message ?? "Unexpected error" }, { status: 500 })
+    // 予期せぬ例外のみ 500
+    console.error("create-signed-upload fatal:", e)
+    return NextResponse.json({ error: "internal_error" }, { status: 500 })
   }
 }
