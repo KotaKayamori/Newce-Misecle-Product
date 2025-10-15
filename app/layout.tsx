@@ -16,8 +16,23 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const supabaseOrigin = (() => {
+    try {
+      return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL as string).origin
+    } catch {
+      return undefined
+    }
+  })()
   return (
     <html lang="ja" className={`${GeistSans.variable} ${GeistMono.variable}`}>
+      <head>
+        {supabaseOrigin && (
+          <>
+            <link rel="preconnect" href={supabaseOrigin} />
+            <link rel="dns-prefetch" href={supabaseOrigin} />
+          </>
+        )}
+      </head>
       <body className={GeistSans.className}>
         <AuthProvider>{children}</AuthProvider>
       </body>

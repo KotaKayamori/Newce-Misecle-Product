@@ -78,3 +78,14 @@
     display: none; /* Chrome, Safari and Opera */
   }
 }
+
+/* Optimize offscreen rendering for supported browsers */
+@supports (content-visibility: auto) {
+  .reel {
+    content-visibility: auto;
+    contain: content;
+    /* Safari 非対応は自動フォールバック */
+    contain-intrinsic-size: 100vh;
+    contain-intrinsic-size: auto 100svh;
+  }
+}
