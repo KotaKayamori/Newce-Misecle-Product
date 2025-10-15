@@ -12,10 +12,11 @@ import { useRouter } from "next/navigation"
 import { useUserProfile } from "@/hooks/useUserProfile"
 import { sendSupportInquiryAction, sendBugReportAction } from "@/app/actions/email-actions"
 import { useToast } from "@/hooks/use-toast"
+import { supabase } from "@/lib/supabase"
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { signOut } = useAuth()
+  const { signOut, user } = useAuth()
   const { toast } = useToast()
   const { userProfile, loading, error, updateProfile } = useUserProfile()
   const [showReviews, setShowReviews] = useState(false)
@@ -69,19 +70,27 @@ export default function ProfilePage() {
   const [editedName, setEditedName] = useState("")
   const [editedUsername, setEditedUsername] = useState("")
   const [isUpdating, setIsUpdating] = useState(false)
+  const [selectedProfileImage, setSelectedProfileImage] = useState<File | null>(null)
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null)
+  const [isUploadingProfile, setIsUploadingProfile] = useState(false)
+  const [profileUploadProgress, setProfileUploadProgress] = useState<number>(0)
 
   // メール送信完了メッセージ用のstate
   const [showEmailSuccess, setShowEmailSuccess] = useState(false)
   const [emailSuccessMessage, setEmailSuccessMessage] = useState("")
   const [emailSuccessType, setEmailSuccessType] = useState<"contact" | "bug">("contact")
 
+  const [selectedImages, setSelectedImages] = useState<File[]>([])
+  const [imagePreviews, setImagePreviews] = useState<string[]>([])
+  const [uploadProgress, setUploadProgress] = useState<number>(0)
+
   // プロフィールデータの初期化
-  useState(() => {
+  useEffect(() => {
     if (userProfile) {
-      setEditedName(userProfile.name)
-      setEditedUsername(userProfile.username)
-      setSelectedGender(userProfile.gender)
-      setSelectedAge(userProfile.age)
+      setEditedName(userProfile.name || "")
+      setEditedUsername(userProfile.username || "")
+      setSelectedGender(userProfile.gender || "")
+      setSelectedAge(userProfile.age || "")
     }
   }, [userProfile])
 
@@ -184,6 +193,107 @@ export default function ProfilePage() {
     )
   }
 
+  // 画像選択ハンドラー
+  const handleProfileImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // ファイルサイズチェック（5MB）
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "ファイルサイズエラー",
+          description: "画像ファイルは5MB以下にしてください。",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // ファイル形式チェック
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "ファイル形式エラー",
+          description: "JPEG、PNG、GIF、WebP形式の画像ファイルを選択してください。",
+          variant: "destructive",
+        })
+        return
+      }
+
+      setSelectedProfileImage(file)
+      
+      // プレビュー用のURL作成
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setProfileImagePreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  // プロフィール画像を削除
+  const handleProfileImageRemove = () => {
+    setSelectedProfileImage(null)
+    setProfileImagePreview(null)
+    
+    // input要素をリセット
+    const fileInput = document.getElementById('profile-image-upload') as HTMLInputElement
+    if (fileInput) {
+      fileInput.value = ''
+    }
+  }
+
+  // 画像をSupabase Storageにアップロード
+  const uploadProfileImageToStorage = async (file: File, userId: string): Promise<string | null> => {
+    try {
+      setIsUploadingProfile(true)
+      setProfileUploadProgress(0)
+
+      // ファイル名を生成（ユーザーIDと現在時刻を使用してユニークにする）
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${userId}-profile-${Date.now()}.${fileExt}`
+      const filePath = fileName
+
+      console.log('Uploading profile image to:', filePath)
+
+      setProfileUploadProgress(20)
+
+      // Supabase Storageにアップロード
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true,
+        })
+
+      if (error) {
+        console.error('Storage upload error:', error)
+        throw new Error(`アップロードエラー: ${error.message}`)
+      }
+
+      setProfileUploadProgress(70)
+
+      // 公開URLを取得
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      setProfileUploadProgress(100)
+      console.log('Profile image uploaded successfully:', publicUrl)
+
+      return publicUrl
+    } catch (error: any) {
+      console.error('Failed to upload profile image:', error)
+      toast({
+        title: "アップロードエラー",
+        description: error.message || "画像のアップロードに失敗しました。もう一度お試しください。",
+        variant: "destructive",
+      })
+      return null
+    } finally {
+      setIsUploadingProfile(false)
+      setProfileUploadProgress(0)
+    }
+  }
+
   const visitHistory = [
     {
       id: 1,
@@ -271,65 +381,119 @@ export default function ProfilePage() {
     },
   ]
 
-  const handleLogout = async () => {
-    setShowLogoutConfirmation(true)
-  }
-
-  const confirmLogout = async () => {
-    try {
-      // Supabaseからログアウト
-      await signOut() 
-      // ログアウト成功後、ログインページに移動
-      router.push("/")
-    } catch (error) {
-      console.error("ログアウトエラー:", error)
-      alert("ログアウトに失敗しました。もう一度お試しください。")
-    } finally {
-      setShowLogoutConfirmation(false)
-    }
-  }
-
   // プロフィール編集の保存処理
   const handleSaveProfile = async () => {
-    const updates = {
+    const updates: any = {
       name: editedName.trim(),
       username: editedUsername.trim(),
     }
 
     if (!updates.name || !updates.username) {
-      alert("名前とユーザーネームを入力してください")
+      toast({
+        title: "入力エラー",
+        description: "名前とユーザーネームを入力してください",
+        variant: "destructive",
+      })
       return
     }
 
     setIsUpdating(true)
-    const success = await updateProfile(updates)
-    setIsUpdating(false)
     
-    if (success) {
-      alert("プロフィールを更新しました")
-      setShowProfileEdit(false)
+    try {
+      // 画像がアップロードされている場合は、まずStorageにアップロード
+      if (selectedProfileImage && user) {
+        const uploadedUrl = await uploadProfileImageToStorage(selectedProfileImage, user.id)
+        if (uploadedUrl) {
+          updates.avatar_url = uploadedUrl
+        } else {
+          // 画像アップロードに失敗した場合
+          setIsUpdating(false)
+          return
+        }
+      }
+
+      // プロフィール情報を更新
+      const success = await updateProfile(updates)
+      
+      if (success) {
+        toast({
+          title: "更新完了",
+          description: "プロフィールを更新しました",
+        })
+        
+        // アップロード関連のstateをリセット
+        setSelectedProfileImage(null)
+        setProfileImagePreview(null)
+        setShowProfileEdit(false)
+      }
+    } catch (error) {
+      console.error('Profile update error:', error)
+      toast({
+        title: "更新エラー",
+        description: "プロフィールの更新に失敗しました",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdating(false)
     }
   }
 
-  // 性別・年齢の保存処理
   const handleSaveGenderAge = async () => {
-    if (!selectedGender || !selectedAge) {
-      alert("性別と年齢を選択してください")
+    const updates: any = {
+      gender: selectedGender,
+      age: selectedAge,
+    }
+
+    if (!updates.gender || !updates.age) {
+      toast({
+        title: "入力エラー",
+        description: "性別と年齢を選択してください",
+        variant: "destructive",
+      })
       return
     }
 
-    const updates = {
-      gender: selectedGender as '男性' | '女性' | 'その他',
-      age: selectedAge as '10代' | '20代' | '30代' | '40代' | '50代以上',
-    }
-
     setIsUpdating(true)
-    const success = await updateProfile(updates)
-    setIsUpdating(false)
     
-    if (success) {
-      alert("性別と年齢を更新しました")
-      setShowGenderAgeModal(false)
+    try {
+      // プロフィール情報を更新
+      const success = await updateProfile(updates)
+      
+      if (success) {
+        toast({
+          title: "更新完了",
+          description: "性別と年齢を更新しました",
+        })
+        
+        setShowGenderAgeModal(false)
+      }
+    } catch (error) {
+      console.error('Gender/Age update error:', error)
+      toast({
+        title: "更新エラー",
+        description: "性別と年齢の更新に失敗しました",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUpdating(false)
+    }
+  }
+
+  const handleLogout = () => {
+    setShowLogoutConfirmation(true)
+  }
+
+  const confirmLogout = async () => {
+    try {
+      await signOut()
+      router.push('/')
+    } catch (error) {
+      console.error('Logout error:', error)
+      toast({
+        title: "ログアウトエラー",
+        description: "ログアウトに失敗しました",
+        variant: "destructive",
+      })
     }
   }
 
@@ -566,14 +730,69 @@ export default function ProfilePage() {
 
         <div className="px-6 py-4 space-y-6">
           <div className="space-y-6">
-            {/* Profile Icon */}
+            {/* Profile Icon with Upload */}
             <div className="text-center">
-              <img
-                src={userProfile?.avatar_url || "/images/misecle-mascot.png"}
-                alt="Profile Icon"
-                className="w-24 h-24 rounded-full object-cover mx-auto mb-2"
-              />
-              <button className="text-blue-600 hover:text-blue-700 transition-colors text-sm">写真を設定</button>
+              <div className="relative inline-block">
+                <img
+                  src={profileImagePreview || userProfile?.avatar_url || "/images/misecle-mascot.png"}
+                  alt="Profile Icon"
+                  className="w-24 h-24 rounded-full object-cover mx-auto mb-2"
+                />
+                
+                {/* 選択された画像の削除ボタン */}
+                {selectedProfileImage && (
+                  <button
+                    type="button"
+                    onClick={handleProfileImageRemove}
+                    className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+              
+              {/* 画像情報表示 */}
+              {selectedProfileImage && (
+                <div className="text-center space-y-1 mb-2">
+                  <p className="text-xs text-gray-600">{selectedProfileImage.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {(selectedProfileImage.size / 1024 / 1024).toFixed(2)}MB
+                  </p>
+                </div>
+              )}
+
+              {/* アップロード進行状況 */}
+              {isUploadingProfile && (
+                <div className="mb-4 space-y-2">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>アップロード中...</span>
+                    <span>{Math.round(profileUploadProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-orange-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${profileUploadProgress}%` }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+
+              {/* 画像アップロードボタン */}
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  id="profile-image-upload"
+                  onChange={handleProfileImageSelect}
+                />
+                <label
+                  htmlFor="profile-image-upload"
+                  className="text-blue-600 hover:text-blue-700 transition-colors text-sm cursor-pointer"
+                >
+                  写真を設定
+                </label>
+              </div>
             </div>
 
             {/* Name - データベースから取得した値を表示 */}
@@ -638,10 +857,10 @@ export default function ProfilePage() {
 
             <Button 
               onClick={handleSaveProfile}
-              disabled={isUpdating || !editedName.trim() || !editedUsername.trim()}
+              disabled={isUpdating || isUploadingProfile || !editedName.trim() || !editedUsername.trim()}
               className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold disabled:bg-gray-300"
             >
-              {isUpdating ? "保存中..." : "保存する"}
+              {isUpdating ? "保存中..." : isUploadingProfile ? "アップロード中..." : "保存する"}
             </Button>
           </div>
         </div>
@@ -1213,23 +1432,215 @@ export default function ProfilePage() {
   }
 
   if (showContactForm) {
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = Array.from(e.target.files || [])
+      
+      if (files.length === 0) return
+
+      // 既存の画像と合わせて最大5枚まで
+      const totalImages = selectedImages.length + files.length
+      if (totalImages > 5) {
+        toast({
+          title: "画像数制限",
+          description: "画像は最大5枚まで添付できます。",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // ファイルサイズと形式チェック
+      const validFiles: File[] = []
+      const errors: string[] = []
+
+      files.forEach((file) => {
+        // ファイルサイズチェック（5MB）
+        if (file.size > 5 * 1024 * 1024) {
+          errors.push(`${file.name}: ファイルサイズが5MBを超えています`)
+          return
+        }
+
+        // ファイル形式チェック
+        const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        if (!allowedTypes.includes(file.type)) {
+          errors.push(`${file.name}: サポートされていないファイル形式です`)
+          return
+        }
+
+        validFiles.push(file)
+      })
+
+      if (errors.length > 0) {
+        toast({
+          title: "ファイルエラー",
+          description: errors.join('\n'),
+          variant: "destructive",
+        })
+      }
+
+      if (validFiles.length === 0) return
+
+      // 既存の画像に新しい画像を追加
+      setSelectedImages(prev => [...prev, ...validFiles])
+      
+      // プレビュー画像を生成
+      validFiles.forEach((file) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+          const result = e.target?.result as string
+          setImagePreviews(prev => [...prev, result])
+        }
+        reader.readAsDataURL(file)
+      })
+
+      // 入力フィールドをリセット
+      e.target.value = ''
+    }
+
+    // 特定の画像を削除
+    const handleImageRemove = (index: number) => {
+      setSelectedImages(prev => prev.filter((_, i) => i !== index))
+      setImagePreviews(prev => prev.filter((_, i) => i !== index))
+    }
+
+    // 全画像をクリア
+    const handleClearAllImages = () => {
+      setSelectedImages([])
+      setImagePreviews([])
+      const fileInput = document.getElementById('image-upload') as HTMLInputElement
+      if (fileInput) {
+        fileInput.value = ''
+      }
+    }
+
+    // 画像をBase64に変換
+    const fileToBase64 = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.readAsDataURL(file)
+        reader.onload = () => {
+          const result = reader.result as string
+          const base64Data = result.split(',')[1]
+          resolve(base64Data)
+        }
+        reader.onerror = error => reject(error)
+      })
+    }
+
+    // 画像圧縮関数（オプション）
+    const compressImage = (file: File, maxWidth: number = 1920, quality: number = 0.8): Promise<File> => {
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        const img = new Image()
+        
+        img.onload = () => {
+          // アスペクト比を保持してリサイズ
+          const ratio = Math.min(maxWidth / img.width, maxWidth / img.height)
+          canvas.width = img.width * ratio
+          canvas.height = img.height * ratio
+          
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height)
+          
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: file.type,
+                lastModified: Date.now()
+              })
+              resolve(compressedFile)
+            } else {
+              resolve(file)
+            }
+          }, file.type, quality)
+        }
+        
+        img.src = URL.createObjectURL(file)
+      })
+    }
+
     async function handleContactSubmit(e: React.FormEvent<HTMLFormElement>) {
       e.preventDefault()
       if (contactSending) return
-      const formEl = e.currentTarget          
+      
+      const formEl = e.currentTarget
       setContactSending(true)
+      setUploadProgress(0)
+      
       try {
         const form = new FormData(formEl)
         const name = (form.get("name") as string) || ""
         const email = (form.get("email") as string) || ""
         const category = (form.get("category") as string) || ""
         const message = (form.get("message") as string) || ""
-        const res = await sendSupportInquiryAction({ name, email, category, message })
+        
+        // 画像データの準備
+        let imageDataArray: Array<{
+          filename: string
+          content: string
+          type: string
+        }> = []
+
+        if (selectedImages.length > 0) {
+          setUploadProgress(10)
+          
+          try {
+            for (let i = 0; i < selectedImages.length; i++) {
+              const file = selectedImages[i]
+              
+              // 必要に応じて画像を圧縮
+              const processedFile = file.size > 2 * 1024 * 1024 
+                ? await compressImage(file) 
+                : file
+              
+              const base64Content = await fileToBase64(processedFile)
+              imageDataArray.push({
+                filename: processedFile.name,
+                content: base64Content,
+                type: processedFile.type
+              })
+              
+              // プログレス更新
+              setUploadProgress(10 + (i + 1) / selectedImages.length * 40)
+            }
+          } catch (error) {
+            console.error("Failed to process images:", error)
+            toast({
+              title: "画像処理エラー",
+              description: "画像の処理中にエラーが発生しました。画像なしで送信するか、別の画像を選択してください。",
+              variant: "destructive",
+            })
+            setContactSending(false)
+            setUploadProgress(0)
+            return
+          }
+        }
+        
+        setUploadProgress(60)
+        
+        console.log("Sending contact form:", { 
+          name, 
+          email, 
+          category, 
+          message, 
+          imageCount: imageDataArray.length 
+        })
+        
+        const res = await sendSupportInquiryAction({ 
+          name, 
+          email, 
+          category, 
+          message,
+          imageDataArray: imageDataArray.length > 0 ? imageDataArray : undefined
+        })
+        
+        setUploadProgress(100)
+        
         if (res.success) {
           formEl.reset()
+          handleClearAllImages() // 画像もクリア
           showEmailSuccessMessage(
             "contact",
-            "お問い合わせを正常に送信いたしました。内容を確認次第、ご登録いただいたメールアドレスにご連絡いたします。"
+            `お問い合わせを正常に送信いたしました。${imageDataArray.length > 0 ? `${imageDataArray.length}枚の画像も添付されました。` : ''}内容を確認次第、ご登録いただいたメールアドレスにご連絡いたします。`
           )
         } else {
           toast({
@@ -1247,9 +1658,10 @@ export default function ProfilePage() {
         })
       } finally {
         setContactSending(false)
+        setUploadProgress(0)
       }
     }
-    
+      
     return (
       <div className="min-h-screen bg-white pb-20">
         <div className="px-6 py-4 flex items-center gap-4">
@@ -1264,6 +1676,7 @@ export default function ProfilePage() {
             onSubmit={handleContactSubmit}
             className="space-y-4"
           >
+            {/* 既存のフォームフィールド */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">お名前</label>
               <input
@@ -1271,6 +1684,7 @@ export default function ProfilePage() {
                 type="text"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 placeholder="お名前を入力してください"
+                required
               />
             </div>
 
@@ -1281,12 +1695,17 @@ export default function ProfilePage() {
                 type="email"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                 placeholder="メールアドレスを入力してください"
+                required
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">お問い合わせ種別</label>
-              <select name="category" className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500">
+              <select 
+                name="category"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                required
+              >
                 <option value="">選択してください</option>
                 <option value="bug">アプリの不具合</option>
                 <option value="store">店舗情報について</option>
@@ -1307,26 +1726,113 @@ export default function ProfilePage() {
               <p className="text-xs text-gray-500 mt-2">※ お問い合わせは support@newce.co.jp に送信されます</p>
             </div>
 
+            {/* 改良された画像アップロード部分 */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">画像を添付</label>
-              <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
-                <input type="file" accept="image/*" className="hidden" id="image-upload" />
-                <label
-                  htmlFor="image-upload"
-                  className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  画像をアップロード
-                </label>
-                <p className="text-xs text-gray-500 mt-2">PNG, JPG, GIF形式（最大5MB）</p>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                画像を添付 ({selectedImages.length}/5)
+              </label>
+              
+              <div className="space-y-4">
+                {/* アップロードエリア */}
+                <div className="border-2 border-dashed border-gray-300 rounded-md p-6 text-center">
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    multiple
+                    className="hidden" 
+                    id="image-upload"
+                    onChange={handleImageSelect}
+                    disabled={selectedImages.length >= 5}
+                  />
+                  <label
+                    htmlFor="image-upload"
+                    className={`cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 ${
+                      selectedImages.length >= 5 ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {selectedImages.length >= 5 ? '画像を追加（上限到達）' : '画像を追加'}
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">
+                    PNG, JPG, GIF, WebP形式（各ファイル最大5MB、最大5枚まで）
+                  </p>
+                </div>
+
+                {/* 画像プレビューエリア */}
+                {selectedImages.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-medium text-gray-700">
+                        選択された画像 ({selectedImages.length}枚)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleClearAllImages}
+                        className="text-sm text-red-600 hover:text-red-700 underline"
+                      >
+                        すべて削除
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3">
+                      {imagePreviews.map((preview, index) => (
+                        <div key={index} className="relative group">
+                          <div className="aspect-square bg-gray-100 rounded-md overflow-hidden">
+                            <img
+                              src={preview}
+                              alt={`プレビュー ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          
+                          {/* 画像情報オーバーレイ */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-2 rounded-b-md">
+                            <p className="text-xs truncate">{selectedImages[index]?.name}</p>
+                            <p className="text-xs">
+                              {(selectedImages[index]?.size / 1024 / 1024).toFixed(2)}MB
+                            </p>
+                          </div>
+                          
+                          {/* 削除ボタン */}
+                          <button
+                            type="button"
+                            onClick={() => handleImageRemove(index)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* アップロード進行状況 */}
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm text-gray-600">
+                      <span>アップロード中...</span>
+                      <span>{Math.round(uploadProgress)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-orange-600 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <Button
               type="submit"
               disabled={contactSending}
-              className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold"
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold disabled:bg-gray-300"
             >
-              {contactSending ? "送信中..." : "送信する"}
+              {contactSending ? 
+                uploadProgress > 0 ? `アップロード中... ${Math.round(uploadProgress)}%` : "送信中..." 
+                : "送信する"
+              }
             </Button>
           </form>
         </div>
@@ -1933,6 +2439,23 @@ export default function ProfilePage() {
     )
   }
 
+  if (showUploadModal) {
+    return (
+      <div className="min-h-screen bg-white pb-20">
+        <div className="px-6 py-4 flex items-center gap-4">
+          <Button variant="ghost" onClick={() => setShowUploadModal(false)} className="text-black">
+            ＜
+          </Button>
+          <h1 className="text-xl font-semibold">動画をアップロード</h1>
+        </div>
+        <div className="px-6 py-4">
+          <VideoUploader />
+        </div>
+        <Navigation />
+      </div>
+    )
+  }
+
   // Stats Page (Followers/Following/Posts)
   if (showFollowers || showFollowing || showPosts) {
     const mockFollowers = [
@@ -2315,14 +2838,14 @@ export default function ProfilePage() {
       <Navigation />
 
       {/* 動画アップロード モーダル */}
-      <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
+      {/* <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
         <DialogContent className="sm:max-w-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle>動画をアップロード</DialogTitle>
           </DialogHeader>
           <VideoUploader />
         </DialogContent>
-      </Dialog>
+      </Dialog> */}
 
       {/* 自分の動画 モーダル */}
       <Dialog open={showMyVideosModal} onOpenChange={setShowMyVideosModal}>

@@ -6,9 +6,9 @@ import { AuthProvider } from "@/components/auth-provider"
 import "./globals.css"
 
 export const metadata: Metadata = {
-  title: "Misecle - レストラン予約アプリ",
-  description: "簡単にレストランを検索・予約できるアプリ",
-  generator: "v0.dev",
+  title: "ミセクル（Misecle）｜ショート動画型グルメ予約サービス",
+  description: "ショート動画型グルメ予約サービス",
+  generator: "Misecle Web App",
 }
 
 export default function RootLayout({

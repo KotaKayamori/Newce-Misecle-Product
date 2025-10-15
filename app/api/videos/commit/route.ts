@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server"
 import { createServerClient } from "@/lib/auth"
+import { ca } from "date-fns/locale"
 
 type Body = {
   path?: string
   publicUrl?: string
   title?: string
   caption?: string
+  category?: string
 }
 
 export async function POST(request: Request) {
@@ -50,6 +52,7 @@ export async function POST(request: Request) {
       storage_path: path,
       title: body.title?.trim() || null,
       caption: body.caption?.trim() || null,
+      category: body.category || null,
     }
 
     const { error: vErr } = await supabase.from("videos").insert(insertPayload)
@@ -67,6 +70,7 @@ export async function POST(request: Request) {
         public_url: playbackUrl,
         title: insertPayload.title,
         description: insertPayload.caption,
+        category: insertPayload.category,
       })
     } catch {}
 

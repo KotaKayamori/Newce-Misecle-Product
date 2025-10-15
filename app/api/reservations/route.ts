@@ -2,9 +2,11 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getCurrentUser } from "@/lib/auth"
 import { getUserReservations } from "@/lib/database"
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser()
+    const user = await getCurrentUser(request)
     if (!user) {
       return NextResponse.json({ success: false, error: "ログインが必要です" }, { status: 401 })
     }
