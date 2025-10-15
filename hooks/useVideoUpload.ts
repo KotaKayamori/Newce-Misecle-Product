@@ -34,6 +34,7 @@ export function useVideoUpload() {
       setState("error")
       return
     }
+
     if (!file.type || !file.type.startsWith("video/")) {
       setError("動画ファイルを選択してください（mp4, webm など）")
       setState("error")
@@ -109,10 +110,12 @@ export function useVideoUpload() {
           category: meta.category,
           caption: meta.caption?.trim() || undefined,
         }
+        
         const {
           data: { session },
         } = await supabase.auth.getSession()
         const accessToken = session?.access_token
+        
         const res = await fetch("/api/videos/commit", {
           method: "POST",
           headers: {
@@ -121,13 +124,14 @@ export function useVideoUpload() {
           },
           body: JSON.stringify(body),
         })
+        
         if (!res.ok) {
-          // non-fatal: keep UI success, but record error message
           const j = await res.json().catch(() => ({}))
-          console.warn("commit failed", res.status, j?.error)
+          throw new Error(j?.error || "動画情報の保存に失敗しました")
         }
-      } catch (e) {
-        console.warn("commit error", e)
+      } catch (e: any) {
+        console.error("commit error", e)
+        throw new Error("動画情報の保存に失敗しました")
       }
 
       setState("success")

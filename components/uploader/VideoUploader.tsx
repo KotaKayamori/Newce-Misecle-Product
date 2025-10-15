@@ -23,7 +23,6 @@ export default function VideoUploader() {
   const [title, setTitle] = useState("")
   const [category, setCategory] = useState<VideoCategory | "">("")
   const [caption, setCaption] = useState("")
-
   const pickFile = () => inputRef.current?.click()
 
   const handleFiles = useCallback((files: FileList | null) => {
@@ -35,11 +34,10 @@ export default function VideoUploader() {
   }, [])
 
   const doUpload = async () => {
-    if (!selectedFile) return
-    const baseName = selectedFile.name.replace(/\.[^.]+$/, "")
-    const derivedTitle = (title || "").trim() || baseName
-    await upload(selectedFile, { 
-      title: derivedTitle, 
+    if (!selectedFile || !category) return
+    
+    await upload(selectedFile, {
+      title: title.trim(),
       category: category as VideoCategory,
       caption: (caption || "").trim() || undefined 
     })
@@ -57,7 +55,7 @@ export default function VideoUploader() {
   const isFormValid = title.trim() && category && selectedFile
 
   return (
-    <div className="max-w-md w-full mx-auto">
+    <div className="max-w-md w-full mx-auto min-h-0">
       <Card className="border-0 shadow-none">
         <CardContent className="pt-6 space-y-4">
           <input
@@ -192,13 +190,13 @@ export default function VideoUploader() {
 
           {/* 成功時のプレビュー */}
           {publicUrl && (
-            <div className="space-y-3 bg-green-50 p-4 rounded-md border border-green-200">
+            <div className="space-y-3 bg-green-50 p-4 rounded-md border border-green-200 max-h-none overflow-visible">
               <p className="text-sm text-green-700 font-medium">✓ アップロード完了</p>
-              {/* <div className="space-y-2">
+              <div className="space-y-2">
                 <p className="text-sm font-medium">タイトル: {title}</p>
                 <p className="text-sm">カテゴリ: {CATEGORY_OPTIONS.find(opt => opt.value === category)?.label}</p>
                 <video src={publicUrl} controls className="w-full rounded max-h-40" />
-              </div> */}
+              </div> 
             </div>
           )}
         </CardContent>
