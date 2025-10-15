@@ -68,7 +68,7 @@ export default function SearchPage() {
   })
 
   const [randomRestaurants, setRandomRestaurants] = useState<any[]>([])
-  const [videos, setVideos] = useState<SupabaseVideoRow[]>([])
+  const [supabaseVideos, setSupabaseVideos] = useState<SupabaseVideoRow[]>([])
   const playersRef = useRef<Record<string, HTMLVideoElement | null>>({})
   const [videoLimit, setVideoLimit] = useState(6)
   const [hasMoreVideos, setHasMoreVideos] = useState(true)
@@ -301,7 +301,7 @@ export default function SearchPage() {
           .range(0, Math.max(0, videoLimit - 1))
         if (error) throw error
         const arr = (data as SupabaseVideoRow[]) || []
-        setVideos(arr)
+        setSupabaseVideos(arr)
         const likeMap: Record<string, number> = {}
         arr.forEach((row) => {
           likeMap[row.id] = row.video_likes?.[0]?.count ?? 0
@@ -1278,10 +1278,10 @@ export default function SearchPage() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">最新動画</h2>
-                <span className="text-sm text-gray-600">{videos.length}件</span>
+                <span className="text-sm text-gray-600">{supabaseVideos.length}件</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {videos.map((v) => (
+                {supabaseVideos.map((v) => (
                   <Card
                     key={v.id}
                     className="overflow-hidden cursor-pointer"
