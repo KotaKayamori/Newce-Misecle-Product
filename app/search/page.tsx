@@ -8,6 +8,7 @@ import { Search, X, Bookmark, User, Heart, Send, Star, RefreshCw } from "lucide-
 import Navigation from "@/components/navigation"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
+import { useRandomVideos } from "@/hooks/useRandomVideos"
 import { mockRestaurants } from "@/lib/mock-data"
 import { supabase } from "@/lib/supabase"
 import { toggleLike } from "@/lib/likes"
@@ -47,8 +48,8 @@ export default function SearchPage() {
     | {
         id: string
         name: string
-        // avatar?: string | null
-        // isFollowing?: boolean
+        avatar?: string | null
+        isFollowing?: boolean
       }
     | null
   >(null)
@@ -277,6 +278,20 @@ export default function SearchPage() {
     })
   }
 
+  const toggleFavorite = (id: string | number) => {
+    const key = String(id)
+    setFavorites((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const handleRefreshVideos = () => {
+    refreshVideos(selectedCategory, 10)
+  }
+
   function FilterButton({ label }: { label: string }) {
     return (
       <button className="w-full border border-gray-300 rounded-full py-3 px-4 text-gray-700 hover:bg-gray-100 transition text-left">
@@ -289,6 +304,9 @@ export default function SearchPage() {
     const shuffled = [...mockRestaurants].sort(() => 0.5 - Math.random())
     setRandomRestaurants(shuffled.slice(0, 6))
   }, [selectedCategory])
+  useEffect(() => {
+    fetchVideos(selectedCategory, 10)
+  }, [selectedCategory, fetchVideos])
 
   // Load videos from Supabase (initial 6, then +2)
   useEffect(() => {
@@ -555,7 +573,7 @@ export default function SearchPage() {
                               id: video.user.id,
                               name: `@${video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}`,
                               avatar: video.user.avatar_url,
-                              isFollowing: favorites.has(video.id),
+                              isFollowing: favorites.has(String(video.id)),
                             })
                             setShowUserProfile(true)
                           }}
@@ -601,7 +619,7 @@ export default function SearchPage() {
                       >
                         <Bookmark
                           className={`w-8 h-8 drop-shadow-lg ${
-                            favorites.has(video.id) ? "fill-white text-white" : "text-white"
+                            favorites.has(String(video.id)) ? "fill-white text-white" : "text-white"
                           }`}
                         />
                       </button>
@@ -1213,7 +1231,7 @@ export default function SearchPage() {
                               id: video.user.id,
                               name: `@${video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}`,
                               avatar: video.user.avatar_url,
-                              isFollowing: favorites.has(video.id),
+                              isFollowing: favorites.has(String(video.id)),
                             })
                             setShowUserProfile(true)
                           }}
@@ -1248,7 +1266,7 @@ export default function SearchPage() {
                             >
                               <Bookmark
                                 className={`w-4 h-4 ${
-                                  favorites.has(video.id) ? "fill-orange-500 text-orange-500" : "text-gray-600"
+                                  favorites.has(String(video.id)) ? "fill-orange-500 text-orange-500" : "text-gray-600"
                                 }`}
                               />
                             </button>
