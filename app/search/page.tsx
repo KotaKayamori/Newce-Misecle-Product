@@ -71,20 +71,19 @@ export default function SearchPage() {
   const [randomRestaurants, setRandomRestaurants] = useState<any[]>([])
   const [supabaseVideos, setSupabaseVideos] = useState<SupabaseVideoRow[]>([])
   const playersRef = useRef<Record<string, HTMLVideoElement | null>>({})
+  const feedPlayersRef = useRef<Record<string, HTMLVideoElement | null>>({})
   const [videoLimit, setVideoLimit] = useState(6)
   const [hasMoreVideos, setHasMoreVideos] = useState(true)
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<SupabaseVideoRow | null>(null)
-  const [showCaption, setShowCaption] = useState(false)
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, { username?: string | null; display_name?: string | null; avatar_url?: string | null }>>({})
-  const [fullscreenMuted, setFullscreenMuted] = useState(true)
+  const [fullscreenMuted, setFullscreenMuted] = useState(false)
+  const [videoFeedMuted, setVideoFeedMuted] = useState(false)
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
-  const captionAvailable = Boolean((selectedVideo?.caption || "").trim().length > 0)
 
-  // Fullscreen overlay interactions (like/save)
+  // Fullscreen overlay interactions (like/favorite)
   const [likedVideoIds, setLikedVideoIds] = useState<Set<string>>(new Set())
-  const [savedVideoIds, setSavedVideoIds] = useState<Set<string>>(new Set())
   const likeMutationRef = useRef<Set<string>>(new Set())
 
   async function toggleVideoLike(videoId: string) {
@@ -117,16 +116,6 @@ export default function SearchPage() {
       likeMutationRef.current.delete(videoId)
     }
   }
-
-  function toggleVideoSave(videoId: string) {
-    setSavedVideoIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(videoId)) next.delete(videoId)
-      else next.add(videoId)
-      return next
-    })
-  }
-
   function mapVideoToRestaurant(video: SupabaseVideoRow | null) {
     if (!video) return null
     const title = (video.title || "おすすめ動画").trim() || "おすすめ動画"
@@ -146,7 +135,6 @@ export default function SearchPage() {
     if (!mapped) return
     setSelectedRestaurant(mapped)
     setShowReservationModal(true)
-    setShowCaption(false)
     setShowFullscreenVideo(false)
   }
 
@@ -155,7 +143,6 @@ export default function SearchPage() {
     if (!mapped) return
     setSelectedRestaurant(mapped)
     setShowStoreDetailModal(true)
-    setShowCaption(false)
     setShowFullscreenVideo(false)
   }
 
@@ -163,25 +150,26 @@ export default function SearchPage() {
   useEffect(() => {
     if (showFullscreenVideo && selectedVideo) {
       try {
-        // Pause any grid players
         Object.values(playersRef.current).forEach((el) => {
           if (el) try { el.pause() } catch {}
         })
       } catch {}
 
-      // Attempt playback once the element is mounted
       const id = requestAnimationFrame(() => {
         const el = fullscreenVideoRef.current
         if (el) {
           try {
-            el.muted = true
+            el.muted = fullscreenMuted
+            if (!fullscreenMuted) {
+              el.volume = 1
+            }
             el.play().catch(() => {})
           } catch {}
         }
       })
       return () => cancelAnimationFrame(id)
     }
-  }, [showFullscreenVideo, selectedVideo])
+  }, [showFullscreenVideo, selectedVideo, fullscreenMuted])
 
   // Video URLs array
   const videoUrls = [
@@ -378,14 +366,30 @@ export default function SearchPage() {
   }, [videoLimit])
 
   useEffect(() => {
-    if (!captionAvailable) {
-      setShowCaption(false)
+    if (showVideoFeed) {
+      setVideoFeedMuted(false)
     }
-  }, [captionAvailable])
+  }, [showVideoFeed])
+
+  useEffect(() => {
+    Object.values(feedPlayersRef.current).forEach((el) => {
+      if (!el) return
+      el.muted = videoFeedMuted
+      if (!videoFeedMuted) {
+        try {
+          el.volume = 1
+          const playPromise = el.play()
+          if (playPromise && typeof playPromise.then === "function") {
+            playPromise.catch(() => {})
+          }
+        } catch {}
+      }
+    })
+  }, [videoFeedMuted])
 
   useEffect(() => {
     if (showFullscreenVideo) {
-      setFullscreenMuted(true)
+      setFullscreenMuted(false)
     }
   }, [showFullscreenVideo])
 
@@ -532,14 +536,18 @@ export default function SearchPage() {
 
       {/* Video Feed Modal - DBから取得した動画を使用 */}
       {showVideoFeed && (
-        <div className="fixed inset-0 z-50 bg-black">
+        <div className="fixed inset-0 z-40 bg-black">
           <div className="h-screen overflow-y-auto snap-y snap-mandatory">
             {videos.map((video, index) => (
               <div key={video.id} className="h-screen w-full relative snap-start">
                 <video
+                  ref={(el) => {
+                    if (el) feedPlayersRef.current[video.id] = el
+                    else delete feedPlayersRef.current[video.id]
+                  }}
                   src={video.public_url}
                   className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                  muted
+                  muted={videoFeedMuted}
                   loop
                   autoPlay
                   playsInline
@@ -561,6 +569,17 @@ export default function SearchPage() {
                   >
                     ＜
                   </Button>
+                </div>
+
+                <div className="absolute top-6 right-6 z-10">
+                  <button
+                    type="button"
+                    onClick={() => setVideoFeedMuted((prev) => !prev)}
+                    className="p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition"
+                    aria-label={videoFeedMuted ? "ミュート解除" : "ミュートにする"}
+                  >
+                    <SpeakerIcon muted={videoFeedMuted} />
+                  </button>
                 </div>
 
                 <div className="absolute inset-0 flex">
@@ -1299,37 +1318,97 @@ export default function SearchPage() {
                 <span className="text-sm text-gray-600">{supabaseVideos.length}件</span>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                {supabaseVideos.map((v) => (
-                  <Card
-                    key={v.id}
-                    className="overflow-hidden cursor-pointer"
-                    aria-label={`動画を全画面で表示（${v.title || "動画"}）`}
-                    title="動画を全画面で表示"
-                  onClick={() => {
-                      setSelectedVideo({ ...v })
-                      setShowCaption(false)
-                      setShowFullscreenVideo(true)
-                    }}
-                  >
-                    <CardContent className="p-0">
-                      <div className="aspect-[9/16] relative">
-                        <video
-                          ref={(el) => (playersRef.current[v.id] = el)}
-                          src={v.playback_url}
-                          className="w-full h-full object-cover rounded-t-lg"
-                          poster={derivePosterUrl(v.playback_url) || "/placeholder.jpg"}
-                          muted
-                          playsInline
-                          preload="metadata"
-                          controls={false}
-                        />
-                      </div>
-                      <div className="p-3">
-                        <h3 className="font-semibold text-sm line-clamp-1">{v.title || "動画"}</h3>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                {supabaseVideos.map((v) => {
+                  const ownerProfile = v.owner_id ? ownerProfiles[v.owner_id] : undefined
+                  const ownerHandle = ownerProfile?.username
+                    ? `@${ownerProfile.username}`
+                    : ownerProfile?.display_name || "ユーザー"
+                  const isFavorite = favorites.has(String(v.id))
+
+                  return (
+                    <Card
+                      key={v.id}
+                      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                      aria-label={`動画を全画面で表示（${v.title || "動画"}）`}
+                      title="動画を全画面で表示"
+                      onClick={() => {
+                        setSelectedVideo({ ...v })
+                        setShowFullscreenVideo(true)
+                      }}
+                    >
+                      <CardContent className="p-0">
+                        <div className="aspect-[9/16] relative">
+                          <video
+                            ref={(el) => (playersRef.current[v.id] = el)}
+                            src={v.playback_url}
+                            className="w-full h-full object-cover rounded-t-lg cursor-pointer"
+                            poster={derivePosterUrl(v.playback_url) || "/placeholder.jpg"}
+                            muted
+                            playsInline
+                            preload="metadata"
+                            controls={false}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedVideo({ ...v })
+                              setShowFullscreenVideo(true)
+                            }}
+                          />
+                          <div
+                            className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedVideo({ ...v })
+                              setShowFullscreenVideo(true)
+                            }}
+                          >
+                            <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
+                              <div className="w-0 h-0 border-l-[20px] border-l-gray-800 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div
+                          className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedUser({
+                              id: v.owner_id || v.id,
+                              name: ownerHandle,
+                              avatar: ownerProfile?.avatar_url,
+                              isFollowing: isFavorite,
+                            })
+                            setShowUserProfile(true)
+                          }}
+                        >
+                          <h3 className="font-semibold text-sm mb-2 line-clamp-2">{v.title || "動画"}</h3>
+
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                                {ownerProfile?.avatar_url ? (
+                                  <img src={ownerProfile.avatar_url} alt={ownerHandle} className="w-full h-full object-cover" />
+                                ) : (
+                                  <User className="w-4 h-4 text-gray-600" />
+                                )}
+                              </div>
+                              <span className="text-xs text-gray-600">{ownerHandle}</span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleFavorite(v.id)
+                              }}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                            >
+                              <Bookmark
+                                className={`w-4 h-4 ${isFavorite ? "fill-orange-500 text-orange-500" : "text-gray-600"}`}
+                              />
+                            </button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
               {hasMoreVideos && (
                 <div className="flex justify-center mt-4">
@@ -1349,13 +1428,13 @@ export default function SearchPage() {
       )}
 
       {showFullscreenVideo && selectedVideo && (
-        <div className="fixed inset-0 bg-black z-[60]">
+        <div className="fixed inset-0 z-40 bg-black">
           <video
             ref={fullscreenVideoRef}
             src={selectedVideo.playback_url}
             className="w-full h-full object-cover"
             poster={derivePosterUrl(selectedVideo.playback_url) || "/placeholder.jpg"}
-            muted={fullscreenMuted}
+            muted
             loop
             autoPlay
             playsInline
@@ -1363,33 +1442,70 @@ export default function SearchPage() {
             preload="auto"
             controls={false}
           />
-          {/* Overlay content (user + actions) */}
+
+          <div className="absolute top-6 left-6 z-10">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const el = fullscreenVideoRef.current
+                if (el) {
+                  try {
+                    el.pause()
+                  } catch {}
+                }
+                setShowFullscreenVideo(false)
+              }}
+              className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white border-none"
+            >
+              ＜
+            </Button>
+          </div>
+
+          <div className="absolute top-6 right-6 z-10">
+            <button
+              type="button"
+              onClick={() => setFullscreenMuted((prev) => !prev)}
+              className="p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition"
+              aria-label={fullscreenMuted ? "ミュート解除" : "ミュートにする"}
+            >
+              <SpeakerIcon muted={fullscreenMuted} />
+            </button>
+          </div>
+
           <div className="absolute inset-0 flex">
             <div className="flex-1 flex flex-col justify-end p-4 pb-32">
               <div className="text-white">
                 <div className="mb-3">
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="w-10 h-10 bg-gray-300 rounded-full overflow-hidden flex items-center justify-center text-gray-600 font-semibold">
+                  <button
+                    onClick={() => {
+                      setSelectedUser({
+                        id: selectedVideo.owner_id || selectedVideo.id,
+                        name: selectedOwnerHandle,
+                        avatar: selectedOwnerProfile?.avatar_url,
+                        isFollowing: favorites.has(String(selectedVideo.id)),
+                      })
+                      setShowUserProfile(true)
+                    }}
+                    className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                  >
+                    <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden">
                       {selectedOwnerProfile?.avatar_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={selectedOwnerProfile.avatar_url} alt="profile" className="w-full h-full object-cover" />
+                        <img src={selectedOwnerProfile.avatar_url} alt={selectedOwnerHandle} className="w-full h-full object-cover" />
                       ) : (
-                        (selectedOwnerHandle.replace(/^@/, "") || "V").toString().trim().charAt(0).toUpperCase()
+                        selectedOwnerHandle.trim().replace(/^@/, "").charAt(0).toUpperCase() || "U"
                       )}
                     </div>
                     <span className="text-white font-semibold text-sm">{selectedOwnerHandle}</span>
-                  </div>
-                  {selectedVideo.title && (
-                    <p className="text-sm text-white font-medium leading-relaxed line-clamp-2">
-                      {selectedVideo.title}
-                    </p>
-                  )}
-                  {!showCaption && selectedVideo.caption && (
-                    <p className="text-sm text-white/80 leading-relaxed mt-2 line-clamp-2">
-                      {selectedVideo.caption}
-                    </p>
-                  )}
+                  </button>
                 </div>
+
+                {selectedVideo.title && (
+                  <div className="mb-2">
+                    <p className="text-white text-sm">{selectedVideo.title}</p>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -1409,12 +1525,12 @@ export default function SearchPage() {
 
               <div className="flex flex-col items-center">
                 <button
+                  onClick={() => toggleFavorite(selectedVideo.id)}
                   className="w-12 h-12 flex items-center justify-center"
-                  onClick={() => toggleVideoSave(selectedVideo.id)}
-                  aria-label={savedVideoIds.has(selectedVideo.id) ? "保存解除" : "保存"}
+                  aria-label={favorites.has(String(selectedVideo.id)) ? "お気に入り解除" : "お気に入り"}
                 >
                   <Bookmark
-                    className={`w-8 h-8 drop-shadow-lg ${savedVideoIds.has(selectedVideo.id) ? "fill-white text-white" : "text-white"}`}
+                    className={`w-8 h-8 drop-shadow-lg ${favorites.has(String(selectedVideo.id)) ? "fill-white text-white" : "text-white"}`}
                   />
                 </button>
               </div>
@@ -1441,62 +1557,23 @@ export default function SearchPage() {
             </div>
           </div>
 
-          {showCaption && selectedVideo.caption && (
-            <div className="absolute bottom-32 left-4 right-20 z-[61]">
-              <div className="bg-black bg-opacity-70 text-white p-4 rounded-2xl whitespace-pre-line space-y-2">
-                {selectedVideo.title && <h3 className="text-base font-semibold">{selectedVideo.title}</h3>}
-                <p className="text-sm leading-relaxed">{selectedVideo.caption}</p>
-              </div>
-            </div>
-          )}
-
-          <div className="absolute top-6 right-6 z-[61]">
-            <button
-              type="button"
-              onClick={() => setFullscreenMuted((prev) => !prev)}
-              className="p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition"
-              aria-label={fullscreenMuted ? "ミュート解除" : "ミュート"}
-            >
-              <SpeakerIcon muted={fullscreenMuted} />
-            </button>
-          </div>
-
-          <div className="absolute bottom-16 left-0 right-0 px-4 z-[61]">
+          <div className="absolute bottom-16 left-0 right-0 px-4">
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => {
-                  openReservationForVideo(selectedVideo)
-                }}
+                onClick={() => openReservationForVideo(selectedVideo)}
                 className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
               >
                 今すぐ予約する
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  openStoreDetailForVideo(selectedVideo)
-                }}
+                onClick={() => openStoreDetailForVideo(selectedVideo)}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
               >
                 もっと見る…
               </button>
             </div>
-          </div>
-          <div className="absolute top-6 left-6 z-[61]">
-            <button
-              onClick={() => {
-                const el = fullscreenVideoRef.current
-                if (el) try { el.pause() } catch {}
-                setShowFullscreenVideo(false)
-                setShowCaption(false)
-              }}
-              className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white border-none px-3 py-2 rounded"
-              aria-label="閉じる"
-              title="閉じる"
-            >
-              ＜
-            </button>
           </div>
         </div>
       )}
@@ -1508,7 +1585,16 @@ export default function SearchPage() {
 
 function SpeakerIcon({ muted }: { muted: boolean }) {
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4.5 9.5v5h3.2L12 20V4l-4.3 5.5H4.5z" fill="currentColor" stroke="currentColor" />
       {!muted && (
         <>
