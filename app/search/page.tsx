@@ -12,6 +12,8 @@ import { useRandomVideos } from "@/hooks/useRandomVideos"
 import { mockRestaurants } from "@/lib/mock-data"
 import { supabase } from "@/lib/supabase"
 import { toggleLike } from "@/lib/likes"
+import { useLike } from "@/hooks/useLike"
+import { useBookmark } from "@/hooks/useBookmark"
 
 type SupabaseVideoRow = {
   id: string
@@ -87,45 +89,95 @@ export default function SearchPage() {
   const [savedVideoIds, setSavedVideoIds] = useState<Set<string>>(new Set())
   const likeMutationRef = useRef<Set<string>>(new Set())
 
-  async function toggleVideoLike(videoId: string) {
-    if (likeMutationRef.current.has(videoId)) return
-    const wasLiked = likedVideoIds.has(videoId)
-    likeMutationRef.current.add(videoId)
-    try {
-      const result = await toggleLike(videoId, wasLiked)
-      if ((result as any)?.needLogin) {
-        router.push("/auth/login")
-        return
+  const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
+
+  function LikeButton({ videoId, className = "" }: { videoId: string; className?: string }) {
+    const { isLiked, likeCount, loading, toggleLike } = useLike(videoId)
+    const router = useRouter()
+
+    const handleLike = async (e: React.MouseEvent) => {
+      e.stopPropagation()
+      try {
+        await toggleLike()
+      } catch (error: any) {
+        if (error.message === 'ログインが必要です') {
+          router.push('/auth/login')
+        }
       }
-      const nowLiked = (result as any)?.liked ?? !wasLiked
-      setLikedVideoIds((prev) => {
-        const next = new Set(prev)
-        if (nowLiked) next.add(videoId)
-        else next.delete(videoId)
-        return next
-      })
-      setVideoLikeCounts((prev) => {
-        const current = prev[videoId] ?? 0
-        const delta = nowLiked ? 1 : -1
-        const nextCount = Math.max(0, current + delta)
-        return { ...prev, [videoId]: nextCount }
-      })
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.warn("like toggle error", e)
-    } finally {
-      likeMutationRef.current.delete(videoId)
+    }
+
+    return (
+      <div className="flex flex-col items-center">
+        <button 
+          onClick={handleLike}
+          disabled={loading}
+          className={`w-12 h-12 flex items-center justify-center ${className}`}
+        >
+          <Heart 
+            className={`w-8 h-8 drop-shadow-lg transition-colors ${
+              isLiked 
+                ? "fill-red-500 text-red-500" 
+                : "text-white hover:text-red-300"
+            }`} 
+          />
+        </button>
+        <span className="text-white text-xs font-medium drop-shadow-lg mt-1">
+          {likeCount > 0 ? likeCount : ''}
+        </span>
+      </div>
+    )
+  }
+
+  // async function toggleVideoLike(videoId: string) {
+  //   if (likeMutationRef.current.has(videoId)) return
+  //   const wasLiked = likedVideoIds.has(videoId)
+  //   likeMutationRef.current.add(videoId)
+  //   try {
+  //     const result = await toggleLike(videoId, wasLiked)
+  //     if ((result as any)?.needLogin) {
+  //       router.push("/auth/login")
+  //       return
+  //     }
+  //     const nowLiked = (result as any)?.liked ?? !wasLiked
+  //     setLikedVideoIds((prev) => {
+  //       const next = new Set(prev)
+  //       if (nowLiked) next.add(videoId)
+  //       else next.delete(videoId)
+  //       return next
+  //     })
+  //     setVideoLikeCounts((prev) => {
+  //       const current = prev[videoId] ?? 0
+  //       const delta = nowLiked ? 1 : -1
+  //       const nextCount = Math.max(0, current + delta)
+  //       return { ...prev, [videoId]: nextCount }
+  //     })
+  //   } catch (e) {
+  //     // eslint-disable-next-line no-console
+  //     console.warn("like toggle error", e)
+  //   } finally {
+  //     likeMutationRef.current.delete(videoId)
+  //   }
+  // }
+
+  const handleBookmarkToggle = async (videoId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await toggleBookmark(videoId)
+    } catch (error: any) {
+      if (error.message === 'ログインが必要です') {
+        router.push('/auth/login')
+      }
     }
   }
 
-  function toggleVideoSave(videoId: string) {
-    setSavedVideoIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(videoId)) next.delete(videoId)
-      else next.add(videoId)
-      return next
-    })
-  }
+  // function toggleVideoSave(videoId: string) {
+  //   setSavedVideoIds((prev) => {
+  //     const next = new Set(prev)
+  //     if (next.has(videoId)) next.delete(videoId)
+  //     else next.add(videoId)
+  //     return next
+  //   })
+  // }
 
   function mapVideoToRestaurant(video: SupabaseVideoRow | null) {
     if (!video) return null
@@ -606,20 +658,17 @@ export default function SearchPage() {
                   {/* Right side buttons */}
                   <div className="w-16 flex flex-col items-center justify-center pb-32 gap-6">
                     <div className="flex flex-col items-center">
-                      <button className="w-12 h-12 flex items-center justify-center">
-                        <Heart className="w-8 h-8 text-white drop-shadow-lg" />
-                      </button>
-                      <span className="text-white text-xs font-medium drop-shadow-lg mt-1">128</span>
+                      <LikeButton videoId={video.id} />
                     </div>
 
                     <div className="flex flex-col items-center">
                       <button
-                        onClick={() => toggleFavorite(video.id)}
-                        className="w-12 h-12 flex items-center justify-center"
+                        onClick={(e) => handleBookmarkToggle(video.id, e)}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
                       >
                         <Bookmark
-                          className={`w-8 h-8 drop-shadow-lg ${
-                            favorites.has(String(video.id)) ? "fill-white text-white" : "text-white"
+                          className={`w-8 h-8 ${
+                            bookmarkedVideoIds.has(video.id) ? "fill-orange-500 text-orange-500" : "text-white hover:text-orange-300"
                           }`}
                         />
                       </button>
@@ -1196,7 +1245,7 @@ export default function SearchPage() {
                         <div className="aspect-[9/16] relative">
                           <video
                             src={video.public_url}
-                            alt={video.title}
+                            aria-label={video.title}
                             className="w-full h-full object-cover rounded-t-lg cursor-pointer"
                             muted
                             loop
@@ -1258,15 +1307,12 @@ export default function SearchPage() {
                               </span>
                             </div>
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleFavorite(video.id)
-                              }}
+                              onClick={(e) => handleBookmarkToggle(video.id, e)}
                               className="p-1 hover:bg-gray-100 rounded transition-colors"
                             >
                               <Bookmark
                                 className={`w-4 h-4 ${
-                                  favorites.has(String(video.id)) ? "fill-orange-500 text-orange-500" : "text-gray-600"
+                                  bookmarkedVideoIds.has(video.id) ? "fill-orange-500 text-orange-500" : "text-gray-600"
                                 }`}
                               />
                             </button>
@@ -1314,7 +1360,7 @@ export default function SearchPage() {
                     <CardContent className="p-0">
                       <div className="aspect-[9/16] relative">
                         <video
-                          ref={(el) => (playersRef.current[v.id] = el)}
+                          ref={(el) => { playersRef.current[v.id] = el }}
                           src={v.playback_url}
                           className="w-full h-full object-cover rounded-t-lg"
                           poster={derivePosterUrl(v.playback_url) || "/placeholder.jpg"}
@@ -1395,26 +1441,20 @@ export default function SearchPage() {
 
             <div className="w-16 flex flex-col items-center justify-center pb-32 gap-6">
               <div className="flex flex-col items-center">
-                <button
-                  className="w-12 h-12 flex items-center justify-center"
-                  onClick={() => toggleVideoLike(selectedVideo.id)}
-                  aria-label={likedVideoIds.has(selectedVideo.id) ? "いいね解除" : "いいね"}
-                >
-                  <Heart className={`w-8 h-8 text-white drop-shadow-lg ${likedVideoIds.has(selectedVideo.id) ? "fill-red-500 text-red-500" : ""}`} />
-                </button>
-                <span className="text-white text-xs font-medium drop-shadow-lg mt-1">
-                  {videoLikeCounts[selectedVideo.id] ?? 0}
-                </span>
+                <LikeButton
+                  videoId={selectedVideo.id}
+                />
               </div>
 
               <div className="flex flex-col items-center">
                 <button
+                  onClick={(e) => handleBookmarkToggle(selectedVideo.id, e)}
                   className="w-12 h-12 flex items-center justify-center"
-                  onClick={() => toggleVideoSave(selectedVideo.id)}
-                  aria-label={savedVideoIds.has(selectedVideo.id) ? "保存解除" : "保存"}
                 >
                   <Bookmark
-                    className={`w-8 h-8 drop-shadow-lg ${savedVideoIds.has(selectedVideo.id) ? "fill-white text-white" : "text-white"}`}
+                    className={`w-8 h-8 drop-shadow-lg ${
+                      bookmarkedVideoIds.has(selectedVideo.id) ? "fill-white text-white" : "text-white"
+                    }`}
                   />
                 </button>
               </div>
