@@ -16,7 +16,7 @@ export default function Navigation() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[70]">
       <div className="flex">
         {navItems.map((item) => {
           const IconComponent = item.icon
