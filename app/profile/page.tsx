@@ -2456,6 +2456,23 @@ export default function ProfilePage() {
     )
   }
 
+  if (showMyVideosModal) {    
+    return (
+      <div className="min-h-screen bg-white pb-20">
+        <div className="px-6 py-4 flex items-center gap-4">
+          <Button variant="ghost" onClick={() => setShowMyVideosModal(false)} className="text-black">
+            ＜
+          </Button>
+          <h1 className="text-xl font-semibold">自分の動画</h1>
+        </div>
+        <div className="px-6 py-4">
+          <MyVideosPanel />
+        </div>
+        <Navigation />
+      </div>
+    )
+  }
+
   // Stats Page (Followers/Following/Posts)
   if (showFollowers || showFollowing || showPosts) {
     const mockFollowers = [
@@ -2837,25 +2854,6 @@ export default function ProfilePage() {
 
       <Navigation />
 
-      {/* 動画アップロード モーダル */}
-      {/* <Dialog open={showUploadModal} onOpenChange={setShowUploadModal}>
-        <DialogContent className="sm:max-w-lg" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>動画をアップロード</DialogTitle>
-          </DialogHeader>
-          <VideoUploader />
-        </DialogContent>
-      </Dialog> */}
-
-      {/* 自分の動画 モーダル */}
-      <Dialog open={showMyVideosModal} onOpenChange={setShowMyVideosModal}>
-        <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>自分の動画</DialogTitle>
-          </DialogHeader>
-          <MyVideosPanel />
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
