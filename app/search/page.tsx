@@ -8,7 +8,7 @@ import { Search, X, Bookmark, User, Heart, Send, Star, RefreshCw } from "lucide-
 import Navigation from "@/components/navigation"
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { useRandomVideos } from "@/hooks/useRandomVideos"
+import { useRandomVideos, type VideoData } from "@/hooks/useRandomVideos"
 import { mockRestaurants } from "@/lib/mock-data"
 import { supabase } from "@/lib/supabase"
 import { toggleLike } from "@/lib/likes"
@@ -28,9 +28,9 @@ type SupabaseVideoRow = {
 export default function SearchPage() {
   const router = useRouter()
   const { videos, loading, error, fetchVideos, refreshVideos } = useRandomVideos()
-  const filters = ["ジャンル", "距離", "空席あり", "予算", "サブスク対応"]
+  const _filters = ["ジャンル", "距離", "空席あり", "予算", "サブスク対応"] // TODO: 未使用
   const [showFilters, setShowFilters] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(0)
+  const [_selectedDate, _setSelectedDate] = useState(0) // TODO: 未使用
   const [selectedFilterCategory, setSelectedFilterCategory] = useState<string | null>(null)
   const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({
     形態: [],
@@ -40,12 +40,12 @@ export default function SearchPage() {
     趣味・嗜好: [],
   })
   const [isSearchMode, setIsSearchMode] = useState(false)
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null)
+  const [_expandedCategory, _setExpandedCategory] = useState<string | null>(null) // TODO: 未使用
   const categoryTabs = ["今日のおすすめ", "今人気のお店", "SNSで人気のお店", "Z世代に人気のお店", "デートにおすすめのお店", "最新動画"]
   const [selectedCategory, setSelectedCategory] = useState("今日のおすすめ")
   const isLatestCategory = selectedCategory === "最新動画"
-  const [showVideoFeed, setShowVideoFeed] = useState(false)
-  const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
+  // const [showVideoFeed, setShowVideoFeed] = useState(false)
+  // const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<
     | {
@@ -57,11 +57,11 @@ export default function SearchPage() {
     | null
   >(null)
   const [popularKeywordsSet, setPopularKeywordsSet] = useState(0)
-  const [searchTerm, setSearchTerm] = useState("")
+  const [_searchTerm, setSearchTerm] = useState("") // TODO: 未使用
 
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null) // TODO: 型を詰める
   const [reservationData, setReservationData] = useState({
     name: "",
     people: 2,
@@ -71,10 +71,10 @@ export default function SearchPage() {
     message: "",
   })
 
-  const [randomRestaurants, setRandomRestaurants] = useState<any[]>([])
+  const [_randomRestaurants, setRandomRestaurants] = useState<any[]>([]) // TODO: 未使用
   const [supabaseVideos, setSupabaseVideos] = useState<SupabaseVideoRow[]>([])
   const playersRef = useRef<Record<string, HTMLVideoElement | null>>({})
-  const feedPlayersRef = useRef<Record<string, HTMLVideoElement | null>>({})
+  // const feedPlayersRef = useRef<Record<string, HTMLVideoElement | null>>({})
   const [videoLimit, setVideoLimit] = useState(6)
   const [hasMoreVideos, setHasMoreVideos] = useState(true)
   const latestSentinelRef = useRef<HTMLDivElement | null>(null)
@@ -83,7 +83,7 @@ export default function SearchPage() {
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, { username?: string | null; display_name?: string | null; avatar_url?: string | null }>>({})
   const [fullscreenMuted, setFullscreenMuted] = useState(false)
-  const [videoFeedMuted, setVideoFeedMuted] = useState(false)
+  // const [videoFeedMuted, setVideoFeedMuted] = useState(false)
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
 
   // Fullscreen overlay interactions (like/favorite)
@@ -91,17 +91,24 @@ export default function SearchPage() {
   const likeMutationRef = useRef<Set<string>>(new Set())
   const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
 
+  useEffect(() => {
+    document.body.classList.add("scrollbar-hide")
+    return () => {
+      document.body.classList.remove("scrollbar-hide")
+    }
+  }, [])
+
   async function toggleVideoLike(videoId: string) {
     if (likeMutationRef.current.has(videoId)) return
     const wasLiked = likedVideoIds.has(videoId)
     likeMutationRef.current.add(videoId)
     try {
       const result = await toggleLike(videoId, wasLiked)
-      if ((result as any)?.needLogin) {
+      if ((result as any)?.needLogin) { // TODO: 型を詰める
         router.push("/auth/login")
         return
       }
-      const nowLiked = (result as any)?.liked ?? !wasLiked
+      const nowLiked = (result as any)?.liked ?? !wasLiked // TODO: 型を詰める
       setLikedVideoIds((prev) => {
         const next = new Set(prev)
         if (nowLiked) next.add(videoId)
@@ -153,6 +160,48 @@ export default function SearchPage() {
     }
   }
 
+  function openRandomVideoFullscreen(video: VideoData) {
+    const playbackUrl = video.playback_url || video.public_url
+    if (!playbackUrl) return
+
+    if (video.user?.id) {
+      setOwnerProfiles((prev) => {
+        const existing = prev[video.user!.id]
+        const nextProfile = {
+          username: video.user?.username,
+          display_name: video.user?.name,
+          avatar_url: video.user?.avatar_url ?? null,
+        }
+        if (
+          existing &&
+          existing.username === nextProfile.username &&
+          existing.display_name === nextProfile.display_name &&
+          existing.avatar_url === nextProfile.avatar_url
+        ) {
+          return prev
+        }
+        return { ...prev, [video.user!.id]: nextProfile }
+      })
+    }
+
+    setVideoLikeCounts((prev) => {
+      if (prev[video.id] !== undefined) return prev
+      return { ...prev, [video.id]: 0 }
+    })
+
+    setSelectedVideo({
+      id: video.id,
+      owner_id: video.user?.id ?? null,
+      playback_url: playbackUrl,
+      storage_path: null,
+      title: video.title ?? null,
+      caption: video.influencer_comment ?? null,
+      created_at: video.created_at,
+      video_likes: [],
+    })
+    setShowFullscreenVideo(true)
+  }
+
   // When opening fullscreen, try to play proactively and pause other inline players
   useEffect(() => {
     if (showFullscreenVideo && selectedVideo) {
@@ -179,31 +228,6 @@ export default function SearchPage() {
   }, [showFullscreenVideo, selectedVideo, fullscreenMuted])
 
   // Video URLs array
-  const videoUrls = [
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/e4922433bbfa40c89df0a9e1f75192fd-WalYMXOSoRpEM4dikM8ZHQC2pIv6cw.MP4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/01128128b91e4216be8e0f1e2eb76d3a-83Mcy3H53RYQLcX9JxsyxoLI9VHH8M.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/efc4143cd14b4daabbf86c724c2d911a-TuRbYoAW7DVdz2WGrlJIZXTGk5Tj8K.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ecf421d1612b4e9c9d9d18982d9e29c1-PhpTeES7tlpnyhvlVCNGF3WY1AWCBs.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/94ed3b99e81b4f4e861e98fa6a737a05-KCDhmH7BRPUUFsJ3n6bACbv40LgLUA.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/0b918043eadc42dbb8a11a8666292e14-MOl0JytZ8z9foz7rwhuYZDR1iWJgOf.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/f0ef4e73b2634edc83f0662216afea99-9Wmgb9IlxC1XmLjSFQQ52IbA6PSi7X.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/59c69364867548408e26dc2ce530028f-rsrZkbHGsDOVbLiC9Jk0bYXklUHcNN.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/6633e00c4e854a1e9ad7715144d0d4a0-CbfjiPi1ex3Z6G7WqIVv7uNBDVqmqF.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/8711c29b4db94231af27d2ec9fac2504-1ivyBR2r1ugGBqyMd4fosbGMRt20gl.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/9e218dd5bf174e77a48386174af1272d-2L3LydtHICbzoyeqvMCuFsfe8WXdYw.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/8e32fd32a40a4257ad509cfb7a5e7685-PClZMaKQ83B8PTSGT2Xkn5qmEAHZ7W.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/cf02561daa5b4af8863d9591ac62645e-CE6tYTu63CWHCCajVlHyYxANJzT4aP.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/fb92522435974a5da420115eda3f8a0b-Ug5LtXi1jgInPaP8WqJ2usgrSf5L8a.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/6a98071d2ad1460084381913878425ad-c9sgTJjw5Lkvk8kYad58Mks6fi1aPy.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/031fc99b3cb649158886f54bba3bd53b-cHFVNW41aIRIDbU37YiciolgCGxrR9.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/029b03bc9e78498a90e554d11522358c-DzJm5Gxy6PCwoSraWl6M5QbdeaTTFC.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/b3b96c6e9aaf4fa4860c5ce5344b8dc3-H21RCMbelIgUirYbPxolPH16qfcz7W.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/efc4143cd14b4daabbf86c724c2d911a-IrBeGhEYIEDl7DoPhAnZp45y4voOq4.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/01128128b91e4216be8e0f1e2eb76d3a-BJ2LcWGKStXMDp320r6s3jIC9p9366.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/e4922433bbfa40c89df0a9e1f75192fd-d17VTvBTfoFxaaqqdH3jOo8qYiChp9.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/94ed3b99e81b4f4e861e98fa6a737a05-CR47nL9G7ql7Z4P96PYNDn4NBydZy8.mp4",
-    "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ecf421d1612b4e9c9d9d18982d9e29c1-bTJ7JdUlEt3Cc4F4Ig9Wl63nGr5qFw.mp4",
-  ]
 
   const filterOptions = {
     形態: [
@@ -282,7 +306,7 @@ export default function SearchPage() {
         if (!prev || String(prev.id) !== videoId) return prev
         return { ...prev, isFollowing: !prev.isFollowing }
       })
-    } catch (error: any) {
+    } catch (error: any) { // TODO: 型を詰める
       if (error?.message === "ログインが必要です") {
         router.push("/auth/login")
       }
@@ -301,7 +325,8 @@ export default function SearchPage() {
 
   const handleRefreshVideos = () => {
     if (isLatestCategory) return
-    refreshVideos(selectedCategory, 10)
+    const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
+    refreshVideos(categoryForFetch, 10)
   }
 
   function FilterButton({ label }: { label: string }) {
@@ -318,7 +343,8 @@ export default function SearchPage() {
   }, [selectedCategory])
   useEffect(() => {
     if (selectedCategory === "最新動画") return
-    fetchVideos(selectedCategory, 10)
+    const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
+    fetchVideos(categoryForFetch, 10)
   }, [selectedCategory, fetchVideos])
 
   // Load videos from Supabase (initial 6, then +2)
@@ -348,7 +374,7 @@ export default function SearchPage() {
           if (!profileErr && profileRows) {
             setOwnerProfiles((prev) => {
               const next = { ...prev }
-              ;(profileRows as any[]).forEach((p) => {
+              ;(profileRows as any[]).forEach((p) => { // TODO: 型を詰める
                 next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
               })
               return next
@@ -368,7 +394,7 @@ export default function SearchPage() {
               .eq("user_id", user.id)
               .in("video_id", videoIds)
             if (!likedErr && likedRows) {
-              setLikedVideoIds(new Set((likedRows as any[]).map((r) => r.video_id)))
+              setLikedVideoIds(new Set((likedRows as any[]).map((r) => r.video_id))) // TODO: 型を詰める
             } else {
               setLikedVideoIds(new Set())
             }
@@ -391,12 +417,6 @@ export default function SearchPage() {
   }, [videoLimit])
 
   useEffect(() => {
-    if (showVideoFeed) {
-      setVideoFeedMuted(false)
-    }
-  }, [showVideoFeed])
-
-  useEffect(() => {
     if (!isLatestCategory) return
     const sentinel = latestSentinelRef.current
     if (!sentinel) return
@@ -416,6 +436,13 @@ export default function SearchPage() {
     return () => observer.disconnect()
   }, [isLatestCategory, hasMoreVideos])
 
+  /*
+  useEffect(() => {
+    if (showVideoFeed) {
+      setVideoFeedMuted(false)
+    }
+  }, [showVideoFeed])
+
   useEffect(() => {
     Object.values(feedPlayersRef.current).forEach((el) => {
       if (!el) return
@@ -431,6 +458,7 @@ export default function SearchPage() {
       }
     })
   }, [videoFeedMuted])
+  */
 
   useEffect(() => {
     if (showFullscreenVideo) {
@@ -452,6 +480,35 @@ export default function SearchPage() {
       } catch {}
     }
   }, [fullscreenMuted])
+
+  useEffect(() => {
+    if (videos.length === 0) return
+    setOwnerProfiles((prev) => {
+      let changed = false
+      const next = { ...prev }
+      videos.forEach((video) => {
+        const user = video.user
+        if (user?.id) {
+          const nextProfile = {
+            username: user.username,
+            display_name: user.name,
+            avatar_url: user.avatar_url ?? null,
+          }
+          const existing = next[user.id]
+          if (
+            !existing ||
+            existing.username !== nextProfile.username ||
+            existing.display_name !== nextProfile.display_name ||
+            existing.avatar_url !== nextProfile.avatar_url
+          ) {
+            next[user.id] = nextProfile
+            changed = true
+          }
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [videos])
 
   const selectedOwnerProfile = selectedVideo?.owner_id ? ownerProfiles[selectedVideo.owner_id] : undefined
   const selectedOwnerHandle = selectedOwnerProfile?.username
@@ -580,6 +637,7 @@ export default function SearchPage() {
       </div>
 
       {/* Video Feed Modal - DBから取得した動画を使用 */}
+      {/*
       {showVideoFeed && (
         <div className="fixed inset-0 z-40 bg-black">
           <div className="h-screen overflow-y-auto snap-y snap-mandatory">
@@ -603,7 +661,6 @@ export default function SearchPage() {
                   }}
                 />
 
-                {/* Back button - top left */}
                 <div className="absolute top-6 left-6 z-10">
                   <Button
                     variant="ghost"
@@ -658,15 +715,12 @@ export default function SearchPage() {
                           </span>
                         </button>
                       </div>
-                      
-                      {/* 動画タイトル表示 */}
                       <div className="mb-2">
                         <p className="text-white text-sm">{video.title}</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Right side buttons */}
                   <div className="w-16 flex flex-col items-center justify-center pb-32 gap-6">
                     <div className="flex flex-col items-center">
                       <button className="w-12 h-12 flex items-center justify-center">
@@ -696,7 +750,6 @@ export default function SearchPage() {
                   </div>
                 </div>
 
-                {/* Bottom buttons */}
                 <div className="absolute bottom-16 left-0 right-0 px-4">
                   <div className="flex gap-2">
                     <button
@@ -742,6 +795,7 @@ export default function SearchPage() {
           </div>
         </div>
       )}
+      */}
 
       {/* User Profile Modal */}
       {showUserProfile && selectedUser && (
@@ -1263,17 +1317,15 @@ export default function SearchPage() {
                           poster={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
                           onClick={(e) => {
                             e.stopPropagation()
-                            setSelectedVideoIndex(videos.findIndex(v => v.id === video.id))
-                            setShowVideoFeed(true)
-                            }}
-                          />
+                            openRandomVideoFullscreen(video)
+                          }}
+                        />
                           {/* Play button overlay */}
                           <div
                             className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setSelectedVideoIndex(videos.findIndex(v => v.id === video.id))
-                              setShowVideoFeed(true)
+                              openRandomVideoFullscreen(video)
                             }}
                           >
                             <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
@@ -1302,11 +1354,14 @@ export default function SearchPage() {
                             <div className="flex items-center gap-2">
                               <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                                 {video.user.avatar_url ? (
-                                  <img 
-                                    src={video.user.avatar_url} 
-                                    alt={video.user.name}
-                                    className="w-full h-full object-cover"
-                                  />
+                                  <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element -- TODO: 画像最適化は後で対応 */}
+                                    <img 
+                                      src={video.user.avatar_url} 
+                                      alt={video.user.name}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </>
                                 ) : (
                                   <User className="w-4 h-4 text-gray-600" />
                                 )}
@@ -1422,7 +1477,10 @@ export default function SearchPage() {
                             <div className="flex items-center gap-2">
                               <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                                 {ownerProfile?.avatar_url ? (
-                                  <img src={ownerProfile.avatar_url} alt={ownerHandle} className="w-full h-full object-cover" />
+                                  <>
+                                    {/* eslint-disable-next-line @next/next/no-img-element -- TODO: 画像最適化は後で対応 */}
+                                    <img src={ownerProfile.avatar_url} alt={ownerHandle} className="w-full h-full object-cover" />
+                                  </>
                                 ) : (
                                   <User className="w-4 h-4 text-gray-600" />
                                 )}

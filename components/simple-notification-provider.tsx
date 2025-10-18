@@ -11,7 +11,7 @@ interface Notification {
   read: boolean
   created_at: string
   time: string
-  icon: any
+  icon: unknown
 }
 
 interface NotificationContextType {

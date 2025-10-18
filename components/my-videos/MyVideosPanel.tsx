@@ -35,7 +35,7 @@ export default function MyVideosPanel() {
         return
       }
       setUid(user.id)
-      let { data, error } = await supabase
+      const { data, error } = await supabase
         .from("user_videos")
         .select("id, path, public_url, content_type, size, created_at, title, description")
         .eq("user_id", user.id)
@@ -46,9 +46,11 @@ export default function MyVideosPanel() {
           .select("id, path, public_url, content_type, size, created_at")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
-        data = fb.data as any
+        const fallbackData = fb.data as any // TODO: 型を詰める
+        setItems(fallbackData || [])
+      } else {
+        setItems((data as any) || []) // TODO: 型を詰める
       }
-      setItems((data as any) || [])
     } catch (e: any) {
       setError(e?.message || "読み込みに失敗しました")
     } finally {
@@ -110,4 +112,3 @@ export default function MyVideosPanel() {
     </div>
   )
 }
-
