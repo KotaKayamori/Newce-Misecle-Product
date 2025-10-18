@@ -44,7 +44,7 @@ export default function FavoritesPage() {
   const likedFeedRef = useRef<HTMLDivElement | null>(null)
   const bookmarkedFeedRef = useRef<HTMLDivElement | null>(null)
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set())
-  const [bookmarkedSet, setBookmarkedSet] = useState<Set<string>>(new Set())
+  const [, setBookmarkedSet] = useState<Set<string>>(new Set()) // TODO: 未使用値
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({})
   const [optimisticDelta, setOptimisticDelta] = useState<Record<string, number>>({})
   const [captionOpenIds, setCaptionOpenIds] = useState<Set<string>>(new Set())
@@ -67,7 +67,7 @@ export default function FavoritesPage() {
           .select("created_at, videos(id, owner_id, playback_url, title, caption, created_at)")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
-        if (!error) setLikedVideos(((data ?? []) as any[]).map((d) => d.videos))
+        if (!error) setLikedVideos(((data ?? []) as any[]).map((d) => d.videos)) // TODO: 型を詰める
         else setLikedVideos([])
       } catch {
         setLikedVideos([])
@@ -137,7 +137,7 @@ export default function FavoritesPage() {
           .in("id", ids)
         if (!error && data) {
           const map: Record<string, number> = {}
-          ;(data as any[]).forEach((r) => {
+          ;(data as any[]).forEach((r) => { // TODO: 型を詰める
             const c = r?.video_likes?.[0]?.count ?? 0
             map[r.id] = c
           })
@@ -155,8 +155,8 @@ export default function FavoritesPage() {
           .select("id, username, display_name, avatar_url")
           .in("id", ownerIds)
         if (!error && data) {
-          const map: Record<string, any> = {}
-          ;(data as any[]).forEach((p) => {
+          const map: Record<string, any> = {} // TODO: 型を詰める
+          ;(data as any[]).forEach((p) => { // TODO: 型を詰める
             map[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
           })
           setOwnerProfiles(map)
@@ -262,8 +262,8 @@ export default function FavoritesPage() {
 
   const handleShare = async (url: string) => {
     try {
-      if ((navigator as any).share) {
-        await (navigator as any).share({ url })
+      if ((navigator as any).share) { // TODO: 型を詰める
+        await (navigator as any).share({ url }) // TODO: 型を詰める
       } else if (navigator.clipboard) {
         await navigator.clipboard.writeText(url)
         console.info("Link copied")
@@ -275,9 +275,9 @@ export default function FavoritesPage() {
 
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null)
-  const [showUserProfile, setShowUserProfile] = useState(false)
-  const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null) // TODO: 型を詰める
+  // const [showUserProfile, setShowUserProfile] = useState(false) // TODO: 未使用
+  // const [selectedUser, setSelectedUser] = useState(null) // TODO: 未使用
   const [reservationData, setReservationData] = useState({
     name: "",
     people: 2,
@@ -503,7 +503,7 @@ export default function FavoritesPage() {
       {/* Bookmarked Videos Feed Modal */}
       {showBookmarkedVideoFeed && bookmarkedVideos.length > 0 && (
         <div className="fixed inset-0 z-50 bg-black">
-          <div ref={bookmarkedFeedRef as any} className="h-screen overflow-y-auto snap-y snap-mandatory">
+          <div ref={bookmarkedFeedRef as any} className="h-screen overflow-y-auto snap-y snap-mandatory"> {/* TODO: 型を詰める */}
             {bookmarkedVideos.map((bookmark, index) => {
               const video = bookmark.videos
               return (
@@ -618,7 +618,7 @@ export default function FavoritesPage() {
       {/* 既存のLiked Videos Feed Modal */}
       {showLikedVideoFeed && likedVideos && (
         <div className="fixed inset-0 z-50 bg-black">
-          <div ref={likedFeedRef as any} className="h-screen overflow-y-auto snap-y snap-mandatory">
+          <div ref={likedFeedRef as any} className="h-screen overflow-y-auto snap-y snap-mandatory"> {/* TODO: 型を詰める */}
             {likedVideos.map((v, index) => (
               <div key={v.id} className="h-screen w-full relative snap-start">
                 <video
@@ -652,11 +652,14 @@ export default function FavoritesPage() {
                         >
                           <div className="w-10 h-10 bg-gray-300 rounded-full overflow-hidden">
                             {ownerProfiles[v.owner_id]?.avatar_url ? (
-                              <img
-                                src={ownerProfiles[v.owner_id]?.avatar_url as string}
-                                alt="avatar"
-                                className="w-full h-full object-cover"
-                              />
+                              <>
+                                {/* eslint-disable-next-line @next/next/no-img-element -- TODO: 画像最適化は後で対応 */}
+                                <img
+                                  src={ownerProfiles[v.owner_id]?.avatar_url as string}
+                                  alt="avatar"
+                                  className="w-full h-full object-cover"
+                                />
+                              </>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-gray-700 font-semibold">
                                 {(ownerProfiles[v.owner_id]?.username || ownerProfiles[v.owner_id]?.display_name || "U").toString().charAt(0).toUpperCase()}

@@ -134,6 +134,7 @@ export default function VideoFeedModal({ videos, selectedVideoIndex, onClose }: 
               <div className="mb-3">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="w-10 h-10 bg-gray-300 rounded-full overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- TODO: 画像最適化は後で対応 */}
                     <img
                       src={currentVideo.user.avatar || "/placeholder.svg"}
                       alt={currentVideo.user.name}

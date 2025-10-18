@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Search, Calendar, Heart, User, Play } from "lucide-react"
+import { Search, Calendar, Heart, User /* , Play */ } from "lucide-react" // TODO: 未使用 Play アイコン
 
 export default function Navigation() {
   const pathname = usePathname()

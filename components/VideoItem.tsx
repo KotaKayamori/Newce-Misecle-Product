@@ -20,7 +20,7 @@ export default function VideoItem({ id, playbackUrl, mode }: VideoItemProps) {
   // TFF measurement using Performance API (console first, later sendBeacon)
   const tffLoggedRef = useRef<boolean>(false)
 
-  const preloadAttr = useMemo(() => {
+  const preloadAttr = useMemo<unknown>(() => {
     // Initial attribute is none; we will mutate via effects per mode
     return "none"
   }, [])
@@ -152,6 +152,8 @@ function derivePosterUrl(playbackUrl: string): string | null {
     setIsReady(true)
   }
 
+  const preloadValue = typeof preloadAttr === "string" ? preloadAttr : undefined
+
   return (
     <div className="relative h-screen w-screen">
       <video
@@ -165,7 +167,7 @@ function derivePosterUrl(playbackUrl: string): string | null {
         {...{ 'webkit-playsinline': 'true' }}
         loop
         controls={false}
-        preload={preloadAttr as any}
+        preload={preloadValue}
         data-src={playbackUrl}
         autoPlay={mode === "active"}
         onLoadedData={handleLoadedData}
@@ -228,5 +230,4 @@ function derivePosterUrl(playbackUrl: string): string | null {
     </div>
   )
 }
-
 

@@ -31,16 +31,16 @@ export default function MessagesPage() {
     }
   }
 
-  const getReactionIcon = (type: string) => {
-    switch (type) {
-      case "heart":
-        return <Heart className="w-4 h-4 fill-red-500 text-red-500" />
-      case "thumbsup":
-        return <ThumbsUp className="w-4 h-4 fill-blue-500 text-blue-500" />
-      default:
-        return null
-    }
-  }
+  // const getReactionIcon = (type: string) => {
+  //   switch (type) {
+  //     case "heart":
+  //       return <Heart className="w-4 h-4 fill-red-500 text-red-500" />
+  //     case "thumbsup":
+  //       return <ThumbsUp className="w-4 h-4 fill-blue-500 text-blue-500" />
+  //     default:
+  //       return null
+  //   }
+  // } // TODO: 未使用
 
   return (
     <div className="min-h-screen bg-white pb-20">
