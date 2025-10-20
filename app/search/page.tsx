@@ -85,6 +85,10 @@ export default function SearchPage() {
   const [fullscreenMuted, setFullscreenMuted] = useState(false)
   // const [videoFeedMuted, setVideoFeedMuted] = useState(false)
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
+  const fullscreenScrollLockRef = useRef<{
+    scrollY: number
+    body: { top: string; position: string; overflow: string; width: string }
+  } | null>(null)
 
   // Fullscreen overlay interactions (like/favorite)
   const [likedVideoIds, setLikedVideoIds] = useState<Set<string>>(new Set())
@@ -509,6 +513,47 @@ export default function SearchPage() {
       return changed ? next : prev
     })
   }, [videos])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    const bodyStyle = document.body.style
+
+    if (showFullscreenVideo) {
+      fullscreenScrollLockRef.current = {
+        scrollY: window.scrollY,
+        body: {
+          top: bodyStyle.top,
+          position: bodyStyle.position,
+          overflow: bodyStyle.overflow,
+          width: bodyStyle.width,
+        },
+      }
+      bodyStyle.top = `-${window.scrollY}px`
+      bodyStyle.position = "fixed"
+      bodyStyle.overflow = "hidden"
+      bodyStyle.width = "100%"
+    } else if (fullscreenScrollLockRef.current) {
+      const previous = fullscreenScrollLockRef.current
+      bodyStyle.top = previous.body.top
+      bodyStyle.position = previous.body.position
+      bodyStyle.overflow = previous.body.overflow
+      bodyStyle.width = previous.body.width
+      window.scrollTo({ top: previous.scrollY })
+      fullscreenScrollLockRef.current = null
+    }
+
+    return () => {
+      if (fullscreenScrollLockRef.current) {
+        const previous = fullscreenScrollLockRef.current
+        bodyStyle.top = previous.body.top
+        bodyStyle.position = previous.body.position
+        bodyStyle.overflow = previous.body.overflow
+        bodyStyle.width = previous.body.width
+        window.scrollTo({ top: previous.scrollY })
+        fullscreenScrollLockRef.current = null
+      }
+    }
+  }, [showFullscreenVideo])
 
   const selectedOwnerProfile = selectedVideo?.owner_id ? ownerProfiles[selectedVideo.owner_id] : undefined
   const selectedOwnerHandle = selectedOwnerProfile?.username
