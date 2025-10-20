@@ -1308,18 +1308,32 @@ export default function SearchPage() {
                     >
                       <CardContent className="p-0">
                         <div className="aspect-[9/16] relative">
-                        <video
-                          src={video.public_url}
-                          alt={video.title}
-                          className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                          playsInline
-                          controls={false}
-                          poster={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openRandomVideoFullscreen(video)
-                          }}
-                        />
+                          <video
+                            src={video.public_url}
+                            alt={video.title}
+                            className="w-full h-full object-cover rounded-t-lg cursor-pointer"
+                            playsInline
+                            controls={false}
+                            poster={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openRandomVideoFullscreen(video)
+                            }}
+                          />
+                          <div className="absolute top-2 right-2 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => toggleFavorite(video.id, e)}
+                              className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
+                              aria-label={bookmarkedVideoIds.has(video.id) ? "ブックマーク解除" : "ブックマーク"}
+                            >
+                              <Bookmark
+                                className={`w-4 h-4 ${
+                                  bookmarkedVideoIds.has(video.id) ? "fill-orange-500 text-orange-500" : "text-white"
+                                }`}
+                              />
+                            </button>
+                          </div>
                           {/* Play button overlay */}
                           <div
                             className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
@@ -1333,6 +1347,7 @@ export default function SearchPage() {
                             </div>
                           </div>
                         </div>
+
                         <div
                           className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
                           onClick={(e) => {
@@ -1370,16 +1385,6 @@ export default function SearchPage() {
                                 @{video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}
                               </span>
                             </div>
-                            <button
-                              onClick={(e) => toggleFavorite(video.id, e)}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                            >
-                              <Bookmark
-                                className={`w-4 h-4 ${
-                                  bookmarkedVideoIds.has(video.id) ? "fill-orange-500 text-orange-500" : "text-gray-600"
-                                }`}
-                              />
-                            </button>
                           </div>
                         </div>
                       </CardContent>
@@ -1445,6 +1450,18 @@ export default function SearchPage() {
                               setShowFullscreenVideo(true)
                             }}
                           />
+                          <div className="absolute top-2 right-2 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => toggleFavorite(v.id, e)}
+                              className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
+                              aria-label={isBookmarked ? "ブックマーク解除" : "ブックマーク"}
+                            >
+                              <Bookmark
+                                className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-white"}`}
+                              />
+                            </button>
+                          </div>
                           <div
                             className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
                             onClick={(e) => {
@@ -1484,17 +1501,9 @@ export default function SearchPage() {
                                 ) : (
                                   <User className="w-4 h-4 text-gray-600" />
                                 )}
-                              </div>
-                              <span className="text-xs text-gray-600">{ownerHandle}</span>
                             </div>
-                            <button
-                              onClick={(e) => toggleFavorite(v.id, e)}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                            >
-                              <Bookmark
-                                className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-gray-600"}`}
-                              />
-                            </button>
+                            <span className="text-xs text-gray-600">{ownerHandle}</span>
+                          </div>
                           </div>
                         </div>
                       </CardContent>

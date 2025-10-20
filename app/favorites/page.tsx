@@ -450,8 +450,9 @@ export default function FavoritesPage() {
                             removeBookmark(video.id)
                           }}
                           className="absolute top-2 right-2 p-2 bg-black bg-opacity-50 rounded-full hover:bg-opacity-70 transition-opacity"
+                          aria-label="ブックマーク解除"
                         >
-                          <Bookmark className="w-4 h-4 fill-blue-500 text-blue-500" />
+                          <Bookmark className="w-4 h-4 fill-orange-500 text-orange-500" />
                         </button>
                       </div>
                       
