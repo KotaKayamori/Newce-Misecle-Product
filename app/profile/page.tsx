@@ -2446,7 +2446,7 @@ export default function ProfilePage() {
           <Button variant="ghost" onClick={() => setShowUploadModal(false)} className="text-black">
             ＜
           </Button>
-          <h1 className="text-xl font-semibold">動画をアップロード</h1>
+          <h1 className="text-xl font-semibold">コンテンツをアップロード</h1>
         </div>
         <div className="px-6 py-4">
           <VideoUploader />

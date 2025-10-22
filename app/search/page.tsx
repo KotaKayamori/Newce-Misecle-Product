@@ -13,6 +13,7 @@ import { mockRestaurants } from "@/lib/mock-data"
 import { supabase } from "@/lib/supabase"
 import { toggleLike } from "@/lib/likes"
 import { useBookmark } from "@/hooks/useBookmark"
+import GuidebookTab from "@/components/GuidebookTab"
 
 type SupabaseVideoRow = {
   id: string
@@ -41,9 +42,18 @@ export default function SearchPage() {
   })
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [_expandedCategory, _setExpandedCategory] = useState<string | null>(null) // TODO: 未使用
-  const categoryTabs = ["今日のおすすめ", "今人気のお店", "SNSで人気のお店", "Z世代に人気のお店", "デートにおすすめのお店", "最新動画"]
+  const categoryTabs = [
+    "今日のおすすめ",
+    "今人気のお店",
+    "SNSで人気のお店",
+    "Z世代に人気のお店",
+    "デートにおすすめのお店",
+    "最新動画",
+    "ガイドブック",
+  ]
   const [selectedCategory, setSelectedCategory] = useState("今日のおすすめ")
   const isLatestCategory = selectedCategory === "最新動画"
+  const isGuidebookCategory = selectedCategory === "ガイドブック"
   // const [showVideoFeed, setShowVideoFeed] = useState(false)
   // const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [showUserProfile, setShowUserProfile] = useState(false)
@@ -328,7 +338,7 @@ export default function SearchPage() {
   }, [bookmarkedVideoIds])
 
   const handleRefreshVideos = () => {
-    if (isLatestCategory) return
+    if (isLatestCategory || isGuidebookCategory) return
     const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
     refreshVideos(categoryForFetch, 10)
   }
@@ -346,7 +356,7 @@ export default function SearchPage() {
     setRandomRestaurants(shuffled.slice(0, 6))
   }, [selectedCategory])
   useEffect(() => {
-    if (selectedCategory === "最新動画") return
+    if (selectedCategory === "最新動画" || selectedCategory === "ガイドブック") return
     const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
     fetchVideos(categoryForFetch, 10)
   }, [selectedCategory, fetchVideos])
@@ -1306,7 +1316,7 @@ export default function SearchPage() {
       {!isSearchMode && (
         <div className="px-6 py-4 bg-white overflow-y-auto scrollbar-hide">
           <div className="space-y-6">
-            {!isLatestCategory && (
+            {!isLatestCategory && !isGuidebookCategory && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">{selectedCategory}</h2>
@@ -1557,6 +1567,15 @@ export default function SearchPage() {
                 })}
               </div>
               <div ref={isLatestCategory ? latestSentinelRef : undefined} className="h-4" />
+            </div>
+            )}
+
+            {isGuidebookCategory && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">{selectedCategory}</h2>
+              </div>
+              <GuidebookTab />
             </div>
             )}
           </div>

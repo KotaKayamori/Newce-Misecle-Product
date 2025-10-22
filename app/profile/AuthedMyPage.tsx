@@ -2465,8 +2465,8 @@ export default function AuthedMyPage() {
           className="w-full max-w-[560px] sm:max-w-lg max-h-[80dvh] sm:max-h-[80vh] overflow-y-auto overscroll-contain bg-white rounded-2xl shadow-xl"
         >
           <DialogHeader className="sticky top-0 z-10 bg-white/95 backdrop-blur border-b px-6 py-4 -mx-6 -mt-6">
-            <DialogTitle>動画をアップロード</DialogTitle>
-            <DialogDescription>mp4 / webm / mov（上限100MB）。アップロード後にすぐ再生できます。</DialogDescription>
+            <DialogTitle>コンテンツをアップロード</DialogTitle>
+            <DialogDescription>動画（mp4 / webm / mov）または写真アルバムをアップロードできます。</DialogDescription>
           </DialogHeader>
           <div className="px-6 pt-4 pb-6">
             <VideoUploader />
