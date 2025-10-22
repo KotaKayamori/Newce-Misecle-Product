@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
 
     // データ形式を整形
-    const formattedVideos = videos?.map(video => {
+    const formattedVideos = videos?.map((video) => {
       // user_profiles comes back as an array (due to the join); pick the first profile, or handle when it's already an object
       const profile = Array.isArray(video.user_profiles) ? video.user_profiles[0] : video.user_profiles
 
@@ -69,15 +69,17 @@ export async function GET(request: NextRequest) {
         category: video.category,
         public_url: video.public_url ?? video.playback_url,
         playback_url: video.playback_url ?? video.public_url,
-        store_info: video.store_info,
-        influencer_comment: video.influencer_comment,
+        caption: video.caption ?? video.influencer_comment ?? null,
+        store_info: video.store_info ?? null,
         created_at: video.created_at,
-        user: profile ? {
-          id: profile.id,
-          name: profile.name,
-          username: profile.username,
-          avatar_url: profile.avatar_url
-        } : null
+        user: profile
+          ? {
+              id: profile.id,
+              name: profile.name,
+              username: profile.username,
+              avatar_url: profile.avatar_url,
+            }
+          : null,
       }
     }) || []
 

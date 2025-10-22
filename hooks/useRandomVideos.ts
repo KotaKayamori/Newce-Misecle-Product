@@ -7,8 +7,8 @@ export interface VideoData {
   title: string
   category: string
   public_url: string
-  store_info?: string
-  influencer_comment?: string
+  caption?: string
+  store_info?: string | null
   created_at: string
   user: {
     id: string
