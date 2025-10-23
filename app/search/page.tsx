@@ -406,10 +406,9 @@ export default function SearchPage() {
       try {
         const { data, count, error } = await supabase
           .from("videos")
-          .select(
-            "id, owner_id, playback_url, storage_path, title, caption, store_info, created_at, video_likes(count)",
-            { count: "exact" },
-          )
+          .select("id, owner_id, playback_url, storage_path, title, caption, created_at, video_likes(count)", {
+            count: "exact",
+          })
           .order("created_at", { ascending: false })
           .range(0, Math.max(0, videoLimit - 1))
         if (error) throw error

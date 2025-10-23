@@ -38,6 +38,29 @@ export async function GET(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
+    const ownerIds = Array.from(new Set((data || []).map((album) => album.owner_id).filter((id): id is string => Boolean(id))))
+    const ownerMap: Record<string, { id: string; username: string | null; displayName: string | null; avatarUrl: string | null }> = {}
+
+    if (ownerIds.length) {
+      const { data: profiles, error: profilesError } = await supabase
+        .from("user_profiles")
+        .select("id, username, display_name, avatar_url")
+        .in("id", ownerIds)
+
+      if (!profilesError && profiles) {
+        profiles.forEach((profile) => {
+          if (profile?.id) {
+            ownerMap[profile.id] = {
+              id: profile.id,
+              username: profile.username ?? null,
+              displayName: profile.display_name ?? null,
+              avatarUrl: profile.avatar_url ?? null,
+            }
+          }
+        })
+      }
+    }
+
     const base = SUPABASE_URL.replace(/\/$/, "")
     const items = (data || []).map((album) => ({
       id: album.id,
@@ -47,6 +70,7 @@ export async function GET(req: NextRequest) {
       coverUrl: album.cover_path ? `${base}/storage/v1/object/public/${BUCKET}/${album.cover_path}` : null,
       createdAt: album.created_at,
       ownerId: album.owner_id,
+      owner: album.owner_id ? ownerMap[album.owner_id] ?? null : null,
     }))
 
     return NextResponse.json(

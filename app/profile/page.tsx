@@ -527,7 +527,7 @@ export default function ProfilePage() {
     {
       category: "アカウント",
       items: [
-        { icon: Upload, label: "動画をアップロード", onClick: () => setShowUploadModal(true) },
+        { icon: Upload, label: "コンテンツをアップロード", onClick: () => setShowUploadModal(true) },
         { icon: Play, label: "自分の動画", onClick: () => setShowMyVideosModal(true) },
         { icon: Settings, label: "パスワード設定", onClick: () => setShowAccountSettings(true) },
         { icon: Settings, label: "ログアウト", onClick: () => handleLogout() },
