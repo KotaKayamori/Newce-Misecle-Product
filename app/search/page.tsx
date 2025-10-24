@@ -13,6 +13,7 @@ import { mockRestaurants } from "@/lib/mock-data"
 import { supabase } from "@/lib/supabase"
 import { toggleLike } from "@/lib/likes"
 import { useBookmark } from "@/hooks/useBookmark"
+import GuidebookTab from "@/components/GuidebookTab"
 
 type SupabaseVideoRow = {
   id: string
@@ -21,6 +22,7 @@ type SupabaseVideoRow = {
   storage_path: string | null
   title: string | null
   caption: string | null
+  store_info?: string | null
   created_at: string
   video_likes?: { count?: number }[]
 }
@@ -41,9 +43,18 @@ export default function SearchPage() {
   })
   const [isSearchMode, setIsSearchMode] = useState(false)
   const [_expandedCategory, _setExpandedCategory] = useState<string | null>(null) // TODO: 未使用
-  const categoryTabs = ["今日のおすすめ", "今人気のお店", "SNSで人気のお店", "Z世代に人気のお店", "デートにおすすめのお店", "最新動画"]
+  const categoryTabs = [
+    "今日のおすすめ",
+    "今人気のお店",
+    "SNSで人気のお店",
+    "Z世代に人気のお店",
+    "デートにおすすめのお店",
+    "最新動画",
+    "ガイドブック",
+  ]
   const [selectedCategory, setSelectedCategory] = useState("今日のおすすめ")
   const isLatestCategory = selectedCategory === "最新動画"
+  const isGuidebookCategory = selectedCategory === "ガイドブック"
   // const [showVideoFeed, setShowVideoFeed] = useState(false)
   // const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [showUserProfile, setShowUserProfile] = useState(false)
@@ -61,7 +72,18 @@ export default function SearchPage() {
 
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null) // TODO: 型を詰める
+  const [selectedRestaurant, setSelectedRestaurant] = useState<
+    | {
+        id: string
+        restaurantName: string
+        restaurantEmail: string
+        genre: string
+        distance: string
+        rating: number
+        caption?: string
+      }
+    | null
+  >(null)
   const [reservationData, setReservationData] = useState({
     name: "",
     people: 2,
@@ -85,6 +107,25 @@ export default function SearchPage() {
   const [fullscreenMuted, setFullscreenMuted] = useState(false)
   // const [videoFeedMuted, setVideoFeedMuted] = useState(false)
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
+  const fullscreenScrollLockRef = useRef<{
+    scrollY: number
+    body: { top: string; position: string; overflow: string; width: string }
+  } | null>(null)
+
+  const normalizeOptionalText = (input?: string | null) => {
+    if (typeof input !== "string") return undefined
+    const trimmed = input.trim()
+    return trimmed.length > 0 ? trimmed : undefined
+  }
+
+ const selectSupabaseVideo = (video: SupabaseVideoRow) => {
+    setSelectedVideo({
+      ...video,
+      caption: normalizeOptionalText(video.caption) ?? null,
+      store_info: normalizeOptionalText(video.store_info) ?? null,
+    })
+    setShowFullscreenVideo(true)
+  }
 
   // Fullscreen overlay interactions (like/favorite)
   const [likedVideoIds, setLikedVideoIds] = useState<Set<string>>(new Set())
@@ -153,7 +194,14 @@ export default function SearchPage() {
   function openStoreDetailForVideo(video: SupabaseVideoRow | null, options?: { keepFullscreen?: boolean }) {
     const mapped = mapVideoToRestaurant(video)
     if (!mapped) return
-    setSelectedRestaurant(mapped)
+    const normalizedCaption =
+      normalizeOptionalText(video?.caption) ||
+      normalizeOptionalText((video as any)?.influencer_comment) ||
+      normalizeOptionalText((video as any)?.captionText)
+    setSelectedRestaurant({
+      ...mapped,
+      caption: normalizedCaption,
+    })
     setShowStoreDetailModal(true)
     if (!options?.keepFullscreen) {
       setShowFullscreenVideo(false)
@@ -193,9 +241,13 @@ export default function SearchPage() {
       id: video.id,
       owner_id: video.user?.id ?? null,
       playback_url: playbackUrl,
-      storage_path: null,
+      storage_path: video.storage_path ?? null,
       title: video.title ?? null,
-      caption: video.influencer_comment ?? null,
+      caption:
+        normalizeOptionalText(video.caption) ??
+        normalizeOptionalText(video.influencer_comment) ??
+        null,
+      store_info: normalizeOptionalText(video.store_info) ?? null,
       created_at: video.created_at,
       video_likes: [],
     })
@@ -268,6 +320,7 @@ export default function SearchPage() {
     ["ハンバーガー", "タイ料理", "インド料理", "スペイン料理", "メキシコ料理"],
     ["ステーキ", "しゃぶしゃぶ", "お好み焼き", "たこ焼き", "串カツ"],
   ]
+  const EMPTY_INFLUENCER_COMMENT_MESSAGE = "感想は追加されていません"
 
   const handleFilterToggle = (category: string, option: string) => {
     setSelectedFilters((prev) => ({
@@ -324,7 +377,7 @@ export default function SearchPage() {
   }, [bookmarkedVideoIds])
 
   const handleRefreshVideos = () => {
-    if (isLatestCategory) return
+    if (isLatestCategory || isGuidebookCategory) return
     const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
     refreshVideos(categoryForFetch, 10)
   }
@@ -342,7 +395,7 @@ export default function SearchPage() {
     setRandomRestaurants(shuffled.slice(0, 6))
   }, [selectedCategory])
   useEffect(() => {
-    if (selectedCategory === "最新動画") return
+    if (selectedCategory === "最新動画" || selectedCategory === "ガイドブック") return
     const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
     fetchVideos(categoryForFetch, 10)
   }, [selectedCategory, fetchVideos])
@@ -353,7 +406,9 @@ export default function SearchPage() {
       try {
         const { data, count, error } = await supabase
           .from("videos")
-          .select("id, owner_id, playback_url, storage_path, title, caption, created_at, video_likes(count)", { count: "exact" })
+          .select("id, owner_id, playback_url, storage_path, title, caption, created_at, video_likes(count)", {
+            count: "exact",
+          })
           .order("created_at", { ascending: false })
           .range(0, Math.max(0, videoLimit - 1))
         if (error) throw error
@@ -509,6 +564,47 @@ export default function SearchPage() {
       return changed ? next : prev
     })
   }, [videos])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+    const bodyStyle = document.body.style
+
+    if (showFullscreenVideo) {
+      fullscreenScrollLockRef.current = {
+        scrollY: window.scrollY,
+        body: {
+          top: bodyStyle.top,
+          position: bodyStyle.position,
+          overflow: bodyStyle.overflow,
+          width: bodyStyle.width,
+        },
+      }
+      bodyStyle.top = `-${window.scrollY}px`
+      bodyStyle.position = "fixed"
+      bodyStyle.overflow = "hidden"
+      bodyStyle.width = "100%"
+    } else if (fullscreenScrollLockRef.current) {
+      const previous = fullscreenScrollLockRef.current
+      bodyStyle.top = previous.body.top
+      bodyStyle.position = previous.body.position
+      bodyStyle.overflow = previous.body.overflow
+      bodyStyle.width = previous.body.width
+      window.scrollTo({ top: previous.scrollY })
+      fullscreenScrollLockRef.current = null
+    }
+
+    return () => {
+      if (fullscreenScrollLockRef.current) {
+        const previous = fullscreenScrollLockRef.current
+        bodyStyle.top = previous.body.top
+        bodyStyle.position = previous.body.position
+        bodyStyle.overflow = previous.body.overflow
+        bodyStyle.width = previous.body.width
+        window.scrollTo({ top: previous.scrollY })
+        fullscreenScrollLockRef.current = null
+      }
+    }
+  }, [showFullscreenVideo])
 
   const selectedOwnerProfile = selectedVideo?.owner_id ? ownerProfiles[selectedVideo.owner_id] : undefined
   const selectedOwnerHandle = selectedOwnerProfile?.username
@@ -771,16 +867,15 @@ export default function SearchPage() {
                     </button>
                     <button
                       onClick={() => {
-                        const restaurantData = {
-                          id: video.id,
-                          restaurantName: video.title,
-                          restaurantEmail: `info@${video.title.toLowerCase().replace(/\s+/g, "-")}.com`,
-                          genre: video.category,
-                          distance: "0.5km",
-                          rating: 4.5,
-                          storeInfo: video.store_info,
-                          influencerComment: video.influencer_comment,
-                        }
+                    const restaurantData = {
+                      id: video.id,
+                      restaurantName: video.title,
+                      restaurantEmail: `info@${video.title.toLowerCase().replace(/\s+/g, "-")}.com`,
+                      genre: video.category,
+                      distance: "0.5km",
+                      rating: 4.5,
+                      caption: video.caption?.trim() || undefined,
+                    }
                         setSelectedRestaurant(restaurantData)
                         setShowStoreDetailModal(true)
                       }}
@@ -1167,79 +1262,30 @@ export default function SearchPage() {
               </div>
 
               {/* 店舗情報 */}
+              {/* 店舗情報セクションは今後の拡張用に保持 */}
+              {/*
               <div className="space-y-4">
                 <h4 className="font-semibold text-gray-800">店舗情報</h4>
-
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">📍</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">住所</p>
-                      <p className="text-sm text-gray-600">東京都渋谷区渋谷1-2-3 渋谷ビル2F</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">📞</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">電話番号</p>
-                      <p className="text-sm text-gray-600">03-1234-5678</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">🕒</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">営業時間</p>
-                      <p className="text-sm text-gray-600">月〜土: 11:30-14:00, 17:00-23:00</p>
-                      <p className="text-sm text-gray-600">日: 11:30-14:00, 17:00-22:00</p>
-                      <p className="text-sm text-red-600">定休日: 火曜日</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">💳</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">決済方法</p>
-                      <p className="text-sm text-gray-600">現金、QRコード、電子マネー</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">🗺️</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">アクセス</p>
-                      <button
-                        onClick={() => window.open("https://maps.google.com", "_blank")}
-                        className="text-sm text-blue-600 hover:text-blue-700 underline"
-                      >
-                        Googleマップで見る
-                      </button>
-                    </div>
-                  </div>
+                <div className="flex items-center justify-center rounded-lg bg-gray-50 py-6 text-sm text-gray-500">
+                  {EMPTY_STORE_INFO_MESSAGE}
                 </div>
               </div>
+              */}
 
               {/* インフルエンサーの感想 */}
               <div className="space-y-4">
-                <h4 className="font-semibold text-gray-800">紹介したインフルエンサーの感想</h4>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-700 leading-relaxed">
-                    今回は、コスパ最強の回らない寿司ランチを紹介！
-                    <br />
-                    <br />
-                    ここは1995年から続く老舗のお寿司屋さんで、29年間も愛され続けている。
-                    <br />
-                    <br />
-                    ここはランチでお得にお寿司をいただけて、握りは1人前で880円、1.5人前で1320円で頂けて超お得。
-                    <br />
-                    <br />
-                    目の前で握ってくれる大将はとても気さくで何度も通いたくなる魅力溢れるお店だった！
-                    <br />
-                    <br />
-                    気になった方はぜひ予約してみてね〜⭐️
-                  </p>
-                </div>
+                <h4 className="font-semibold text-gray-800">詳細情報</h4>
+                {selectedRestaurant?.caption ? (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
+                      {selectedRestaurant.caption}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center rounded-lg bg-gray-50 py-6 text-sm text-gray-500">
+                    {EMPTY_INFLUENCER_COMMENT_MESSAGE}
+                  </div>
+                )}
               </div>
 
               {/* 予約ボタン */}
@@ -1261,7 +1307,7 @@ export default function SearchPage() {
       {!isSearchMode && (
         <div className="px-6 py-4 bg-white overflow-y-auto scrollbar-hide">
           <div className="space-y-6">
-            {!isLatestCategory && (
+            {!isLatestCategory && !isGuidebookCategory && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">{selectedCategory}</h2>
@@ -1308,18 +1354,32 @@ export default function SearchPage() {
                     >
                       <CardContent className="p-0">
                         <div className="aspect-[9/16] relative">
-                        <video
-                          src={video.public_url}
-                          alt={video.title}
-                          className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                          playsInline
-                          controls={false}
-                          poster={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            openRandomVideoFullscreen(video)
-                          }}
-                        />
+                          <video
+                            src={video.public_url}
+                            alt={video.title}
+                            className="w-full h-full object-cover rounded-t-lg cursor-pointer"
+                            playsInline
+                            controls={false}
+                            poster={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              openRandomVideoFullscreen(video)
+                            }}
+                          />
+                          <div className="absolute top-2 right-2 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => toggleFavorite(video.id, e)}
+                              className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
+                              aria-label={bookmarkedVideoIds.has(video.id) ? "ブックマーク解除" : "ブックマーク"}
+                            >
+                              <Bookmark
+                                className={`w-4 h-4 ${
+                                  bookmarkedVideoIds.has(video.id) ? "fill-orange-500 text-orange-500" : "text-white"
+                                }`}
+                              />
+                            </button>
+                          </div>
                           {/* Play button overlay */}
                           <div
                             className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
@@ -1333,6 +1393,7 @@ export default function SearchPage() {
                             </div>
                           </div>
                         </div>
+
                         <div
                           className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
                           onClick={(e) => {
@@ -1370,16 +1431,6 @@ export default function SearchPage() {
                                 @{video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}
                               </span>
                             </div>
-                            <button
-                              onClick={(e) => toggleFavorite(video.id, e)}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                            >
-                              <Bookmark
-                                className={`w-4 h-4 ${
-                                  bookmarkedVideoIds.has(video.id) ? "fill-orange-500 text-orange-500" : "text-gray-600"
-                                }`}
-                              />
-                            </button>
                           </div>
                         </div>
                       </CardContent>
@@ -1425,8 +1476,7 @@ export default function SearchPage() {
                       aria-label={`動画を全画面で表示（${v.title || "動画"}）`}
                       title="動画を全画面で表示"
                       onClick={() => {
-                        setSelectedVideo({ ...v })
-                        setShowFullscreenVideo(true)
+                        selectSupabaseVideo(v)
                       }}
                     >
                       <CardContent className="p-0">
@@ -1441,17 +1491,27 @@ export default function SearchPage() {
                             controls={false}
                             onClick={(e) => {
                               e.stopPropagation()
-                              setSelectedVideo({ ...v })
-                              setShowFullscreenVideo(true)
+                              selectSupabaseVideo(v)
                             }}
                           />
+                          <div className="absolute top-2 right-2 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => toggleFavorite(v.id, e)}
+                              className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
+                              aria-label={isBookmarked ? "ブックマーク解除" : "ブックマーク"}
+                            >
+                              <Bookmark
+                                className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-white"}`}
+                              />
+                            </button>
+                          </div>
                           <div
                             className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setSelectedVideo({ ...v })
-                              setShowFullscreenVideo(true)
-                            }}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            selectSupabaseVideo(v)
+                          }}
                           >
                             <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
                               <div className="w-0 h-0 border-l-[20px] border-l-gray-800 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
@@ -1484,17 +1544,9 @@ export default function SearchPage() {
                                 ) : (
                                   <User className="w-4 h-4 text-gray-600" />
                                 )}
-                              </div>
-                              <span className="text-xs text-gray-600">{ownerHandle}</span>
                             </div>
-                            <button
-                              onClick={(e) => toggleFavorite(v.id, e)}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                            >
-                              <Bookmark
-                                className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-gray-600"}`}
-                              />
-                            </button>
+                            <span className="text-xs text-gray-600">{ownerHandle}</span>
+                          </div>
                           </div>
                         </div>
                       </CardContent>
@@ -1503,6 +1555,15 @@ export default function SearchPage() {
                 })}
               </div>
               <div ref={isLatestCategory ? latestSentinelRef : undefined} className="h-4" />
+            </div>
+            )}
+
+            {isGuidebookCategory && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">{selectedCategory}</h2>
+              </div>
+              <GuidebookTab />
             </div>
             )}
           </div>
