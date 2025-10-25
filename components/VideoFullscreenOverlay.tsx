@@ -125,20 +125,34 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         <div className="w-16 flex flex-col items-center justify-center pb-32 gap-6">
           <div className="flex flex-col items-center">
             <button className="w-12 h-12 flex items-center justify-center" onClick={onToggleLike} aria-label={liked ? "いいね解除" : "いいね"}>
-              <Heart className={`w-8 h-8 text-white drop-shadow-lg ${liked ? "fill-red-500 text-red-500" : ""}`} />
+              <Heart
+                className={`w-8 h-8 ${liked ? "fill-red-500 text-transparent" : "text-white"}`}
+                style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 3px rgba(0,0,0,0.35))", ...(liked ? { stroke: 'none' } : {}) }}
+              />
             </button>
-            <span className="text-white text-xs font-medium drop-shadow-lg mt-1">{likeCount}</span>
+            <span
+              className="text-white text-xs font-medium mt-1"
+              style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 3px rgba(0,0,0,0.35))" }}
+            >
+              {likeCount}
+            </span>
           </div>
 
           <div className="flex flex-col items-center">
             <button className="w-12 h-12 flex items-center justify-center" onClick={onToggleBookmark} aria-label={bookmarked ? "ブックマーク解除" : "ブックマーク"}>
-              <Bookmark className={`w-8 h-8 drop-shadow-lg ${bookmarked ? "fill-white text-white" : "text-white"}`} />
+              <Bookmark
+                className={`w-8 h-8 ${bookmarked ? "fill-orange-500 text-orange-500" : "text-white"}`}
+                style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 3px rgba(0,0,0,0.35))" }}
+              />
             </button>
           </div>
 
           <div className="flex flex-col items-center">
             <button className="w-12 h-12 flex items-center justify-center" onClick={() => onShare()} aria-label="共有">
-              <Send className="w-8 h-8 text-white drop-shadow-lg" />
+              <Send
+                className="w-8 h-8 text-white"
+                style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 3px rgba(0,0,0,0.35))" }}
+              />
             </button>
           </div>
         </div>

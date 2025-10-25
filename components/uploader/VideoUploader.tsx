@@ -164,7 +164,7 @@ export default function VideoUploader() {
           },
           body: JSON.stringify({
             title: title.trim(),
-            description: caption.trim() || null,
+            caption: caption.trim() || null,
             visibility: "public",
           }),
         })

@@ -56,12 +56,17 @@ type ReserveCtx = {
   setShowFullscreenVideo?: (b: boolean) => void
 }
 
-export function openReservationForVideo(ctx: ReserveCtx, video: BasicVideo | null) {
+export function openReservationForVideo(
+  ctx: ReserveCtx,
+  video: BasicVideo | null,
+  options?: { keepFullscreen?: boolean }
+) {
   const mapped = mapVideoToRestaurant(video)
   if (!mapped) return
   ctx.setSelectedRestaurant(mapped)
   ctx.setShowReservationModal(true)
-  if (ctx.setShowFullscreenVideo) ctx.setShowFullscreenVideo(false)
+  // デフォルトはフルスクリーンを維持。必要な場合のみ明示的に閉じる
+  if (options?.keepFullscreen === false && ctx.setShowFullscreenVideo) ctx.setShowFullscreenVideo(false)
 }
 
 

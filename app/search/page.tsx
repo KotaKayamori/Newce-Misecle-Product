@@ -15,6 +15,8 @@ import { toggleLike } from "@/lib/likes"
 import { openReservationForVideo as openReserveShared, openStoreDetailForVideo as openStoreShared } from "@/lib/video-actions"
 import { useBookmark } from "@/hooks/useBookmark"
 import VideoCard from "@/components/VideoCard"
+import AlbumCard from "@/components/AlbumCard"
+import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 
 type SupabaseVideoRow = {
@@ -57,6 +59,26 @@ export default function SearchPage() {
   const [selectedCategory, setSelectedCategory] = useState("今日のおすすめ")
   const isLatestCategory = selectedCategory === "最新動画"
   const isGuidebookCategory = selectedCategory === "ガイドブック"
+  type AlbumItem = {
+    id: string
+    title?: string | null
+    description?: string | null
+    coverUrl?: string | null
+    createdAt?: string | null
+    owner?: { username?: string | null; displayName?: string | null; avatarUrl?: string | null } | null
+  }
+  const [albums, setAlbums] = useState<AlbumItem[]>([])
+  const [albumsLoading, setAlbumsLoading] = useState(false)
+  const [albumsError, setAlbumsError] = useState<string | null>(null)
+  // Album like/bookmark state
+  const [albumLikedSet, setAlbumLikedSet] = useState<Set<string>>(new Set())
+  const [albumBookmarkedSet, setAlbumBookmarkedSet] = useState<Set<string>>(new Set())
+  // Album viewer state
+  type AssetItem = { id: string; url: string; order: number; width?: number | null; height?: number | null }
+  const [openAlbumId, setOpenAlbumId] = useState<string | null>(null)
+  const [albumAssets, setAlbumAssets] = useState<AssetItem[]>([])
+  const [albumIndex, setAlbumIndex] = useState(0)
+  const [albumLoading, setAlbumLoading] = useState(false)
   // const [showVideoFeed, setShowVideoFeed] = useState(false)
   // const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [showUserProfile, setShowUserProfile] = useState(false)
@@ -141,6 +163,100 @@ export default function SearchPage() {
     }
   }, [])
 
+  // Fetch guidebook albums when tab is active
+  useEffect(() => {
+    if (!isGuidebookCategory) return
+    let aborted = false
+    ;(async () => {
+      try {
+        setAlbumsLoading(true)
+        setAlbumsError(null)
+        const res = await fetch('/api/guidebook/albums?random=10', { cache: 'no-store' })
+        if (!res.ok) throw new Error('アルバムの取得に失敗しました')
+        const json = await res.json().catch(() => ({}))
+        if (aborted) return
+        setAlbums(Array.isArray(json?.items) ? json.items : [])
+      } catch (e) {
+        if (aborted) return
+        setAlbums([])
+        setAlbumsError(e instanceof Error ? e.message : '取得に失敗しました')
+      } finally {
+        if (!aborted) setAlbumsLoading(false)
+      }
+    })()
+    return () => { aborted = true }
+  }, [isGuidebookCategory])
+
+  // Fetch album like/bookmark states for current user
+  useEffect(() => {
+    ;(async () => {
+      try {
+        if (!isGuidebookCategory) return
+        if (!albums || albums.length === 0) { setAlbumLikedSet(new Set()); setAlbumBookmarkedSet(new Set()); return }
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setAlbumLikedSet(new Set()); setAlbumBookmarkedSet(new Set()); return }
+        const albumIds = albums.map((a) => a.id)
+        const [likedRes, savedRes] = await Promise.all([
+          supabase.from("photo_album_likes").select("album_id").eq("user_id", user.id).in("album_id", albumIds),
+          supabase.from("photo_album_bookmarks").select("album_id").eq("user_id", user.id).in("album_id", albumIds),
+        ])
+        if (!likedRes.error && likedRes.data) setAlbumLikedSet(new Set((likedRes.data as any[]).map((r) => r.album_id)))
+        else setAlbumLikedSet(new Set())
+        if (!savedRes.error && savedRes.data) setAlbumBookmarkedSet(new Set((savedRes.data as any[]).map((r) => r.album_id)))
+        else setAlbumBookmarkedSet(new Set())
+      } catch {
+        setAlbumLikedSet(new Set()); setAlbumBookmarkedSet(new Set())
+      }
+    })()
+  }, [isGuidebookCategory, albums])
+
+  async function toggleAlbumLike(albumId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+      if (!accessToken) { router.push("/auth/login"); return }
+      const wasLiked = albumLikedSet.has(albumId)
+      setAlbumLikedSet((prev) => { const s = new Set(prev); wasLiked ? s.delete(albumId) : s.add(albumId); return s })
+      await fetch(`/api/guidebook/albums/${albumId}/likes`, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } })
+    } catch {
+      setAlbumLikedSet((prev) => { const s = new Set(prev); if (s.has(albumId)) s.delete(albumId); else s.add(albumId); return s })
+    }
+  }
+
+  async function toggleAlbumBookmark(albumId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+      if (!accessToken) { router.push("/auth/login"); return }
+      const wasSaved = albumBookmarkedSet.has(albumId)
+      setAlbumBookmarkedSet((prev) => { const s = new Set(prev); wasSaved ? s.delete(albumId) : s.add(albumId); return s })
+      await fetch(`/api/guidebook/albums/${albumId}/bookmarks`, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } })
+    } catch {
+      setAlbumBookmarkedSet((prev) => { const s = new Set(prev); if (s.has(albumId)) s.delete(albumId); else s.add(albumId); return s })
+    }
+  }
+
+  // Open album viewer
+  async function openAlbum(albumId: string) {
+    try {
+      setAlbumLoading(true)
+      const res = await fetch(`/api/guidebook/albums/${albumId}/assets`, { cache: "no-store" })
+      if (!res.ok) throw new Error("アルバムの取得に失敗しました")
+      const json = await res.json().catch(() => ({}))
+      const items: AssetItem[] = json?.items ?? []
+      setAlbumAssets(items)
+      setAlbumIndex(0)
+      setOpenAlbumId(albumId)
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("open album error", e)
+      setAlbumAssets([])
+      setOpenAlbumId(albumId)
+    } finally {
+      setAlbumLoading(false)
+    }
+  }
+
   async function toggleVideoLike(videoId: string) {
     if (likeMutationRef.current.has(videoId)) return
     const wasLiked = likedVideoIds.has(videoId)
@@ -185,8 +301,8 @@ export default function SearchPage() {
     }
   }
 
-  function openReservationForVideo(video: SupabaseVideoRow | null) {
-    openReserveShared({ setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo }, video as any)
+  function openReservationForVideo(video: SupabaseVideoRow | null, options?: { keepFullscreen?: boolean }) {
+    openReserveShared({ setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo }, video as any, options)
   }
 
   function openStoreDetailForVideo(video: SupabaseVideoRow | null, options?: { keepFullscreen?: boolean }) {
@@ -365,6 +481,23 @@ export default function SearchPage() {
     if (isLatestCategory || isGuidebookCategory) return
     const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
     refreshVideos(categoryForFetch, 10)
+  }
+
+  const handleRefreshAlbums = async () => {
+    if (!isGuidebookCategory) return
+    try {
+      setAlbumsLoading(true)
+      setAlbumsError(null)
+      const res = await fetch('/api/guidebook/albums?random=10', { cache: 'no-store' })
+      if (!res.ok) throw new Error('アルバムの取得に失敗しました')
+      const json = await res.json().catch(() => ({}))
+      setAlbums(Array.isArray(json?.items) ? json.items : [])
+    } catch (e) {
+      setAlbums([])
+      setAlbumsError(e instanceof Error ? e.message : '取得に失敗しました')
+    } finally {
+      setAlbumsLoading(false)
+    }
   }
 
   function FilterButton({ label }: { label: string }) {
@@ -1471,8 +1604,38 @@ export default function SearchPage() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">{selectedCategory}</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">{albums.length}件</span>
+                  <button
+                    onClick={handleRefreshAlbums}
+                    disabled={albumsLoading}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    aria-label="アルバムを更新"
+                  >
+                    <RefreshCw className={`w-4 h-4 text-gray-600 ${albumsLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
               </div>
-              <div className="text-sm text-gray-500">ガイドブックは準備中です</div>
+              {albumsError ? (
+                <div className="text-sm text-red-500">{albumsError}</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {albums.map((a) => (
+                    <AlbumCard
+                      key={a.id}
+                      coverUrl={a.coverUrl}
+                      title={a.title || a.description || 'アルバム'}
+                      onClickCard={() => openAlbum(a.id)}
+                      showTopBookmark
+                      isBookmarked={albumBookmarkedSet.has(a.id)}
+                      onToggleBookmark={(e) => { e.stopPropagation(); toggleAlbumBookmark(a.id) }}
+                      bottomMetaVariant="account"
+                      accountAvatarUrl={a.owner?.avatarUrl ?? null}
+                      accountLabel={a.owner?.username ? `@${a.owner.username}` : (a.owner?.displayName || 'ユーザー')}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
             )}
           </div>
@@ -1504,12 +1667,31 @@ export default function SearchPage() {
             } catch {}
           }}
           onClose={() => setShowFullscreenVideo(false)}
-          onReserve={() => openReservationForVideo(selectedVideo)}
+          onReserve={() => openReservationForVideo(selectedVideo, { keepFullscreen: true })}
           onMore={() => openStoreDetailForVideo(selectedVideo, { keepFullscreen: true })}
           muted={fullscreenMuted}
           onToggleMuted={() => setFullscreenMuted((prev) => !prev)}
         />
       )}
+
+      {/* Album Viewer Modal */}
+      <AlbumViewerOverlay
+        open={Boolean(openAlbumId)}
+        assets={albumAssets}
+        index={albumIndex}
+        loading={albumLoading}
+        onClose={() => { setOpenAlbumId(null); setAlbumAssets([]); setAlbumIndex(0) }}
+        onPrev={() => setAlbumIndex((i) => Math.max(0, i - 1))}
+        onNext={() => setAlbumIndex((i) => Math.min(albumAssets.length - 1, i + 1))}
+        title={albums.find((a) => a.id === openAlbumId)?.title || albums.find((a) => a.id === openAlbumId)?.description || null}
+        ownerAvatarUrl={albums.find((a) => a.id === openAlbumId)?.owner?.avatarUrl ?? null}
+        ownerLabel={(() => { const a = albums.find((x) => x.id === openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
+        description={albums.find((a) => a.id === openAlbumId)?.description || null}
+        liked={openAlbumId ? albumLikedSet.has(openAlbumId) : false}
+        onToggleLike={() => { if (openAlbumId) toggleAlbumLike(openAlbumId) }}
+        bookmarked={openAlbumId ? albumBookmarkedSet.has(openAlbumId) : false}
+        onToggleBookmark={() => { if (openAlbumId) toggleAlbumBookmark(openAlbumId) }}
+      />
 
       <Navigation />
     </div>

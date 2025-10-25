@@ -3,6 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent } from "@/components/ui/card"
 import VideoCard from "@/components/VideoCard"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
+import AlbumCard from "@/components/AlbumCard"
+import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import { Heart, User, Play, Bookmark, Send, Star, RefreshCw } from "lucide-react"
 // 画像サムネイル生成にSearchと同じ関数を利用
 // derivePosterUrl は Search ページ内で定義されているため、同等の処理をここにも定義
@@ -65,6 +67,23 @@ export default function FavoritesPage() {
   const [bookmarkedMuted, setBookmarkedMuted] = useState(false)
   const [likedMuted, setLikedMuted] = useState(false)
 
+  // ===== Albums (Guidebook) state =====
+  type AlbumRow = { id: string; owner_id: string; title: string | null; caption: string | null; cover_path: string | null; created_at: string }
+  const [likedAlbums, setLikedAlbums] = useState<AlbumRow[] | null>(null)
+  const [savedAlbums, setSavedAlbums] = useState<AlbumRow[]>([])
+  const [likedAlbumsLoading, setLikedAlbumsLoading] = useState(true)
+  const [savedAlbumsLoading, setSavedAlbumsLoading] = useState(true)
+  const [likedAlbumSet, setLikedAlbumSet] = useState<Set<string>>(new Set())
+  const [bookmarkedAlbumSet, setBookmarkedAlbumSet] = useState<Set<string>>(new Set())
+  const [albumFsOpen, setAlbumFsOpen] = useState(false)
+  const [albumFsAssets, setAlbumFsAssets] = useState<{ id: string; url: string; order: number; width?: number | null; height?: number | null }[]>([])
+  const [albumFsIndex, setAlbumFsIndex] = useState(0)
+  const [albumFsTitle, setAlbumFsTitle] = useState<string | null>(null)
+  const [albumFsOwnerLabel, setAlbumFsOwnerLabel] = useState<string | null>(null)
+  const [albumFsOwnerAvatar, setAlbumFsOwnerAvatar] = useState<string | null>(null)
+  const [albumFsDescription, setAlbumFsDescription] = useState<string | null>(null)
+  const [albumFsAlbumId, setAlbumFsAlbumId] = useState<string | null>(null)
+
   // Fetch liked videos
   useEffect(() => {
     ;(async () => {
@@ -88,6 +107,68 @@ export default function FavoritesPage() {
         setLikedVideos([])
       } finally {
         setLikesLoading(false)
+      }
+    })()
+  }, [])
+
+  // Fetch liked albums
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          setLikedAlbums([])
+          return
+        }
+        const { data, error } = await supabase
+          .from("photo_album_likes")
+          .select("created_at, photo_albums:photo_albums(id, owner_id, title, caption, cover_path, created_at)")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+        if (!error) {
+          const rows: AlbumRow[] = ((data ?? []) as any[]).map((d) => d.photo_albums)
+          setLikedAlbums(rows)
+          setLikedAlbumSet(new Set(rows.map((a) => a.id)))
+        } else {
+          setLikedAlbums([])
+          setLikedAlbumSet(new Set())
+        }
+      } catch {
+        setLikedAlbums([])
+        setLikedAlbumSet(new Set())
+      } finally {
+        setLikedAlbumsLoading(false)
+      }
+    })()
+  }, [])
+
+  // Fetch saved (bookmarked) albums
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          setSavedAlbums([])
+          return
+        }
+        const { data, error } = await supabase
+          .from("photo_album_bookmarks")
+          .select("created_at, photo_albums:photo_albums(id, owner_id, title, caption, cover_path, created_at)")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+        if (!error) {
+          const rows: AlbumRow[] = ((data ?? []) as any[]).map((d) => d.photo_albums)
+          setSavedAlbums(rows)
+          setBookmarkedAlbumSet(new Set(rows.map((a) => a.id)))
+        } else {
+          setSavedAlbums([])
+          setBookmarkedAlbumSet(new Set())
+        }
+      } catch {
+        setSavedAlbums([])
+        setBookmarkedAlbumSet(new Set())
+      } finally {
+        setSavedAlbumsLoading(false)
       }
     })()
   }, [])
@@ -186,6 +267,30 @@ export default function FavoritesPage() {
       setBookmarkedSet(new Set(bookmarkedVideos.map(bookmark => bookmark.videos.id)))
     }
   }, [bookmarkedVideos])
+
+  // Fetch owner profiles for albums (both liked and saved)
+  useEffect(() => {
+    (async () => {
+      try {
+        const ids = Array.from(new Set([...(likedAlbums ?? []).map((a) => a.owner_id), ...savedAlbums.map((a) => a.owner_id)]))
+        const missing = ids.filter((id) => !ownerProfiles[id])
+        if (missing.length === 0) return
+        const { data, error } = await supabase
+          .from("user_profiles")
+          .select("id, username, display_name, avatar_url")
+          .in("id", missing)
+        if (!error && data) {
+          setOwnerProfiles((prev) => {
+            const next = { ...prev }
+            ;(data as any[]).forEach((p) => {
+              next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
+            })
+            return next
+          })
+        }
+      } catch {}
+    })()
+  }, [likedAlbums, savedAlbums])
 
   useEffect(() => {
     // Keep local set in sync with hook (align with Search)
@@ -433,6 +538,72 @@ export default function FavoritesPage() {
     }
   }
 
+  // ===== Albums: helpers and handlers =====
+  function deriveAlbumCoverUrl(coverPath?: string | null): string | null {
+    if (!coverPath) return null
+    const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "")
+    if (!base) return null
+    const objectPath = coverPath.replace(/^\/+/, "")
+    return `${base}/storage/v1/object/public/photos/${objectPath}`
+  }
+
+  const openAlbumOverlay = async (album: AlbumRow, startIndex = 0) => {
+    try {
+      setAlbumFsAlbumId(album.id)
+      const profile = ownerProfiles[album.owner_id]
+      const handle = profile?.username ? `@${profile.username}` : (profile?.display_name || "ユーザー")
+      setAlbumFsTitle(album.title ?? album.caption ?? "アルバム")
+      setAlbumFsDescription(album.caption ?? null)
+      setAlbumFsOwnerLabel(handle)
+      setAlbumFsOwnerAvatar(profile?.avatar_url ?? null)
+      const res = await fetch(`/api/guidebook/albums/${album.id}/assets`, { cache: "no-store" })
+      const json = await res.json()
+      const items = (json?.items ?? []).map((a: any) => ({ id: a.id, url: a.url, order: a.order, width: a.width, height: a.height }))
+      setAlbumFsAssets(items)
+      setAlbumFsIndex(Math.min(Math.max(0, startIndex), Math.max(0, items.length - 1)))
+      setAlbumFsOpen(true)
+    } catch {}
+  }
+
+  const toggleAlbumLike = async (albumId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+      if (!accessToken) { router.push("/auth/login"); return }
+      const wasLiked = likedAlbumSet.has(albumId)
+      setLikedAlbumSet((prev) => { const s = new Set(prev); wasLiked ? s.delete(albumId) : s.add(albumId); return s })
+      if (wasLiked) {
+        setLikedAlbums((prev) => prev ? prev.filter((a) => a.id !== albumId) : prev)
+      } else {
+        const target = savedAlbums.find((a) => a.id === albumId) || (likedAlbums ?? []).find((a) => a.id === albumId)
+        if (target) setLikedAlbums((prev) => [target, ...(prev ?? [])])
+      }
+      await fetch(`/api/guidebook/albums/${albumId}/likes`, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } })
+    } catch (e) {
+      // rollback (simplified)
+      setLikedAlbumSet((prev) => { const s = new Set(prev); if (s.has(albumId)) s.delete(albumId); else s.add(albumId); return s })
+    }
+  }
+
+  const toggleAlbumBookmark = async (albumId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+      if (!accessToken) { router.push("/auth/login"); return }
+      const wasSaved = bookmarkedAlbumSet.has(albumId)
+      setBookmarkedAlbumSet((prev) => { const s = new Set(prev); wasSaved ? s.delete(albumId) : s.add(albumId); return s })
+      if (wasSaved) {
+        setSavedAlbums((prev) => prev.filter((a) => a.id !== albumId))
+      } else {
+        const source = (likedAlbums ?? []).find((a) => a.id === albumId) || savedAlbums.find((a) => a.id === albumId)
+        if (source) setSavedAlbums((prev) => [source, ...prev])
+      }
+      await fetch(`/api/guidebook/albums/${albumId}/bookmarks`, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } })
+    } catch (e) {
+      setBookmarkedAlbumSet((prev) => { const s = new Set(prev); if (s.has(albumId)) s.delete(albumId); else s.add(albumId); return s })
+    }
+  }
+
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<any>(null) // TODO: 型を詰める
@@ -455,19 +626,31 @@ export default function FavoritesPage() {
 
       <div className="px-6">
         <Tabs defaultValue="restaurants" className="w-full">
-          <div className="overflow-x-auto scrollbar-hide">
-            <TabsList className="grid grid-cols-2 bg-transparent h-auto p-0 border-0 w-full">
+          <div className="overflow-x-auto whitespace-nowrap scrollbar-hide">
+            <TabsList className="inline-flex w-max gap-3 bg-transparent h-auto p-0 border-0">
               <TabsTrigger
                 value="restaurants"
-                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-black data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none border-b-2 border-transparent pb-3 text-gray-600 py-2"
+                className="shrink-0 px-3 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-black data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none border-b-2 border-transparent pb-3 text-gray-600 py-2"
               >
                 いいねした動画 ({likedVideos?.length ?? 0})
               </TabsTrigger>
               <TabsTrigger
                 value="videos"
-                className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-black data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none border-b-2 border-transparent pb-3 text-gray-600 py-2"
+                className="shrink-0 px-3 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-black data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none border-b-2 border-transparent pb-3 text-gray-600 py-2"
               >
                 保存した動画 ({bookmarkedVideos.length})
+              </TabsTrigger>
+              <TabsTrigger
+                value="liked-albums"
+                className="shrink-0 px-3 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-black data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none border-b-2 border-transparent pb-3 text-gray-600 py-2"
+              >
+                いいねしたアルバム ({likedAlbums?.length ?? 0})
+              </TabsTrigger>
+              <TabsTrigger
+                value="saved-albums"
+                className="shrink-0 px-3 data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-black data-[state=active]:border-b-2 data-[state=active]:border-orange-500 rounded-none border-b-2 border-transparent pb-3 text-gray-600 py-2"
+              >
+                保存したアルバム ({savedAlbums.length})
               </TabsTrigger>
             </TabsList>
           </div>
@@ -585,6 +768,67 @@ export default function FavoritesPage() {
               </div>
             )}
           </TabsContent>
+
+          {/* いいねしたアルバム */}
+          <TabsContent value="liked-albums" className="mt-4 bg-white overflow-y-auto scrollbar-hide">
+            {likedAlbumsLoading ? (
+              <div className="py-8 text-center text-gray-500">読み込み中…</div>
+            ) : (likedAlbums && likedAlbums.length > 0) ? (
+              <div className="grid grid-cols-2 gap-3">
+                {likedAlbums.map((a) => {
+                  const profile = ownerProfiles[a.owner_id]
+                  const label = profile?.username ? `@${profile.username}` : (profile?.display_name || 'ユーザー')
+                  return (
+                    <AlbumCard
+                      key={a.id}
+                      coverUrl={deriveAlbumCoverUrl(a.cover_path)}
+                      title={a.title || a.caption || 'アルバム'}
+                      onClickCard={() => openAlbumOverlay(a)}
+                      showTopBookmark
+                      isBookmarked={bookmarkedAlbumSet.has(a.id)}
+                      onToggleBookmark={(e) => { e.stopPropagation(); toggleAlbumBookmark(a.id) }}
+                      bottomMetaVariant="account"
+                      accountAvatarUrl={profile?.avatar_url ?? null}
+                      accountLabel={label}
+                    />
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-600">いいねしたアルバムがありません</div>
+            )}
+          </TabsContent>
+
+          {/* 保存したアルバム */}
+          <TabsContent value="saved-albums" className="mt-4 bg-white overflow-y-auto scrollbar-hide">
+            {savedAlbumsLoading ? (
+              <div className="py-8 text-center text-gray-500">読み込み中…</div>
+            ) : savedAlbums.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {savedAlbums.map((a) => {
+                  const profile = ownerProfiles[a.owner_id]
+                  const label = profile?.username ? `@${profile.username}` : (profile?.display_name || 'ユーザー')
+                  return (
+                    <AlbumCard
+                      key={a.id}
+                      coverUrl={deriveAlbumCoverUrl(a.cover_path)}
+                      title={a.title || a.caption || 'アルバム'}
+                      onClickCard={() => openAlbumOverlay(a)}
+                      showTopBookmark
+                      isBookmarked={true}
+                      onToggleBookmark={(e) => { e.stopPropagation(); toggleAlbumBookmark(a.id) }}
+                      bottomMetaVariant="account"
+                      accountAvatarUrl={profile?.avatar_url ?? null}
+                      accountLabel={label}
+                    />
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-gray-600">保存したアルバムがありません</div>
+            )}
+          </TabsContent>
+
         </Tabs>
       </div>
 
@@ -604,10 +848,35 @@ export default function FavoritesPage() {
           onToggleBookmark={() => toggleBookmarkForVideo({ id: fsVideo.id } as any)}
           onShare={async () => { try { if ((navigator as any).share) { await (navigator as any).share({ url: fsVideo.playback_url }) } else { await navigator.clipboard.writeText(fsVideo.playback_url); alert("リンクをコピーしました") } } catch {} }}
           onClose={() => setFsOpen(false)}
-          onReserve={() => { openReserveShared({ setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo: setFsOpen as any }, { id: fsVideo.id, title: fsVideo.title as any } as any) }}
+          onReserve={() => { openReserveShared({ setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo: setFsOpen as any }, { id: fsVideo.id, title: fsVideo.title as any } as any, { keepFullscreen: true }) }}
           onMore={() => { openStoreShared({ setSelectedRestaurant, setShowStoreDetailModal }, { id: fsVideo.id, title: fsVideo.title as any, caption: fsVideo.caption as any } as any, { keepFullscreen: true }) }}
           muted={fsMuted}
           onToggleMuted={() => setFsMuted((m) => !m)}
+        />
+      )}
+
+      {/* Album fullscreen overlay */}
+      {albumFsOpen && (
+        <AlbumViewerOverlay
+          open={albumFsOpen}
+          assets={albumFsAssets}
+          index={albumFsIndex}
+          onClose={() => setAlbumFsOpen(false)}
+          onPrev={() => setAlbumFsIndex((i) => Math.max(0, i - 1))}
+          onNext={() => setAlbumFsIndex((i) => Math.min(albumFsAssets.length - 1, i + 1))}
+          title={albumFsTitle}
+          ownerAvatarUrl={albumFsOwnerAvatar}
+          ownerLabel={albumFsOwnerLabel ?? undefined}
+          description={albumFsDescription ?? undefined}
+          liked={albumFsAlbumId ? likedAlbumSet.has(albumFsAlbumId) : false}
+          onToggleLike={() => albumFsAlbumId && toggleAlbumLike(albumFsAlbumId)}
+          bookmarked={albumFsAlbumId ? bookmarkedAlbumSet.has(albumFsAlbumId) : false}
+          onToggleBookmark={() => albumFsAlbumId && toggleAlbumBookmark(albumFsAlbumId)}
+          onShare={async () => {
+            const url = albumFsAssets[albumFsIndex]?.url
+            if (!url) return
+            try { if ((navigator as any).share) await (navigator as any).share({ url }); else { await navigator.clipboard.writeText(url); alert("リンクをコピーしました") } } catch {}
+          }}
         />
       )}
 
