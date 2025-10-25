@@ -314,7 +314,7 @@ export default function SearchPage() {
   }
 
   function openRandomVideoFullscreen(video: VideoData) {
-    const playbackUrl = (video as any).playback_url || video.public_url
+    const playbackUrl = video.public_url
     if (!playbackUrl) return
 
     if (video.user?.id) {
@@ -346,13 +346,10 @@ export default function SearchPage() {
       id: video.id,
       owner_id: video.user?.id ?? null,
       playback_url: playbackUrl,
-      storage_path: (video as any).storage_path ?? null,
+      storage_path: null,
       title: video.title ?? null,
       caption:
-        normalizeOptionalText(video.caption) ??
-        normalizeOptionalText((video as any).influencer_comment) ??
-        null,
-      store_info: normalizeOptionalText(video.store_info) ?? null,
+        normalizeOptionalText(video.caption) ?? null,
       created_at: video.created_at,
       video_likes: [],
     })
@@ -1553,7 +1550,7 @@ export default function SearchPage() {
               )}
             </div>
             )}
-            {!isLatestCategory && !isGuidebookCategory && (
+            {!didSearch && !isLatestCategory && !isGuidebookCategory && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">{selectedCategory}</h2>
@@ -1625,7 +1622,7 @@ export default function SearchPage() {
             )}
 
             {/* Supabase videos list (play on demand) */}
-            {isLatestCategory && (
+            {!didSearch && isLatestCategory && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">{selectedCategory}</h2>
@@ -1728,7 +1725,7 @@ export default function SearchPage() {
             </div>
             )}
 
-            {isGuidebookCategory && (
+            {!didSearch && isGuidebookCategory && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">{selectedCategory}</h2>
