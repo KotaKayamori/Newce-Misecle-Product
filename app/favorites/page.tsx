@@ -1,12 +1,19 @@
 "use client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Heart, User, Play, Bookmark, Share2, Star, RefreshCw } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import VideoCard from "@/components/VideoCard"
+import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
+import { Heart, User, Play, Bookmark, Send, Star, RefreshCw } from "lucide-react"
+// 画像サムネイル生成にSearchと同じ関数を利用
+// derivePosterUrl は Search ページ内で定義されているため、同等の処理をここにも定義
 import Navigation from "@/components/navigation"
 import { useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { FALLBACK_VIDEO_URL } from "@/lib/media"
+import { openReservationForVideo as openReserveShared, openStoreDetailForVideo as openStoreShared } from "@/lib/video-actions"
 import { supabase } from "@/lib/supabase"
 import { toggleLike } from "@/lib/likes"
+import { useBookmark } from "@/hooks/useBookmark"
 
 interface BookmarkedVideo {
   id: string
@@ -44,11 +51,19 @@ export default function FavoritesPage() {
   const likedFeedRef = useRef<HTMLDivElement | null>(null)
   const bookmarkedFeedRef = useRef<HTMLDivElement | null>(null)
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set())
-  const [, setBookmarkedSet] = useState<Set<string>>(new Set()) // TODO: 未使用値
+  const [bookmarkedSet, setBookmarkedSet] = useState<Set<string>>(new Set())
+  const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({})
   const [optimisticDelta, setOptimisticDelta] = useState<Record<string, number>>({})
   const [captionOpenIds, setCaptionOpenIds] = useState<Set<string>>(new Set())
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, { username?: string | null; display_name?: string | null; avatar_url?: string | null }>>({})
+  const [fsOpen, setFsOpen] = useState(false)
+  const [fsVideo, setFsVideo] = useState<{ id: string; playback_url: string; poster_url?: string | null; title?: string | null; caption?: string | null } | null>(null)
+  const [fsOwnerHandle, setFsOwnerHandle] = useState<string>("")
+  const [fsOwnerAvatar, setFsOwnerAvatar] = useState<string | null | undefined>(null)
+  const [fsMuted, setFsMuted] = useState(false)
+  const [bookmarkedMuted, setBookmarkedMuted] = useState(false)
+  const [likedMuted, setLikedMuted] = useState(false)
 
   // Fetch liked videos
   useEffect(() => {
@@ -172,6 +187,58 @@ export default function FavoritesPage() {
     }
   }, [bookmarkedVideos])
 
+  useEffect(() => {
+    // Keep local set in sync with hook (align with Search)
+    if (bookmarkedVideoIds) {
+      setBookmarkedSet(new Set(Array.from(bookmarkedVideoIds)))
+    }
+  }, [bookmarkedVideoIds])
+
+  // Fetch owner profiles for bookmarked videos as well (to show account meta like Search)
+  useEffect(() => {
+    (async () => {
+      try {
+        const ids = Array.from(new Set(bookmarkedVideos.map((b) => b.videos.owner_id).filter(Boolean))) as string[]
+        if (ids.length === 0) return
+        const { data, error } = await supabase
+          .from("user_profiles")
+          .select("id, username, display_name, avatar_url")
+          .in("id", ids)
+        if (!error && data) {
+          setOwnerProfiles((prev) => {
+            const next = { ...prev }
+            ;(data as any[]).forEach((p) => {
+              next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
+            })
+            return next
+          })
+        }
+      } catch {}
+    })()
+  }, [bookmarkedVideos])
+
+  const getLikeCount = (id: string) => (likeCounts[id] ?? 0) + (optimisticDelta[id] ?? 0)
+
+  const openOverlayForLiked = (v: { id: string; owner_id: string; playback_url: string; title?: string | null; caption?: string | null }) => {
+    const prof = ownerProfiles[v.owner_id]
+    const handle = prof?.username ? `@${prof.username}` : (prof?.display_name || "ユーザー")
+    setFsVideo({ id: v.id, playback_url: v.playback_url || FALLBACK_VIDEO_URL, poster_url: derivePosterUrl(v.playback_url as any, (v as any).storage_path), title: v.title ?? null, caption: v.caption ?? null })
+    setFsOwnerHandle(handle)
+    setFsOwnerAvatar(prof?.avatar_url ?? null)
+    setFsMuted(false)
+    setFsOpen(true)
+  }
+
+  const openOverlayForBookmarked = (video: { id: string; owner_id: string; playback_url: string; title?: string | null; caption?: string | null }) => {
+    const prof = ownerProfiles[video.owner_id]
+    const handle = prof?.username ? `@${prof.username}` : (prof?.display_name || "ユーザー")
+    setFsVideo({ id: video.id, playback_url: video.playback_url || FALLBACK_VIDEO_URL, poster_url: derivePosterUrl(video.playback_url as any, (video as any).storage_path), title: video.title ?? null, caption: video.caption ?? null })
+    setFsOwnerHandle(handle)
+    setFsOwnerAvatar(prof?.avatar_url ?? null)
+    setFsMuted(false)
+    setFsOpen(true)
+  }
+
   // Remove bookmark function
   const removeBookmark = async (videoId: string) => {
     try {
@@ -202,6 +269,48 @@ export default function FavoritesPage() {
       }
     } catch (error) {
       console.error('Failed to remove bookmark:', error)
+    }
+  }
+
+  // 汎用ブックマークトグル（追加・削除）。保存タブと状態を同期
+  const toggleBookmarkForVideo = async (video: { id: string; title?: string | null; category?: string | null; playback_url?: string }) => {
+    try {
+      // Align with Search: delegate to useBookmark hook
+      await toggleBookmark(video.id)
+      const nowBookmarked = !bookmarkedSet.has(video.id)
+
+      if (nowBookmarked) {
+        // 追加（存在しない場合のみ）
+        setBookmarkedSet(prev => new Set(prev).add(video.id))
+        setBookmarkedVideos(prev => {
+          const exists = prev.some(b => b.videos.id === video.id)
+          if (exists) return prev
+          const next: BookmarkedVideo = {
+            id: `local-${video.id}`,
+            created_at: new Date().toISOString(),
+            videos: {
+              id: video.id,
+              title: (video.title ?? '').toString(),
+              category: ((video as any).category ?? '').toString(),
+              playback_url: video.playback_url ?? FALLBACK_VIDEO_URL,
+              caption: '',
+              created_at: new Date().toISOString(),
+              owner_id: ''
+            }
+          }
+          return [next, ...prev]
+        })
+      } else {
+        // 削除
+        setBookmarkedSet(prev => {
+          const next = new Set(prev)
+          next.delete(video.id)
+          return next
+        })
+        setBookmarkedVideos(prev => prev.filter(b => b.videos.id !== video.id))
+      }
+    } catch (e) {
+      console.error('Failed to toggle bookmark:', e)
     }
   }
 
@@ -248,6 +357,14 @@ export default function FavoritesPage() {
     setOptimisticDelta((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + (wasLiked ? -1 : +1) }))
     try {
       await toggleLike(id, wasLiked)
+      // likedVideosを同期
+      setLikedVideos(prev => {
+        if (!prev) return prev
+        if (wasLiked) {
+          return prev.filter(v => v.id !== id)
+        }
+        return prev
+      })
     } catch {
       // rollback on failure
       setLikedSet((prev) => {
@@ -259,6 +376,49 @@ export default function FavoritesPage() {
       setOptimisticDelta((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + (wasLiked ? +1 : -1) }))
     }
   }
+
+  // ブックマークフィード上でのいいね（いいねタブへ反映）
+  const handleToggleLikeFromBookmarked = async (video: { id: string; owner_id?: string; playback_url?: string; title?: string | null; caption?: string | null; created_at?: string }) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      router.push("/auth/login")
+      return
+    }
+    const id = video.id
+    const wasLiked = likedSet.has(id)
+    setLikedSet(prev => { const s = new Set(prev); wasLiked ? s.delete(id) : s.add(id); return s })
+    setOptimisticDelta(prev => ({ ...prev, [id]: (prev[id] ?? 0) + (wasLiked ? -1 : +1) }))
+    try {
+      await toggleLike(id, wasLiked)
+      setLikedVideos(prev => {
+        const list = prev ?? []
+        if (wasLiked) {
+          return list.filter(v => v.id !== id)
+        } else {
+          const exists = list.some(v => v.id === id)
+          if (exists) return list
+          const next = {
+            id,
+            owner_id: (video as any).owner_id ?? '',
+            playback_url: video.playback_url ?? FALLBACK_VIDEO_URL,
+            title: video.title ?? null,
+            caption: video.caption ?? null,
+            created_at: video.created_at ?? new Date().toISOString()
+          }
+          return [next, ...list]
+        }
+      })
+    } catch (e) {
+      // rollback
+      setLikedSet(prev => { const s = new Set(prev); wasLiked ? s.add(id) : s.delete(id); return s })
+      setOptimisticDelta(prev => ({ ...prev, [id]: (prev[id] ?? 0) + (wasLiked ? +1 : -1) }))
+    }
+  }
+
+  // Use shared actions to align behavior with Search
+  const mapAnyVideoToRestaurant = undefined as any
 
   const handleShare = async (url: string) => {
     try {
@@ -328,35 +488,20 @@ export default function FavoritesPage() {
                 </button>
               </div>
             ) : likedVideos && likedVideos.length > 0 ? (
-              <div className="grid grid-cols-2 gap-4">
-                {likedVideos.map((v, idx) => (
-                  <div
+              <div className="grid grid-cols-2 gap-3">
+                {likedVideos.map((v) => (
+                  <VideoCard
                     key={v.id}
-                    className="bg-white rounded-lg overflow-hidden shadow-sm border cursor-pointer hover:shadow-md transition-shadow"
-                    onClick={() => {
-                      setSelectedLikedIndex(idx)
-                      setShowLikedVideoFeed(true)
-                    }}
-                  >
-                    <div className="relative aspect-[9/16] bg-black">
-                      <video
-                        src={v.playback_url || FALLBACK_VIDEO_URL}
-                        className="w-full h-full object-cover"
-                        muted
-                        playsInline
-                        preload="metadata"
-                        controls={false}
-                      />
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/0 hover:bg-black/10 transition-colors">
-                        <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow">
-                          <div className="w-0 h-0 border-l-[16px] border-l-gray-800 border-t-[10px] border-t-transparent border-b-[10px] border-b-transparent ml-1"></div>
-                        </div>
-                      </div>
-                      <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/60 to-transparent">
-                        <p className="text-white text-xs font-medium line-clamp-1">{v.title || ""}</p>
-                      </div>
-                    </div>
-                  </div>
+                    posterUrl={derivePosterUrl(v.playback_url, (v as any).storage_path) || FALLBACK_VIDEO_URL}
+                    title={v.title || v.caption || '無題の動画'}
+                    bottomMetaVariant="account"
+                    accountAvatarUrl={ownerProfiles[v.owner_id]?.avatar_url ?? null}
+                    accountLabel={ownerProfiles[v.owner_id]?.username ? `@${ownerProfiles[v.owner_id]?.username}` : (ownerProfiles[v.owner_id]?.display_name || 'ユーザー')}
+                    showTopBookmark
+                    isBookmarked={bookmarkedSet.has(v.id)}
+                    onToggleBookmark={() => toggleBookmarkForVideo(v)}
+                    onClickCard={() => openOverlayForLiked(v as any)}
+                  />
                 ))}
               </div>
             ) : (
@@ -405,82 +550,24 @@ export default function FavoritesPage() {
                 </button>
               </div>
             ) : bookmarkedVideos.length > 0 ? (
-              <div className="grid grid-cols-2 gap-4">
-                {bookmarkedVideos.map((bookmark, index) => {
+              <div className="grid grid-cols-2 gap-3">
+                {bookmarkedVideos.map((bookmark) => {
                   const video = bookmark.videos
+                  const profile = ownerProfiles[video.owner_id]
+                  const label = profile?.username ? `@${profile.username}` : (profile?.display_name || 'ユーザー')
                   return (
-                    <div
+                    <VideoCard
                       key={bookmark.id}
-                      className="bg-white rounded-lg overflow-hidden shadow-sm border cursor-pointer hover:shadow-md transition-shadow"
-                    >
-                      <div className="aspect-[9/16] relative">
-                        <video
-                          src={video.playback_url || FALLBACK_VIDEO_URL}
-                          aria-label={video.title || '動画'}
-                          className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                          muted
-                          loop
-                          autoPlay
-                          playsInline
-                          controls={false}
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedBookmarkedIndex(index)
-                            setShowBookmarkedVideoFeed(true)
-                          }}
-                        />
-                        {/* Play button overlay */}
-                        <div
-                          className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedBookmarkedIndex(index)
-                            setShowBookmarkedVideoFeed(true)
-                          }}
-                        >
-                          <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
-                            <div className="w-0 h-0 border-l-[20px] border-l-gray-800 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
-                          </div>
-                        </div>
-                        
-                        {/* Remove bookmark button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            removeBookmark(video.id)
-                          }}
-                          className="absolute top-2 right-2 p-2 bg-black bg-opacity-50 rounded-full hover:bg-opacity-70 transition-opacity"
-                          aria-label="ブックマーク解除"
-                        >
-                          <Bookmark className="w-4 h-4 fill-orange-500 text-orange-500" />
-                        </button>
-                      </div>
-                      
-                      <div className="p-3">
-                        <h3 className="font-semibold text-sm mb-2 line-clamp-2">
-                          {video.title || video.caption || '無題の動画'}
-                        </h3>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
-                              <User className="w-4 h-4 text-gray-600" />
-                            </div>
-                            <span className="text-xs text-gray-600">
-                              {new Date(bookmark.created_at).toLocaleDateString('ja-JP')}
-                            </span>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeBookmark(video.id)
-                            }}
-                            className="p-1 hover:bg-gray-100 rounded transition-colors"
-                          >
-                            <Bookmark className="w-4 h-4 fill-orange-500 text-orange-500" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                      posterUrl={derivePosterUrl(video.playback_url as any, (video as any).storage_path) || "/placeholder.jpg"}
+                      title={video.title || video.caption || '無題の動画'}
+                      showTopBookmark
+                      isBookmarked
+                      onToggleBookmark={() => removeBookmark(video.id)}
+                      bottomMetaVariant="account"
+                      accountAvatarUrl={profile?.avatar_url ?? null}
+                      accountLabel={label}
+                      onClickCard={() => openOverlayForBookmarked(video as any)}
+                    />
                   )
                 })}
               </div>
@@ -501,248 +588,27 @@ export default function FavoritesPage() {
         </Tabs>
       </div>
 
-      {/* Bookmarked Videos Feed Modal */}
-      {showBookmarkedVideoFeed && bookmarkedVideos.length > 0 && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <div ref={bookmarkedFeedRef as any} className="h-screen overflow-y-auto snap-y snap-mandatory"> {/* TODO: 型を詰める */}
-            {bookmarkedVideos.map((bookmark, index) => {
-              const video = bookmark.videos
-              return (
-                <div key={bookmark.id} className="h-screen w-full relative snap-start">
-                  <video
-                    src={video.playback_url || FALLBACK_VIDEO_URL}
-                    className="w-full h-full object-cover"
-                    muted
-                    loop
-                    autoPlay
-                    playsInline
-                    controls={false}
-                  />
+      {/* Reel feed modals disabled (replaced by VideoFullscreenOverlay) */}
 
-                  {/* Back button */}
-                  <div className="absolute top-6 left-6 z-10">
-                    <button
-                      onClick={() => setShowBookmarkedVideoFeed(false)}
-                      className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white border-none px-3 py-2 rounded"
-                    >
-                      ＜
-                    </button>
-                  </div>
-
-                  {/* Video info */}
-                  <div className="absolute inset-0 flex">
-                    <div className="flex-1 flex flex-col justify-end p-4 pb-32">
-                      <div className="text-white">
-                        <div className="mb-3">
-                          <h3 className="text-lg font-semibold mb-2">
-                            {video.title || video.caption || '無題の動画'}
-                          </h3>
-                          <p className="text-sm text-gray-300">
-                            保存日: {new Date(bookmark.created_at).toLocaleDateString('ja-JP')}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right side buttons */}
-                    <div className="w-16 flex flex-col items-center justify-end pb-20 gap-6">
-                      <div className="flex flex-col items-center">
-                        <button className="w-12 h-12 flex items-center justify-center">
-                          <Heart className="w-8 h-8 text-white drop-shadow-lg" />
-                        </button>
-                      </div>
-
-                      <div className="flex flex-col items-center">
-                        <button 
-                          onClick={() => removeBookmark(video.id)}
-                          className="w-12 h-12 flex items-center justify-center"
-                        >
-                          <Bookmark className="w-8 h-8 text-white drop-shadow-lg fill-white" />
-                        </button>
-                      </div>
-
-                      <div className="flex flex-col items-center">
-                        <button 
-                          onClick={() => handleShare(video.playback_url)}
-                          className="w-12 h-12 flex items-center justify-center"
-                        >
-                          <Share2 className="w-8 h-8 text-white drop-shadow-lg" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bottom buttons */}
-                  <div className="absolute bottom-16 left-0 right-0 px-4">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          const restaurantData = {
-                            id: video.id,
-                            restaurantName: video.title || '店舗名',
-                            genre: video.category || '料理',
-                            distance: "0.5km",
-                            rating: 4.5,
-                          }
-                          setSelectedRestaurant(restaurantData)
-                          setShowReservationModal(true)
-                        }}
-                        className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
-                      >
-                        今すぐ予約する
-                      </button>
-                      <button
-                        onClick={() => {
-                          const restaurantData = {
-                            id: video.id,
-                            restaurantName: video.title || '店舗名',
-                            genre: video.category || '料理',
-                            distance: "0.5km",
-                            rating: 4.5,
-                          }
-                          setSelectedRestaurant(restaurantData)
-                          setShowStoreDetailModal(true)
-                        }}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
-                      >
-                        もっと見る…
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* 既存のLiked Videos Feed Modal */}
-      {showLikedVideoFeed && likedVideos && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <div ref={likedFeedRef as any} className="h-screen overflow-y-auto snap-y snap-mandatory"> {/* TODO: 型を詰める */}
-            {likedVideos.map((v, index) => (
-              <div key={v.id} className="h-screen w-full relative snap-start">
-                <video
-                  src={v.playback_url || FALLBACK_VIDEO_URL}
-                  className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                  muted
-                  loop
-                  autoPlay
-                  playsInline
-                  controls={false}
-                />
-
-                {/* Back button */}
-                <div className="absolute top-6 left-6 z-10">
-                  <button
-                    onClick={() => setShowLikedVideoFeed(false)}
-                    className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white border-none px-3 py-2 rounded"
-                  >
-                    ＜
-                  </button>
-                </div>
-
-                {/* Left profile overlay */}
-                <div className="absolute inset-0 flex">
-                  <div className="flex-1 flex flex-col justify-end p-4 pb-32">
-                    <div className="text-white">
-                      <div className="mb-3">
-                        <button
-                          onClick={() => {}}
-                          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-                        >
-                          <div className="w-10 h-10 bg-gray-300 rounded-full overflow-hidden">
-                            {ownerProfiles[v.owner_id]?.avatar_url ? (
-                              <>
-                                {/* eslint-disable-next-line @next/next/no-img-element -- TODO: 画像最適化は後で対応 */}
-                                <img
-                                  src={ownerProfiles[v.owner_id]?.avatar_url as string}
-                                  alt="avatar"
-                                  className="w-full h-full object-cover"
-                                />
-                              </>
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-700 font-semibold">
-                                {(ownerProfiles[v.owner_id]?.username || ownerProfiles[v.owner_id]?.display_name || "U").toString().charAt(0).toUpperCase()}
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-white font-semibold text-sm">
-                            {ownerProfiles[v.owner_id]?.username
-                              ? `@${ownerProfiles[v.owner_id]?.username}`
-                              : ownerProfiles[v.owner_id]?.display_name || "ユーザー"}
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Right side action buttons */}
-                <div className="absolute right-4 bottom-28 z-10 flex flex-col items-center gap-5">
-                  <div className="flex flex-col items-center">
-                    <button
-                      onClick={() => handleToggleLikeInFeed(v.id)}
-                      className="w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center"
-                    >
-                      <Heart className={`w-6 h-6 ${likedSet.has(v.id) ? "fill-red-500 text-red-500" : "text-white"}`} />
-                    </button>
-                    <span className="text-white text-xs mt-1">
-                      {(likeCounts[v.id] ?? 0) + (optimisticDelta[v.id] ?? 0)}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <button className="w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center">
-                      <Bookmark className="w-6 h-6 text-white" />
-                    </button>
-                  </div>
-
-                  <div className="flex flex-col items-center">
-                    <button
-                      onClick={() => handleShare(v.playback_url)}
-                      className="w-12 h-12 rounded-full bg-black/40 hover:bg-black/60 flex items-center justify-center"
-                    >
-                      <Share2 className="w-6 h-6 text-white" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Bottom CTA buttons */}
-                <div className="absolute bottom-16 left-0 right-0 px-4">
-                  <div className="flex gap-2">
-                    <button className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
-                      今すぐ予約する
-                    </button>
-                    <button
-                      onClick={() => {
-                        setCaptionOpenIds((prev) => {
-                          const s = new Set(prev)
-                          if (s.has(v.id)) s.delete(v.id)
-                          else s.add(v.id)
-                          return s
-                        })
-                      }}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
-                    >
-                      もっと見る…
-                    </button>
-                  </div>
-                </div>
-
-                {/* Bottom overlay for title/caption */}
-                {captionOpenIds.has(v.id) && (
-                  <div className="absolute inset-x-0 bottom-28 px-4">
-                    <div className="bg-black/50 rounded-xl p-3">
-                      <p className="text-white text-sm font-medium whitespace-pre-wrap">{v.title || ""}</p>
-                      {v.caption && <p className="text-white/90 text-xs mt-1 whitespace-pre-wrap">{v.caption}</p>}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* Unified fullscreen overlay */}
+      {fsOpen && fsVideo && (
+        <VideoFullscreenOverlay
+          open={fsOpen}
+          video={fsVideo}
+          ownerHandle={fsOwnerHandle}
+          ownerAvatarUrl={fsOwnerAvatar ?? null}
+          liked={likedSet.has(fsVideo.id)}
+          likeCount={getLikeCount(fsVideo.id)}
+          onToggleLike={() => handleToggleLikeInFeed(fsVideo.id)}
+          bookmarked={bookmarkedSet.has(fsVideo.id)}
+          onToggleBookmark={() => toggleBookmarkForVideo({ id: fsVideo.id } as any)}
+          onShare={async () => { try { if ((navigator as any).share) { await (navigator as any).share({ url: fsVideo.playback_url }) } else { await navigator.clipboard.writeText(fsVideo.playback_url); alert("リンクをコピーしました") } } catch {} }}
+          onClose={() => setFsOpen(false)}
+          onReserve={() => { openReserveShared({ setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo: setFsOpen as any }, { id: fsVideo.id, title: fsVideo.title as any } as any) }}
+          onMore={() => { openStoreShared({ setSelectedRestaurant, setShowStoreDetailModal }, { id: fsVideo.id, title: fsVideo.title as any, caption: fsVideo.caption as any } as any, { keepFullscreen: true }) }}
+          muted={fsMuted}
+          onToggleMuted={() => setFsMuted((m) => !m)}
+        />
       )}
 
       {/* Reservation Modal */}
@@ -758,6 +624,7 @@ export default function FavoritesPage() {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* お名前 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-3">お名前</label>
                 <input
@@ -769,6 +636,78 @@ export default function FavoritesPage() {
                 />
               </div>
 
+              {/* 人数 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">人数</label>
+                <select
+                  value={reservationData.people}
+                  onChange={(e) => setReservationData((prev) => ({ ...prev, people: Number.parseInt(e.target.value) }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 text-center text-lg"
+                >
+                  {Array.from({ length: 20 }, (_, i) => i + 1).map((num) => (
+                    <option key={num} value={num}>{num}名</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 日付 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">日付</label>
+                <input
+                  type="date"
+                  value={reservationData.date}
+                  onChange={(e) => setReservationData((prev) => ({ ...prev, date: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  min={new Date().toISOString().split("T")[0]}
+                />
+              </div>
+
+              {/* 時間帯 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">時間帯</label>
+                <select
+                  value={reservationData.time}
+                  onChange={(e) => setReservationData((prev) => ({ ...prev, time: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  {Array.from({ length: 25 }, (_, i) => {
+                    const hour = Math.floor(i / 2) + 11
+                    const minute = i % 2 === 0 ? "00" : "30"
+                    if (hour > 23) return null
+                    const timeStr = `${hour.toString().padStart(2, "0")}:${minute}`
+                    return <option key={timeStr} value={timeStr}>{timeStr}</option>
+                  }).filter(Boolean) as any}
+                </select>
+              </div>
+
+              {/* 席タイプ */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">席タイプ</label>
+                <select
+                  value={reservationData.seatType}
+                  onChange={(e) => setReservationData((prev) => ({ ...prev, seatType: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="指定なし">指定なし</option>
+                  <option value="テーブル">テーブル</option>
+                  <option value="カウンター">カウンター</option>
+                  <option value="個室">個室</option>
+                </select>
+              </div>
+
+              {/* メッセージ */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">メッセージ（任意）</label>
+                <textarea
+                  value={reservationData.message}
+                  onChange={(e) => setReservationData((prev) => ({ ...prev, message: e.target.value }))}
+                  rows={4}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                  placeholder="アレルギーや特別なリクエストがあればお書きください"
+                />
+              </div>
+
+              {/* 送信 */}
               <button
                 className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-lg font-semibold rounded-lg"
                 onClick={() => {
@@ -806,6 +745,11 @@ export default function FavoritesPage() {
                   <span>•</span>
                   <span>{selectedRestaurant.distance}</span>
                 </div>
+                {selectedRestaurant.caption && (
+                  <div className="mt-3">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{selectedRestaurant.caption}</p>
+                  </div>
+                )}
               </div>
 
               <button
@@ -825,4 +769,61 @@ export default function FavoritesPage() {
       <Navigation />
     </div>
   )
+}
+
+function SpeakerIcon({ muted }: { muted: boolean }) {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4.5 9.5v5h3.2L12 20V4l-4.3 5.5H4.5z" fill="currentColor" stroke="currentColor" />
+      {!muted && (
+        <>
+          <path d="M15.2 9.2a3.3 3.3 0 010 5.6" />
+          <path d="M17.4 7a5.6 5.6 0 010 10" />
+        </>
+      )}
+      {muted && <line x1="16.2" y1="8" x2="21" y2="16" />}
+    </svg>
+  )
+}
+
+// Searchページと同じロジックで動画URLから推測した.webpのサムネURLを生成
+function derivePosterUrl(playbackUrl?: string | null, storagePath?: string | null): string | null {
+  if (storagePath) {
+    const posterPath = storagePath.replace(/\.[^.]+$/, ".webp")
+    if (posterPath && posterPath !== storagePath) {
+      const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "")
+      if (base) {
+        const objectPath = posterPath.replace(/^\/+/, "")
+        return `${base}/storage/v1/object/public/videos/${objectPath}`
+      }
+    }
+  }
+  if (!playbackUrl) return null
+  try {
+    const u = new URL(playbackUrl)
+    const pathname = u.pathname || ""
+    const m = pathname.match(/\.([a-zA-Z0-9]+)$/)
+    const ext = (m?.[1] || "").toLowerCase()
+    if (!/(mp4|mov|m4v|webm|ogg)$/.test(ext)) return null
+    const webpPath = pathname.replace(/\.(mp4|mov|m4v|webm|ogg)$/i, ".webp")
+    u.pathname = webpPath
+    u.search = ""
+    u.hash = ""
+    return u.toString()
+  } catch {
+    const base = (playbackUrl as any)?.split?.("?")[0]
+    if (base && /\.(mp4|mov|m4v|webm|ogg)$/i.test(base)) {
+      return base.replace(/\.(mp4|mov|m4v|webm|ogg)$/i, ".webp")
+    }
+    return null
+  }
 }
