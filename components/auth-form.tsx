@@ -150,8 +150,9 @@ export function AuthForm() {
     setError("")
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(resetData.resetField)
-      
+      const { error } = await supabase.auth.resetPasswordForEmail(resetData.resetField, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
       if (error) throw error
 
       alert(`パスワードリセットリンクを${resetData.resetField}に送信しました`)
