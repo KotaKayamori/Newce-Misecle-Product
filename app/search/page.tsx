@@ -22,7 +22,6 @@ type SupabaseVideoRow = {
   storage_path: string | null
   title: string | null
   caption: string | null
-  store_info?: string | null
   created_at: string
   video_likes?: { count?: number }[]
 }
@@ -42,6 +41,11 @@ export default function SearchPage() {
     趣味・嗜好: [],
   })
   const [isSearchMode, setIsSearchMode] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [searchResults, setSearchResults] = useState<SupabaseVideoRow[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [didSearch, setDidSearch] = useState(false)
   const [_expandedCategory, _setExpandedCategory] = useState<string | null>(null) // TODO: 未使用
   const categoryTabs = [
     "今日のおすすめ",
@@ -55,8 +59,6 @@ export default function SearchPage() {
   const [selectedCategory, setSelectedCategory] = useState("今日のおすすめ")
   const isLatestCategory = selectedCategory === "最新動画"
   const isGuidebookCategory = selectedCategory === "ガイドブック"
-  // const [showVideoFeed, setShowVideoFeed] = useState(false)
-  // const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<
     | {
@@ -68,8 +70,6 @@ export default function SearchPage() {
     | null
   >(null)
   const [popularKeywordsSet, setPopularKeywordsSet] = useState(0)
-  const [_searchTerm, setSearchTerm] = useState("") // TODO: 未使用
-
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<
@@ -96,7 +96,6 @@ export default function SearchPage() {
   const [_randomRestaurants, setRandomRestaurants] = useState<any[]>([]) // TODO: 未使用
   const [supabaseVideos, setSupabaseVideos] = useState<SupabaseVideoRow[]>([])
   const playersRef = useRef<Record<string, HTMLVideoElement | null>>({})
-  // const feedPlayersRef = useRef<Record<string, HTMLVideoElement | null>>({})
   const [videoLimit, setVideoLimit] = useState(6)
   const [hasMoreVideos, setHasMoreVideos] = useState(true)
   const latestSentinelRef = useRef<HTMLDivElement | null>(null)
@@ -105,7 +104,6 @@ export default function SearchPage() {
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, { username?: string | null; display_name?: string | null; avatar_url?: string | null }>>({})
   const [fullscreenMuted, setFullscreenMuted] = useState(false)
-  // const [videoFeedMuted, setVideoFeedMuted] = useState(false)
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
   const fullscreenScrollLockRef = useRef<{
     scrollY: number
@@ -118,11 +116,12 @@ export default function SearchPage() {
     return trimmed.length > 0 ? trimmed : undefined
   }
 
- const selectSupabaseVideo = (video: SupabaseVideoRow) => {
+
+
+  const selectSupabaseVideo = (video: SupabaseVideoRow) => {
     setSelectedVideo({
       ...video,
       caption: normalizeOptionalText(video.caption) ?? null,
-      store_info: normalizeOptionalText(video.store_info) ?? null,
     })
     setShowFullscreenVideo(true)
   }
@@ -209,7 +208,7 @@ export default function SearchPage() {
   }
 
   function openRandomVideoFullscreen(video: VideoData) {
-    const playbackUrl = video.playback_url || video.public_url
+    const playbackUrl = video.public_url
     if (!playbackUrl) return
 
     if (video.user?.id) {
@@ -241,17 +240,85 @@ export default function SearchPage() {
       id: video.id,
       owner_id: video.user?.id ?? null,
       playback_url: playbackUrl,
-      storage_path: video.storage_path ?? null,
+      storage_path: null,
       title: video.title ?? null,
       caption:
-        normalizeOptionalText(video.caption) ??
-        normalizeOptionalText(video.influencer_comment) ??
-        null,
-      store_info: normalizeOptionalText(video.store_info) ?? null,
+        normalizeOptionalText(video.caption) ?? null,
       created_at: video.created_at,
       video_likes: [],
     })
     setShowFullscreenVideo(true)
+  }
+
+  function escapeIlike(input: string) {
+    return input.replace(/[%_]/g, "\\$&")
+  }
+
+  async function performSearch(q: string) {
+    const trimmed = q.trim()
+    if (!trimmed) return
+    setSearchLoading(true)
+    setSearchError(null)
+    try {
+      const pattern = `%${escapeIlike(trimmed)}%`
+      const { data, error } = await supabase
+        .from("videos")
+        .select("id, owner_id, playback_url, storage_path, title, caption, created_at, video_likes(count)")
+        .or(`title.ilike.${pattern},caption.ilike.${pattern}`)
+        .order("created_at", { ascending: false })
+        .limit(40)
+
+      if (error) throw error
+      const arr = (data as SupabaseVideoRow[]) || []
+      setSearchResults(arr)
+      setDidSearch(true)
+
+      // いいね数を反映
+      setVideoLikeCounts((prev) => {
+        const next = { ...prev }
+        arr.forEach((row) => {
+          next[row.id] = row.video_likes?.[0]?.count ?? next[row.id] ?? 0
+        })
+        return next
+      })
+
+      // オーナープロフィールを取得
+      const ownerIds = Array.from(new Set(arr.map((row) => row.owner_id).filter((id): id is string => Boolean(id))))
+      if (ownerIds.length > 0) {
+        const { data: profileRows, error: profileErr } = await supabase
+          .from("user_profiles")
+          .select("id, username, display_name, avatar_url")
+          .in("id", ownerIds)
+        if (!profileErr && profileRows) {
+          setOwnerProfiles((prev) => {
+            const next = { ...prev }
+            ;(profileRows as any[]).forEach((p) => {
+              next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
+            })
+            return next
+          })
+        }
+      }
+    } catch (e: any) {
+      console.warn("search error", e)
+      setSearchError(e?.message ?? "検索に失敗しました")
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
+  function handleSearchSubmit() {
+    if (!searchTerm.trim()) return
+    setDidSearch(true)
+    performSearch(searchTerm)
+    setIsSearchMode(false)
+  }
+
+  function clearSearch() {
+    setSearchTerm("")
+    setSearchResults([])
+    setSearchError(null)
+    setDidSearch(false)
   }
 
   // When opening fullscreen, try to play proactively and pause other inline players
@@ -491,30 +558,6 @@ export default function SearchPage() {
     return () => observer.disconnect()
   }, [isLatestCategory, hasMoreVideos])
 
-  /*
-  useEffect(() => {
-    if (showVideoFeed) {
-      setVideoFeedMuted(false)
-    }
-  }, [showVideoFeed])
-
-  useEffect(() => {
-    Object.values(feedPlayersRef.current).forEach((el) => {
-      if (!el) return
-      el.muted = videoFeedMuted
-      if (!videoFeedMuted) {
-        try {
-          el.volume = 1
-          const playPromise = el.play()
-          if (playPromise && typeof playPromise.then === "function") {
-            playPromise.catch(() => {})
-          }
-        } catch {}
-      }
-    })
-  }, [videoFeedMuted])
-  */
-
   useEffect(() => {
     if (showFullscreenVideo) {
       setFullscreenMuted(false)
@@ -615,28 +658,42 @@ export default function SearchPage() {
     <div className="min-h-screen bg-white pb-20 overflow-y-auto scrollbar-hide">
       {/* Search Header */}
       <div className="bg-white px-6 py-4">
-        {!isSearchMode ? (
-          <div className="flex items-center gap-3 mb-4">
-            <div onClick={() => setIsSearchMode(true)} className="flex-1 relative cursor-pointer">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
-              <div className="pl-10 pr-4 py-2 border border-black rounded-full bg-white text-black">
-                店舗名・ジャンル・キーワードで検索
-              </div>
-            </div>
-          </div>
-        ) : (
+        {(isSearchMode || didSearch) ? (
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
               <Input
                 placeholder="店舗名・ジャンル・キーワードで検索"
-                className="pl-10 rounded-full border-black text-black placeholder:text-black"
-                autoFocus
+                className="pl-10 rounded-full border-black text-black placeholder:text-gray-400"
+                autoFocus={isSearchMode}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearchSubmit()
+                }}
               />
             </div>
-            <Button variant="ghost" onClick={() => setIsSearchMode(false)} className="text-black hover:text-gray-800">
-              キャンセル
+            <Button
+              onClick={handleSearchSubmit}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              disabled={!searchTerm.trim() || searchLoading}
+            >
+              検索
             </Button>
+            {isSearchMode && (
+              <Button variant="ghost" onClick={() => setIsSearchMode(false)} className="text-black hover:text-gray-800">
+                キャンセル
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 mb-4">
+            <div onClick={() => setIsSearchMode(true)} className="flex-1 relative cursor-pointer">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
+              <div className="pl-10 pr-4 py-2 border border-black rounded-full bg-white text-gray-400">
+                店舗名・ジャンル・キーワードで検索
+              </div>
+            </div>
           </div>
         )}
 
@@ -731,166 +788,6 @@ export default function SearchPage() {
           </div>
         )}
       </div>
-
-      {/* Video Feed Modal - DBから取得した動画を使用 */}
-      {/*
-      {showVideoFeed && (
-        <div className="fixed inset-0 z-40 bg-black">
-          <div className="h-screen overflow-y-auto snap-y snap-mandatory">
-            {videos.map((video, index) => (
-              <div key={video.id} className="h-screen w-full relative snap-start">
-                <video
-                  ref={(el) => {
-                    if (el) feedPlayersRef.current[video.id] = el
-                    else delete feedPlayersRef.current[video.id]
-                  }}
-                  src={video.public_url}
-                  className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                  muted={videoFeedMuted}
-                  playsInline
-                  controls={false}
-                  poster={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setSelectedVideoIndex(index)
-                    setShowVideoFeed(true)
-                  }}
-                />
-
-                <div className="absolute top-6 left-6 z-10">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowVideoFeed(false)}
-                    className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white border-none"
-                  >
-                    ＜
-                  </Button>
-                </div>
-
-                <div className="absolute top-6 right-6 z-10">
-                  <button
-                    type="button"
-                    onClick={() => setVideoFeedMuted((prev) => !prev)}
-                    className="p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition"
-                    aria-label={videoFeedMuted ? "ミュート解除" : "ミュートにする"}
-                  >
-                    <SpeakerIcon muted={videoFeedMuted} />
-                  </button>
-                </div>
-
-                <div className="absolute inset-0 flex">
-                  <div className="flex-1 flex flex-col justify-end p-4 pb-32">
-                    <div className="text-white">
-                      <div className="mb-3">
-                        <button
-                          onClick={() => {
-                            setSelectedUser({
-                              id: video.id,
-                              name: `@${video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}`,
-                              avatar: video.user.avatar_url,
-                              isFollowing: bookmarkedVideoIds.has(video.id),
-                            })
-                            setShowUserProfile(true)
-                          }}
-                          className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-                        >
-                          <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden">
-                            {video.user.avatar_url ? (
-                              <img 
-                                src={video.user.avatar_url} 
-                                alt={video.user.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              video.user.name.charAt(0)
-                            )}
-                          </div>
-                          <span className="text-white font-semibold text-sm">
-                            @{video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}
-                          </span>
-                        </button>
-                      </div>
-                      <div className="mb-2">
-                        <p className="text-white text-sm">{video.title}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="w-16 flex flex-col items-center justify-center pb-32 gap-6">
-                    <div className="flex flex-col items-center">
-                      <button className="w-12 h-12 flex items-center justify-center">
-                        <Heart className="w-8 h-8 text-white drop-shadow-lg" />
-                      </button>
-                      <span className="text-white text-xs font-medium drop-shadow-lg mt-1">128</span>
-                    </div>
-
-                    <div className="flex flex-col items-center">
-                      <button
-                        onClick={(e) => toggleFavorite(video.id, e)}
-                        className="w-12 h-12 flex items-center justify-center"
-                      >
-                        <Bookmark
-                          className={`w-8 h-8 drop-shadow-lg ${
-                            bookmarkedVideoIds.has(video.id) ? "fill-white text-white" : "text-white"
-                          }`}
-                        />
-                      </button>
-                    </div>
-
-                    <div className="flex flex-col items-center">
-                      <button className="w-12 h-12 flex items-center justify-center">
-                        <Send className="w-8 h-8 text-white drop-shadow-lg" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="absolute bottom-16 left-0 right-0 px-4">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => {
-                        const restaurantData = {
-                          id: video.id,
-                          restaurantName: video.title,
-                          restaurantEmail: `info@${video.title.toLowerCase().replace(/\s+/g, "-")}.com`,
-                          genre: video.category,
-                          distance: "0.5km",
-                          rating: 4.5,
-                        }
-                        setSelectedRestaurant(restaurantData)
-                        setShowReservationModal(true)
-                      }}
-                      className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
-                    >
-                      今すぐ予約する
-                    </button>
-                    <button
-                      onClick={() => {
-                    const restaurantData = {
-                      id: video.id,
-                      restaurantName: video.title,
-                      restaurantEmail: `info@${video.title.toLowerCase().replace(/\s+/g, "-")}.com`,
-                      genre: video.category,
-                      distance: "0.5km",
-                      rating: 4.5,
-                      caption: video.caption?.trim() || undefined,
-                    }
-                        setSelectedRestaurant(restaurantData)
-                        setShowStoreDetailModal(true)
-                      }}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
-                    >
-                      もっと見る…
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      */}
 
       {/* User Profile Modal */}
       {showUserProfile && selectedUser && (
@@ -1307,264 +1204,278 @@ export default function SearchPage() {
       {!isSearchMode && (
         <div className="px-6 py-4 bg-white overflow-y-auto scrollbar-hide">
           <div className="space-y-6">
-            {!isLatestCategory && !isGuidebookCategory && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">{selectedCategory}</h2>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">{videos.length}件</span>
-                  <button
-                    onClick={handleRefreshVideos}
-                    disabled={loading}
-                    className="p-1 hover:bg-gray-100 rounded transition-colors"
-                  >
-                    <RefreshCw className={`w-4 h-4 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Loading State */}
-              {loading && (
-                <div className="flex justify-center py-8">
-                  <div className="text-gray-500">動画を読み込み中...</div>
-                </div>
-              )}
-
-              {/* Error State */}
-              {error && (
-                <div className="flex flex-col items-center py-8">
-                  <div className="text-red-500 mb-2">エラーが発生しました</div>
-                  <button
-                    onClick={handleRefreshVideos}
-                    className="text-blue-600 hover:text-blue-700 underline"
-                  >
-                    再試行
-                  </button>
-                </div>
-              )}
-
-              {/* 2x3 Grid Layout - DBから取得した動画 */}
-              {!loading && !error && (
-                <div className="grid grid-cols-2 gap-3">
-                  {videos.map((video) => (
-                    <Card
-                      key={video.id}
-                      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                      onClick={() => router.push(`/restaurant/${video.id}`)}
+            {didSearch ? (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">検索結果</h2>
+                  <div className="flex items-center gap-2">
+                    {searchLoading && <span className="text-sm text-gray-600">検索中...</span>}
+                    {!!searchResults.length && (
+                      <span className="text-sm text-gray-600">{searchResults.length}件</span>
+                    )}
+                    <button
+                      onClick={clearSearch}
+                      className="p-1 hover:bg-gray-100 rounded transition-colors text-sm text-gray-600"
                     >
-                      <CardContent className="p-0">
-                        <div className="aspect-[9/16] relative">
-                          <video
-                            src={video.public_url}
-                            alt={video.title}
-                            className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                            playsInline
-                            controls={false}
-                            poster={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              openRandomVideoFullscreen(video)
-                            }}
-                          />
-                          <div className="absolute top-2 right-2 z-10">
-                            <button
-                              type="button"
-                              onClick={(e) => toggleFavorite(video.id, e)}
-                              className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
-                              aria-label={bookmarkedVideoIds.has(video.id) ? "ブックマーク解除" : "ブックマーク"}
-                            >
-                              <Bookmark
-                                className={`w-4 h-4 ${
-                                  bookmarkedVideoIds.has(video.id) ? "fill-orange-500 text-orange-500" : "text-white"
-                                }`}
-                              />
-                            </button>
-                          </div>
-                          {/* Play button overlay */}
-                          <div
-                            className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              openRandomVideoFullscreen(video)
-                            }}
-                          >
-                            <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
-                              <div className="w-0 h-0 border-l-[20px] border-l-gray-800 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
-                            </div>
-                          </div>
-                        </div>
+                      クリア
+                    </button>
+                  </div>
+                </div>
 
-                        <div
-                          className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedUser({
-                              id: video.id,
-                              name: `@${video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}`,
-                              avatar: video.user.avatar_url,
-                              isFollowing: bookmarkedVideoIds.has(video.id),
-                            })
-                            setShowUserProfile(true)
-                          }}
+                {searchError && (
+                  <div className="flex flex-col items-center py-8">
+                    <div className="text-red-500 mb-2">{searchError}</div>
+                    <button onClick={() => performSearch(searchTerm)} className="text-blue-600 hover:text-blue-700 underline">
+                      再試行
+                    </button>
+                  </div>
+                )}
+
+                {!searchError && !searchLoading && searchResults.length === 0 && (
+                  <div className="flex flex-col items-center py-12 text-gray-500">
+                    検索結果が見つかりませんでした
+                  </div>
+                )}
+
+                {!searchError && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {searchResults.map((v) => {
+                      const ownerProfile = v.owner_id ? ownerProfiles[v.owner_id] : undefined
+                      const ownerHandle = ownerProfile?.username
+                        ? `@${ownerProfile.username}`
+                        : ownerProfile?.display_name || "ユーザー"
+                      const isBookmarked = bookmarkedVideoIds.has(v.id)
+
+                      return (
+                        <Card
+                          key={v.id}
+                          className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                          aria-label={`動画を全画面で表示（${v.title || "動画"}）`}
+                          title="動画を全画面で表示"
+                          onClick={() => selectSupabaseVideo(v)}
                         >
-                          <h3 className="font-semibold text-sm mb-2 line-clamp-2">
-                            {video.title}
-                          </h3>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                                {video.user.avatar_url ? (
-                                  <>
-                                    {/* eslint-disable-next-line @next/next/no-img-element -- TODO: 画像最適化は後で対応 */}
-                                    <img 
-                                      src={video.user.avatar_url} 
-                                      alt={video.user.name}
-                                      className="w-full h-full object-cover"
-                                    />
-                                  </>
-                                ) : (
-                                  <User className="w-4 h-4 text-gray-600" />
-                                )}
+                          <CardContent className="p-0">
+                            <div className="aspect-[9/16] relative">
+                              <video
+                                ref={(el) => { playersRef.current[v.id] = el }}
+                                src={v.playback_url}
+                                className="w-full h-full object-cover rounded-t-lg cursor-pointer"
+                                poster={derivePosterUrl(v.playback_url, v.storage_path) || "/placeholder.jpg"}
+                                playsInline
+                                preload="metadata"
+                                controls={false}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  selectSupabaseVideo(v)
+                                }}
+                              />
+                              <div className="absolute top-2 right-2 z-10">
+                                <button
+                                  type="button"
+                                  onClick={(e) => toggleFavorite(v.id, e)}
+                                  className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
+                                  aria-label={isBookmarked ? "ブックマーク解除" : "ブックマーク"}
+                                >
+                                  <Bookmark
+                                    className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-white"}`}
+                                  />
+                                </button>
                               </div>
-                              <span className="text-xs text-gray-600">
-                                @{video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}
-                              </span>
+                              <div
+                                className="absolute inset-0 flex items-center justify中心 bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  selectSupabaseVideo(v)
+                                }}
+                              >
+                                <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
+                                  <div className="w-0 h-0 border-l-[20px] border-l-gray-800 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              {/* Empty State */}
-              {!loading && !error && videos.length === 0 && (
-                <div className="flex flex-col items-center py-8">
-                  <div className="text-gray-500 mb-2">動画が見つかりませんでした</div>
-                  <button
-                    onClick={handleRefreshVideos}
-                    className="text-blue-600 hover:text-blue-700 underline"
-                  >
-                    再読み込み
-                  </button>
-                </div>
-              )}
-            </div>
-            )}
-
-            {/* Supabase videos list (play on demand) */}
-            {isLatestCategory && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">{selectedCategory}</h2>
-                <span className="text-sm text-gray-600">{supabaseVideos.length}件</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {supabaseVideos.map((v) => {
-                  const ownerProfile = v.owner_id ? ownerProfiles[v.owner_id] : undefined
-                  const ownerHandle = ownerProfile?.username
-                    ? `@${ownerProfile.username}`
-                    : ownerProfile?.display_name || "ユーザー"
-                  const isBookmarked = bookmarkedVideoIds.has(v.id)
-
-                  return (
-                    <Card
-                      key={v.id}
-                      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                      aria-label={`動画を全画面で表示（${v.title || "動画"}）`}
-                      title="動画を全画面で表示"
-                      onClick={() => {
-                        selectSupabaseVideo(v)
-                      }}
-                    >
-                      <CardContent className="p-0">
-                        <div className="aspect-[9/16] relative">
-                          <video
-                            ref={(el) => (playersRef.current[v.id] = el)}
-                            src={v.playback_url}
-                            className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                            poster={derivePosterUrl(v.playback_url, v.storage_path) || "/placeholder.jpg"}
-                            playsInline
-                            preload="metadata"
-                            controls={false}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              selectSupabaseVideo(v)
-                            }}
-                          />
-                          <div className="absolute top-2 right-2 z-10">
-                            <button
-                              type="button"
-                              onClick={(e) => toggleFavorite(v.id, e)}
-                              className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
-                              aria-label={isBookmarked ? "ブックマーク解除" : "ブックマーク"}
+                            <div
+                              className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedUser({
+                                  id: v.id,
+                                  name: ownerHandle,
+                                  avatar: ownerProfile?.avatar_url,
+                                  isFollowing: bookmarkedVideoIds.has(v.id),
+                                })
+                                setShowUserProfile(true)
+                              }}
                             >
-                              <Bookmark
-                                className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-white"}`}
-                              />
-                            </button>
-                          </div>
-                          <div
-                            className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            selectSupabaseVideo(v)
-                          }}
-                          >
-                            <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
-                              <div className="w-0 h-0 border-l-[20px] border-l-gray-800 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
+                              <h3 className="font-semibold text-sm mb-2 line-clamp-2">{v.title || "動画"}</h3>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                                    {ownerProfile?.avatar_url ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img src={ownerProfile.avatar_url} alt={ownerHandle} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <User className="w-4 h-4 text-gray-600" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-gray-600">{ownerHandle}</span>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                        <div
-                          className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setSelectedUser({
-                              id: v.id,
-                              name: ownerHandle,
-                              avatar: ownerProfile?.avatar_url,
-                              isFollowing: bookmarkedVideoIds.has(v.id),
-                            })
-                            setShowUserProfile(true)
-                          }}
+                          </CardContent>
+                        </Card>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* ここに既存のカテゴリ別リスト（おすすめ、最新動画、ガイドブック）のブロックが続きます */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold">{selectedCategory}</h2>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">{videos.length}件</span>
+                      <button
+                        onClick={handleRefreshVideos}
+                        disabled={loading}
+                        className="p-1 hover:bg-gray-100 rounded transition-colors"
+                      >
+                        <RefreshCw className={`w-4 h-4 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Loading State */}
+                  {loading && (
+                    <div className="flex justify-center py-8">
+                      <div className="text-gray-500">動画を読み込み中...</div>
+                    </div>
+                  )}
+
+                  {/* Error State */}
+                  {error && (
+                    <div className="flex flex-col items-center py-8">
+                      <div className="text-red-500 mb-2">エラーが発生しました</div>
+                      <button
+                        onClick={handleRefreshVideos}
+                        className="text-blue-600 hover:text-blue-700 underline"
+                      >
+                        再試行
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 2x3 Grid Layout - DBから取得した動画 */}
+                  {!loading && !error && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {videos.map((video) => (
+                        <Card
+                          key={video.id}
+                          className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                          onClick={() => router.push(`/restaurant/${video.id}`)}
                         >
-                          <h3 className="font-semibold text-sm mb-2 line-clamp-2">{v.title || "動画"}</h3>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                                {ownerProfile?.avatar_url ? (
-                                  <>
-                                    {/* eslint-disable-next-line @next/next/no-img-element -- TODO: 画像最適化は後で対応 */}
-                                    <img src={ownerProfile.avatar_url} alt={ownerHandle} className="w-full h-full object-cover" />
-                                  </>
-                                ) : (
-                                  <User className="w-4 h-4 text-gray-600" />
-                                )}
+                          <CardContent className="p-0">
+                            <div className="aspect-[9/16] relative">
+                              <video
+                                src={video.public_url}
+                                auto-label={video.title}
+                                className="w-full h-full object-cover rounded-t-lg cursor-pointer"
+                                playsInline
+                                controls={false}
+                                poster={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openRandomVideoFullscreen(video)
+                                }}
+                              />
+                              <div className="absolute top-2 right-2 z-10">
+                                <button
+                                  type="button"
+                                  onClick={(e) => toggleFavorite(video.id, e)}
+                                  className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
+                                  aria-label={bookmarkedVideoIds.has(video.id) ? "ブックマーク解除" : "ブックマーク"}
+                                >
+                                  <Bookmark
+                                    className={`w-4 h-4 ${
+                                      bookmarkedVideoIds.has(video.id) ? "fill-orange-500 text-orange-500" : "text-white"
+                                    }`}
+                                  />
+                                </button>
+                              </div>
+                              {/* Play button overlay */}
+                              <div
+                                className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openRandomVideoFullscreen(video)
+                                }}
+                              >
+                                <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
+                                  <div className="w-0 h-0 border-l-[20px] border-l-gray-800 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
+                                </div>
+                              </div>
                             </div>
-                            <span className="text-xs text-gray-600">{ownerHandle}</span>
-                          </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
-              <div ref={isLatestCategory ? latestSentinelRef : undefined} className="h-4" />
-            </div>
-            )}
 
-            {isGuidebookCategory && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">{selectedCategory}</h2>
-              </div>
-              <GuidebookTab />
-            </div>
+                            <div
+                              className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedUser({
+                                  id: video.id,
+                                  name: `@${video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}`,
+                                  avatar: video.user.avatar_url,
+                                  isFollowing: bookmarkedVideoIds.has(video.id),
+                                })
+                                setShowUserProfile(true)
+                              }}
+                            >
+                              <h3 className="font-semibold text-sm mb-2 line-clamp-2">
+                                {video.title}
+                              </h3>
+
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                                    {video.user.avatar_url ? (
+                                      <>
+                                        {/* eslint-disable-next-line @next/next/no-img-element -- TODO: 画像最適化は後で対応 */}
+                                        <img 
+                                          src={video.user.avatar_url} 
+                                          alt={video.user.name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </>
+                                    ) : (
+                                      <User className="w-4 h-4 text-gray-600" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs text-gray-600">
+                                    @{video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {!loading && !error && videos.length === 0 && (
+                    <div className="flex flex-col items-center py-8">
+                      <div className="text-gray-500 mb-2">動画が見つかりませんでした</div>
+                      <button
+                        onClick={handleRefreshVideos}
+                        className="text-blue-600 hover:text-blue-700 underline"
+                      >
+                        再読み込み
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>
