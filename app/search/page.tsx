@@ -46,6 +46,11 @@ export default function SearchPage() {
     趣味・嗜好: [],
   })
   const [isSearchMode, setIsSearchMode] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [searchResults, setSearchResults] = useState<SupabaseVideoRow[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [didSearch, setDidSearch] = useState(false)
   const [_expandedCategory, _setExpandedCategory] = useState<string | null>(null) // TODO: 未使用
   const categoryTabs = [
     "今日のおすすめ",
@@ -92,7 +97,6 @@ export default function SearchPage() {
     | null
   >(null)
   const [popularKeywordsSet, setPopularKeywordsSet] = useState(0)
-  const [_searchTerm, setSearchTerm] = useState("") // TODO: 未使用
 
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
@@ -353,6 +357,78 @@ export default function SearchPage() {
       video_likes: [],
     })
     setShowFullscreenVideo(true)
+  }
+
+  function escapeIlike(input: string) {
+    return input.replace(/[%_]/g, "\\$&")
+  }
+
+  async function performSearch(q: string) {
+    const trimmed = q.trim()
+    if (!trimmed) return
+    setSearchLoading(true)
+    setSearchError(null)
+    try {
+      const pattern = `%${escapeIlike(trimmed)}%`
+      const { data, error } = await supabase
+        .from("videos")
+        .select("id, owner_id, playback_url, storage_path, title, caption, created_at, video_likes(count)")
+        .or(`title.ilike.${pattern},caption.ilike.${pattern}`)
+        .order("created_at", { ascending: false })
+        .limit(40)
+
+      if (error) throw error
+      const arr = (data as SupabaseVideoRow[]) || []
+      setSearchResults(arr)
+      setDidSearch(true)
+
+      // いいね数を反映
+      setVideoLikeCounts((prev) => {
+        const next = { ...prev }
+        arr.forEach((row) => {
+          next[row.id] = row.video_likes?.[0]?.count ?? next[row.id] ?? 0
+        })
+        return next
+      })
+
+      // オーナープロフィールを取得
+      const ownerIds = Array.from(new Set(arr.map((row) => row.owner_id).filter((id): id is string => Boolean(id))))
+      if (ownerIds.length > 0) {
+        const { data: profileRows, error: profileErr } = await supabase
+          .from("user_profiles")
+          .select("id, username, display_name, avatar_url")
+          .in("id", ownerIds)
+        if (!profileErr && profileRows) {
+          setOwnerProfiles((prev) => {
+            const next = { ...prev }
+            ;(profileRows as any[]).forEach((p) => {
+              next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
+            })
+            return next
+          })
+        }
+      }
+    } catch (e: any) {
+      // eslint-disable-next-line no-console
+      console.warn("search error", e)
+      setSearchError(e?.message ?? "検索に失敗しました")
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
+  function handleSearchSubmit() {
+    if (!searchTerm.trim()) return
+    setDidSearch(true)
+    performSearch(searchTerm)
+    setIsSearchMode(false)
+  }
+
+  function clearSearch() {
+    setSearchTerm("")
+    setSearchResults([])
+    setSearchError(null)
+    setDidSearch(false)
   }
 
   // When opening fullscreen, try to play proactively and pause other inline players
@@ -733,28 +809,36 @@ export default function SearchPage() {
     <div className="min-h-screen bg-white pb-20 overflow-y-auto scrollbar-hide">
       {/* Search Header */}
       <div className="bg-white px-6 py-4">
-        {!isSearchMode ? (
-          <div className="flex items-center gap-3 mb-4">
-            <div onClick={() => setIsSearchMode(true)} className="flex-1 relative cursor-pointer">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
-              <div className="pl-10 pr-4 py-2 border border-black rounded-full bg-white text-black">
-                店舗名・ジャンル・キーワードで検索
-              </div>
-            </div>
-          </div>
-        ) : (
+        {(isSearchMode || didSearch) ? (
           <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
               <Input
                 placeholder="店舗名・ジャンル・キーワードで検索"
-                className="pl-10 rounded-full border-black text-black placeholder:text-black"
-                autoFocus
+                className="pl-10 rounded-full border-black text-black placeholder:text-gray-400"
+                autoFocus={isSearchMode}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit() }}
               />
             </div>
-            <Button variant="ghost" onClick={() => setIsSearchMode(false)} className="text-black hover:text-gray-800">
-              キャンセル
+            <Button onClick={handleSearchSubmit} className="bg-orange-600 hover:bg-orange-700 text-white" disabled={!searchTerm.trim() || searchLoading}>
+              検索
             </Button>
+            {isSearchMode && (
+              <Button variant="ghost" onClick={() => setIsSearchMode(false)} className="text-black hover:text-gray-800">
+                キャンセル
+              </Button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 mb-4">
+            <div onClick={() => setIsSearchMode(true)} className="flex-1 relative cursor-pointer">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
+              <div className="pl-10 pr-4 py-2 border border-black rounded-full bg-white text-gray-400">
+                店舗名・ジャンル・キーワードで検索
+              </div>
+            </div>
           </div>
         )}
 
@@ -1425,6 +1509,50 @@ export default function SearchPage() {
       {!isSearchMode && (
         <div className="px-6 py-4 bg-white overflow-y-auto scrollbar-hide">
           <div className="space-y-6">
+            {didSearch && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">検索結果</h2>
+                <div className="flex items-center gap-2">
+                  {searchError ? (
+                    <span className="text-sm text-red-500">{searchError}</span>
+                  ) : (
+                    <span className="text-sm text-gray-600">{searchResults.length}件</span>
+                  )}
+                  {didSearch && (
+                    <button onClick={() => performSearch(searchTerm)} disabled={searchLoading} className="p-1 hover:bg-gray-100 rounded transition-colors">
+                      <RefreshCw className={`w-4 h-4 text-gray-600 ${searchLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              {searchLoading ? (
+                <div className="flex justify-center py-8"><div className="text-gray-500">検索中...</div></div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {searchResults.map((v) => {
+                    const ownerProfile = v.owner_id ? ownerProfiles[v.owner_id] : undefined
+                    const ownerHandle = ownerProfile?.username ? `@${ownerProfile.username}` : (ownerProfile?.display_name || "ユーザー")
+                    const isBookmarked = bookmarkedVideoIds.has(v.id)
+                    return (
+                      <VideoCard
+                        key={v.id}
+                        posterUrl={derivePosterUrl(v.playback_url, v.storage_path) || "/placeholder.jpg"}
+                        title={v.title || v.caption || '動画'}
+                        onClickCard={() => selectSupabaseVideo(v)}
+                        showTopBookmark
+                        isBookmarked={isBookmarked}
+                        onToggleBookmark={(e) => toggleFavorite(v.id, e as any)}
+                        bottomMetaVariant="account"
+                        accountAvatarUrl={ownerProfile?.avatar_url}
+                        accountLabel={ownerHandle}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            )}
             {!isLatestCategory && !isGuidebookCategory && (
             <div>
               <div className="flex items-center justify-between mb-4">
