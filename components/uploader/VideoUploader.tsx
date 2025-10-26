@@ -41,6 +41,7 @@ export default function VideoUploader() {
   const [photoState, setPhotoState] = useState<PhotoUploadState>("idle")
   const [photoResult, setPhotoResult] = useState<string[]>([])
   const [albumId, setAlbumId] = useState<string | null>(null)
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
 
   const pickFile = () => {
     if (!mode) {
@@ -67,6 +68,16 @@ export default function VideoUploader() {
 
   const removePhotoFile = (index: number) => {
     setPhotoFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const movePhotoFile = (fromIndex: number, toIndex: number) => {
+    setPhotoFiles((prev) => {
+      if (toIndex < 0 || toIndex >= prev.length) return prev
+      const next = prev.slice()
+      const [moved] = next.splice(fromIndex, 1)
+      next.splice(toIndex, 0, moved)
+      return next
+    })
   }
 
   const resetVideo = () => {
@@ -96,6 +107,19 @@ export default function VideoUploader() {
       setCategory("")
     }
   }
+
+  // Generate/revoke local preview URLs for selected album images
+  useEffect(() => {
+    if (!photoFiles || photoFiles.length === 0) {
+      setPhotoPreviews([])
+      return
+    }
+    const urls = photoFiles.map((f) => URL.createObjectURL(f))
+    setPhotoPreviews(urls)
+    return () => {
+      urls.forEach((u) => URL.revokeObjectURL(u))
+    }
+  }, [photoFiles])
 
   useEffect(() => {
     const preventWindowDrop = (event: DragEvent) => {
@@ -127,7 +151,6 @@ export default function VideoUploader() {
       title: title.trim(),
       category: category as VideoCategory,
       caption: caption.trim() || undefined,
-      uploadKind: "video",
     })
   }
 
@@ -164,7 +187,7 @@ export default function VideoUploader() {
           },
           body: JSON.stringify({
             title: title.trim(),
-            description: caption.trim() || null,
+            caption: caption.trim() || null,
             visibility: "public",
           }),
         })
@@ -478,20 +501,52 @@ export default function VideoUploader() {
                         {photoFiles.map((file, index) => (
                           <li
                             key={`${file.name}-${index}`}
-                            className="flex items-center justify-between rounded-md border border-gray-200 bg-white px-3 py-2"
+                            className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2"
                           >
-                            <span className="truncate text-sm font-medium text-gray-700">{file.name}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                removePhotoFile(index)
-                              }}
-                              className="inline-flex items-center gap-1 rounded-md border border-transparent px-2 py-1 text-sm text-red-500 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                              削除
-                            </button>
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden flex-shrink-0">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                {photoPreviews[index] ? (
+                                  <img src={photoPreviews[index]} alt={file.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Preview</div>
+                                )}
+                              </div>
+                              <span className="truncate text-sm font-medium text-gray-700 block">{index + 1}. {file.name}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={index === 0 || isUploading}
+                                onClick={(e) => { e.stopPropagation(); movePhotoFile(index, index - 1) }}
+                                className="inline-flex items-center rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                                aria-label="上へ"
+                                title="上へ"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                disabled={index === photoFiles.length - 1 || isUploading}
+                                onClick={(e) => { e.stopPropagation(); movePhotoFile(index, index + 1) }}
+                                className="inline-flex items-center rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                                aria-label="下へ"
+                                title="下へ"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  removePhotoFile(index)
+                                }}
+                                className="inline-flex items-center gap-1 rounded-md border border-transparent px-2 py-1 text-sm text-red-500 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                削除
+                              </button>
+                            </div>
                           </li>
                         ))}
                       </ul>

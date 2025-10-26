@@ -12,9 +12,14 @@ import { useRandomVideos, type VideoData } from "@/hooks/useRandomVideos"
 import { mockRestaurants } from "@/lib/mock-data"
 import { supabase } from "@/lib/supabase"
 import { toggleLike } from "@/lib/likes"
+import { openReservationForVideo as openReserveShared, openStoreDetailForVideo as openStoreShared } from "@/lib/video-actions"
 import { useBookmark } from "@/hooks/useBookmark"
 import GuidebookTab from "@/components/GuidebookTab"
 import { useToast } from "@/hooks/use-toast" // 追加
+import VideoCard from "@/components/VideoCard"
+import AlbumCard from "@/components/AlbumCard"
+import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
+import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 
 type SupabaseVideoRow = {
   id: string
@@ -60,6 +65,28 @@ export default function SearchPage() {
   const [selectedCategory, setSelectedCategory] = useState("今日のおすすめ")
   const isLatestCategory = selectedCategory === "最新動画"
   const isGuidebookCategory = selectedCategory === "ガイドブック"
+  type AlbumItem = {
+    id: string
+    title?: string | null
+    description?: string | null
+    coverUrl?: string | null
+    createdAt?: string | null
+    owner?: { username?: string | null; displayName?: string | null; avatarUrl?: string | null } | null
+  }
+  const [albums, setAlbums] = useState<AlbumItem[]>([])
+  const [albumsLoading, setAlbumsLoading] = useState(false)
+  const [albumsError, setAlbumsError] = useState<string | null>(null)
+  // Album like/bookmark state
+  const [albumLikedSet, setAlbumLikedSet] = useState<Set<string>>(new Set())
+  const [albumBookmarkedSet, setAlbumBookmarkedSet] = useState<Set<string>>(new Set())
+  // Album viewer state
+  type AssetItem = { id: string; url: string; order: number; width?: number | null; height?: number | null }
+  const [openAlbumId, setOpenAlbumId] = useState<string | null>(null)
+  const [albumAssets, setAlbumAssets] = useState<AssetItem[]>([])
+  const [albumIndex, setAlbumIndex] = useState(0)
+  const [albumLoading, setAlbumLoading] = useState(false)
+  // const [showVideoFeed, setShowVideoFeed] = useState(false)
+  // const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<
     | {
@@ -71,6 +98,7 @@ export default function SearchPage() {
     | null
   >(null)
   const [popularKeywordsSet, setPopularKeywordsSet] = useState(0)
+
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
   const [selectedRestaurant, setSelectedRestaurant] = useState<
@@ -140,6 +168,100 @@ export default function SearchPage() {
     }
   }, [])
 
+  // Fetch guidebook albums when tab is active
+  useEffect(() => {
+    if (!isGuidebookCategory) return
+    let aborted = false
+    ;(async () => {
+      try {
+        setAlbumsLoading(true)
+        setAlbumsError(null)
+        const res = await fetch('/api/guidebook/albums?random=10', { cache: 'no-store' })
+        if (!res.ok) throw new Error('アルバムの取得に失敗しました')
+        const json = await res.json().catch(() => ({}))
+        if (aborted) return
+        setAlbums(Array.isArray(json?.items) ? json.items : [])
+      } catch (e) {
+        if (aborted) return
+        setAlbums([])
+        setAlbumsError(e instanceof Error ? e.message : '取得に失敗しました')
+      } finally {
+        if (!aborted) setAlbumsLoading(false)
+      }
+    })()
+    return () => { aborted = true }
+  }, [isGuidebookCategory])
+
+  // Fetch album like/bookmark states for current user
+  useEffect(() => {
+    ;(async () => {
+      try {
+        if (!isGuidebookCategory) return
+        if (!albums || albums.length === 0) { setAlbumLikedSet(new Set()); setAlbumBookmarkedSet(new Set()); return }
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) { setAlbumLikedSet(new Set()); setAlbumBookmarkedSet(new Set()); return }
+        const albumIds = albums.map((a) => a.id)
+        const [likedRes, savedRes] = await Promise.all([
+          supabase.from("photo_album_likes").select("album_id").eq("user_id", user.id).in("album_id", albumIds),
+          supabase.from("photo_album_bookmarks").select("album_id").eq("user_id", user.id).in("album_id", albumIds),
+        ])
+        if (!likedRes.error && likedRes.data) setAlbumLikedSet(new Set((likedRes.data as any[]).map((r) => r.album_id)))
+        else setAlbumLikedSet(new Set())
+        if (!savedRes.error && savedRes.data) setAlbumBookmarkedSet(new Set((savedRes.data as any[]).map((r) => r.album_id)))
+        else setAlbumBookmarkedSet(new Set())
+      } catch {
+        setAlbumLikedSet(new Set()); setAlbumBookmarkedSet(new Set())
+      }
+    })()
+  }, [isGuidebookCategory, albums])
+
+  async function toggleAlbumLike(albumId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+      if (!accessToken) { router.push("/auth/login"); return }
+      const wasLiked = albumLikedSet.has(albumId)
+      setAlbumLikedSet((prev) => { const s = new Set(prev); wasLiked ? s.delete(albumId) : s.add(albumId); return s })
+      await fetch(`/api/guidebook/albums/${albumId}/likes`, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } })
+    } catch {
+      setAlbumLikedSet((prev) => { const s = new Set(prev); if (s.has(albumId)) s.delete(albumId); else s.add(albumId); return s })
+    }
+  }
+
+  async function toggleAlbumBookmark(albumId: string) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+      if (!accessToken) { router.push("/auth/login"); return }
+      const wasSaved = albumBookmarkedSet.has(albumId)
+      setAlbumBookmarkedSet((prev) => { const s = new Set(prev); wasSaved ? s.delete(albumId) : s.add(albumId); return s })
+      await fetch(`/api/guidebook/albums/${albumId}/bookmarks`, { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` } })
+    } catch {
+      setAlbumBookmarkedSet((prev) => { const s = new Set(prev); if (s.has(albumId)) s.delete(albumId); else s.add(albumId); return s })
+    }
+  }
+
+  // Open album viewer
+  async function openAlbum(albumId: string) {
+    try {
+      setAlbumLoading(true)
+      const res = await fetch(`/api/guidebook/albums/${albumId}/assets`, { cache: "no-store" })
+      if (!res.ok) throw new Error("アルバムの取得に失敗しました")
+      const json = await res.json().catch(() => ({}))
+      const items: AssetItem[] = json?.items ?? []
+      setAlbumAssets(items)
+      setAlbumIndex(0)
+      setOpenAlbumId(albumId)
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("open album error", e)
+      setAlbumAssets([])
+      setOpenAlbumId(albumId)
+    } finally {
+      setAlbumLoading(false)
+    }
+  }
+
   async function toggleVideoLike(videoId: string) {
     if (likeMutationRef.current.has(videoId)) return
     const wasLiked = likedVideoIds.has(videoId)
@@ -188,29 +310,12 @@ export default function SearchPage() {
     }
   }
 
-  function openReservationForVideo(video: SupabaseVideoRow | null) {
-    const mapped = mapVideoToRestaurant(video)
-    if (!mapped) return
-    setSelectedRestaurant(mapped)
-    setShowReservationModal(true)
-    setShowFullscreenVideo(false)
+  function openReservationForVideo(video: SupabaseVideoRow | null, options?: { keepFullscreen?: boolean }) {
+    openReserveShared({ setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo }, video as any, options)
   }
 
   function openStoreDetailForVideo(video: SupabaseVideoRow | null, options?: { keepFullscreen?: boolean }) {
-    const mapped = mapVideoToRestaurant(video)
-    if (!mapped) return
-    const normalizedCaption =
-      normalizeOptionalText(video?.caption) ||
-      normalizeOptionalText((video as any)?.influencer_comment) ||
-      normalizeOptionalText((video as any)?.captionText)
-    setSelectedRestaurant({
-      ...mapped,
-      caption: normalizedCaption,
-    })
-    setShowStoreDetailModal(true)
-    if (!options?.keepFullscreen) {
-      setShowFullscreenVideo(false)
-    }
+    openStoreShared({ setSelectedRestaurant, setShowStoreDetailModal, setShowFullscreenVideo }, video as any, options)
   }
 
   function openRandomVideoFullscreen(video: VideoData) {
@@ -306,6 +411,7 @@ export default function SearchPage() {
         }
       }
     } catch (e: any) {
+      // eslint-disable-next-line no-console
       console.warn("search error", e)
       setSearchError(e?.message ?? "検索に失敗しました")
     } finally {
@@ -459,6 +565,23 @@ export default function SearchPage() {
     if (isLatestCategory || isGuidebookCategory) return
     const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
     refreshVideos(categoryForFetch, 10)
+  }
+
+  const handleRefreshAlbums = async () => {
+    if (!isGuidebookCategory) return
+    try {
+      setAlbumsLoading(true)
+      setAlbumsError(null)
+      const res = await fetch('/api/guidebook/albums?random=10', { cache: 'no-store' })
+      if (!res.ok) throw new Error('アルバムの取得に失敗しました')
+      const json = await res.json().catch(() => ({}))
+      setAlbums(Array.isArray(json?.items) ? json.items : [])
+    } catch (e) {
+      setAlbums([])
+      setAlbumsError(e instanceof Error ? e.message : '取得に失敗しました')
+    } finally {
+      setAlbumsLoading(false)
+    }
   }
 
   function FilterButton({ label }: { label: string }) {
@@ -680,18 +803,12 @@ export default function SearchPage() {
                 autoFocus={isSearchMode}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSearchSubmit()
-                }}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit() }}
               />
             </div>
-            <Button
-              onClick={handleSearchSubmit}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-              disabled={!searchTerm.trim() || searchLoading}
-            >
-              検索
-            </Button>
+              <Button onClick={handleSearchSubmit} className="bg-orange-600 hover:bg-orange-700 text-white" disabled={!searchTerm.trim() || searchLoading}>                                                       
+                検索
+              </Button>
             {isSearchMode && (
               <Button variant="ghost" onClick={() => setIsSearchMode(false)} className="text-black hover:text-gray-800">
                 キャンセル
@@ -1216,22 +1333,69 @@ export default function SearchPage() {
       {!isSearchMode && (
         <div className="px-6 py-4 bg-white overflow-y-auto scrollbar-hide">
           <div className="space-y-6">
-            {didSearch ? (
+              {didSearch && (
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-lg font-semibold">検索結果</h2>
                   <div className="flex items-center gap-2">
                     {searchLoading && <span className="text-sm text-gray-600">検索中...</span>}
-                    {!!searchResults.length && (
+                    {!searchLoading && !searchError && (
                       <span className="text-sm text-gray-600">{searchResults.length}件</span>
                     )}
                     <button
                       onClick={clearSearch}
                       className="p-1 hover:bg-gray-100 rounded transition-colors text-sm text-gray-600"
+                      disabled={searchLoading}
                     >
                       クリア
                     </button>
                   </div>
+                </div>
+                {searchError ? (
+                  <div className="flex flex-col items-center py-8">
+                    <div className="text-red-500 mb-2">{searchError}</div>
+                    <button onClick={() => performSearch(searchTerm)} className="text-blue-600 hover:text-blue-700 underline">再試行</button>
+                  </div>
+                ) : searchLoading ? (
+                  <div className="flex justify-center py-8"><div className="text-gray-500">検索中...</div></div>
+                ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {searchResults.map((v) => {
+                    const ownerProfile = v.owner_id ? ownerProfiles[v.owner_id] : undefined
+                    const ownerHandle = ownerProfile?.username ? `@${ownerProfile.username}` : (ownerProfile?.display_name || "ユーザー")
+                    const isBookmarked = bookmarkedVideoIds.has(v.id)
+                    return (
+                      <VideoCard
+                        key={v.id}
+                        posterUrl={derivePosterUrl(v.playback_url, v.storage_path) || "/placeholder.jpg"}
+                        title={v.title || v.caption || '動画'}
+                        onClickCard={() => selectSupabaseVideo(v)}
+                        showTopBookmark
+                        isBookmarked={isBookmarked}
+                        onToggleBookmark={(e) => toggleFavorite(v.id, e as any)}
+                        bottomMetaVariant="account"
+                        accountAvatarUrl={ownerProfile?.avatar_url}
+                        accountLabel={ownerHandle}
+                      />
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            )}
+              {!didSearch && !isLatestCategory && !isGuidebookCategory && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">{selectedCategory}</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">{videos.length}件</span>
+                  <button
+                    onClick={handleRefreshVideos}
+                    disabled={loading}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                  >
+                    <RefreshCw className={`w-4 h-4 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
+                  </button>
                 </div>
 
                 {searchError && (
@@ -1249,114 +1413,25 @@ export default function SearchPage() {
                   </div>
                 )}
 
-                {!searchError && (
-                  <div className="grid grid-cols-2 gap-3">
-                    {searchResults.map((v) => {
-                      const ownerProfile = v.owner_id ? ownerProfiles[v.owner_id] : undefined
-                      const ownerHandle = ownerProfile?.username
-                        ? `@${ownerProfile.username}`
-                        : ownerProfile?.display_name || "ユーザー"
-                      const isBookmarked = bookmarkedVideoIds.has(v.id)
-
-                      return (
-                        <Card
-                          key={v.id}
-                          className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                          aria-label={`動画を全画面で表示（${v.title || "動画"}）`}
-                          title="動画を全画面で表示"
-                          onClick={() => selectSupabaseVideo(v)}
-                        >
-                          <CardContent className="p-0">
-                            <div className="aspect-[9/16] relative">
-                              <video
-                                ref={(el) => { playersRef.current[v.id] = el }}
-                                src={v.playback_url}
-                                className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                                poster={derivePosterUrl(v.playback_url, v.storage_path) || "/placeholder.jpg"}
-                                playsInline
-                                preload="metadata"
-                                controls={false}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  selectSupabaseVideo(v)
-                                }}
-                              />
-                              <div className="absolute top-2 right-2 z-10">
-                                <button
-                                  type="button"
-                                  onClick={(e) => toggleFavorite(v.id, e)}
-                                  className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
-                                  aria-label={isBookmarked ? "ブックマーク解除" : "ブックマーク"}
-                                >
-                                  <Bookmark
-                                    className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-white"}`}
-                                  />
-                                </button>
-                              </div>
-                              <div
-                                className="absolute inset-0 flex items-center justify中心 bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  selectSupabaseVideo(v)
-                                }}
-                              >
-                                <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
-                                  <div className="w-0 h-0 border-l-[20px] border-l-gray-800 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
-                                </div>
-                              </div>
-                            </div>
-                            <div
-                              className="p-3 cursor-pointer hover:bg-gray-50 transition-colors"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setSelectedUser({
-                                  id: v.id,
-                                  name: ownerHandle,
-                                  avatar: ownerProfile?.avatar_url,
-                                  isFollowing: bookmarkedVideoIds.has(v.id),
-                                })
-                                setShowUserProfile(true)
-                              }}
-                            >
-                              <h3 className="font-semibold text-sm mb-2 line-clamp-2">{v.title || "動画"}</h3>
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                                    {ownerProfile?.avatar_url ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img src={ownerProfile.avatar_url} alt={ownerHandle} className="w-full h-full object-cover" />
-                                    ) : (
-                                      <User className="w-4 h-4 text-gray-600" />
-                                    )}
-                                  </div>
-                                  <span className="text-xs text-gray-600">{ownerHandle}</span>
-                                </div>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <>
-                {/* ここに既存のカテゴリ別リスト（おすすめ、最新動画、ガイドブック）のブロックが続きます */}
-                <div>
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-lg font-semibold">{selectedCategory}</h2>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">{videos.length}件</span>
-                      <button
-                        onClick={handleRefreshVideos}
-                        disabled={loading}
-                        className="p-1 hover:bg-gray-100 rounded transition-colors"
-                      >
-                        <RefreshCw className={`w-4 h-4 text-gray-600 ${loading ? 'animate-spin' : ''}`} />
-                      </button>
-                    </div>
-                  </div>
+              {/* 2x3 Grid Layout - DBから取得した動画 */}
+              {!loading && !error && (
+                <div className="grid grid-cols-2 gap-3">
+                  {videos.map((video) => (
+                    <VideoCard
+                      key={video.id}
+                      posterUrl={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
+                      title={video.title}
+                      onClickCard={() => openRandomVideoFullscreen(video)}
+                      showTopBookmark
+                      isBookmarked={bookmarkedVideoIds.has(video.id)}
+                      onToggleBookmark={(e) => toggleFavorite(video.id, e as any)}
+                      bottomMetaVariant="account"
+                      accountAvatarUrl={video.user.avatar_url}
+                      accountLabel={`@${video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}`}
+                    />
+                  ))}
+                </div>
+              )}
 
                   {/* Loading State */}
                   {loading && (
@@ -1365,41 +1440,55 @@ export default function SearchPage() {
                     </div>
                   )}
 
-                  {/* Error State */}
-                  {error && (
-                    <div className="flex flex-col items-center py-8">
-                      <div className="text-red-500 mb-2">エラーが発生しました</div>
-                      <button
-                        onClick={handleRefreshVideos}
-                        className="text-blue-600 hover:text-blue-700 underline"
-                      >
-                        再試行
-                      </button>
-                    </div>
-                  )}
+            {/* Supabase videos list (play on demand) */}
+              {!didSearch && isLatestCategory && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">{selectedCategory}</h2>
+                <span className="text-sm text-gray-600">{supabaseVideos.length}件</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {supabaseVideos.map((v) => {
+                  const ownerProfile = v.owner_id ? ownerProfiles[v.owner_id] : undefined
+                  const ownerHandle = ownerProfile?.username
+                    ? `@${ownerProfile.username}`
+                    : ownerProfile?.display_name || "ユーザー"
+                  const isBookmarked = bookmarkedVideoIds.has(v.id)
 
-                  {/* 2x3 Grid Layout - DBから取得した動画 */}
-                  {!loading && !error && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {videos.map((video) => (
-                        <Card
-                          key={video.id}
-                          className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-                          onClick={() => router.push(`/restaurant/${video.id}`)}
-                        >
-                          <CardContent className="p-0">
-                            <div className="aspect-[9/16] relative">
-                              <video
-                                src={video.public_url}
-                                auto-label={video.title}
-                                className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-                                playsInline
-                                controls={false}
-                                poster={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  openRandomVideoFullscreen(video)
-                                }}
+                  return (
+                    <Card
+                      key={v.id}
+                      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                      aria-label={`動画を全画面で表示（${v.title || "動画"}）`}
+                      title="動画を全画面で表示"
+                      onClick={() => {
+                        selectSupabaseVideo(v)
+                      }}
+                    >
+                      <CardContent className="p-0">
+                        <div className="aspect-[9/16] relative">
+                          <video
+                            ref={(el) => { playersRef.current[v.id] = el }}
+                            src={v.playback_url}
+                            className="w-full h-full object-cover rounded-t-lg cursor-pointer"
+                            poster={derivePosterUrl(v.playback_url, v.storage_path) || "/placeholder.jpg"}
+                            playsInline
+                            preload="metadata"
+                            controls={false}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              selectSupabaseVideo(v)
+                            }}
+                          />
+                          <div className="absolute top-2 right-2 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => toggleFavorite(v.id, e)}
+                              className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
+                              aria-label={isBookmarked ? "ブックマーク解除" : "ブックマーク"}
+                            >
+                              <Bookmark
+                                className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-white"}`}
                               />
                               <div className="absolute top-2 right-2 z-10">
                                 <button
@@ -1474,177 +1563,98 @@ export default function SearchPage() {
                     </div>
                   )}
 
-                  {/* Empty State */}
-                  {!loading && !error && videos.length === 0 && (
-                    <div className="flex flex-col items-center py-8">
-                      <div className="text-gray-500 mb-2">動画が見つかりませんでした</div>
-                      <button
-                        onClick={handleRefreshVideos}
-                        className="text-blue-600 hover:text-blue-700 underline"
-                      >
-                        再読み込み
-                      </button>
-                    </div>
-                  )}
+              {!didSearch && isGuidebookCategory && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">{selectedCategory}</h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">{albums.length}件</span>
+                  <button
+                    onClick={handleRefreshAlbums}
+                    disabled={albumsLoading}
+                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    aria-label="アルバムを更新"
+                  >
+                    <RefreshCw className={`w-4 h-4 text-gray-600 ${albumsLoading ? 'animate-spin' : ''}`} />
+                  </button>
                 </div>
-              </>
+              </div>
+              {albumsError ? (
+                <div className="text-sm text-red-500">{albumsError}</div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  {albums.map((a) => (
+                    <AlbumCard
+                      key={a.id}
+                      coverUrl={a.coverUrl}
+                      title={a.title || a.description || 'アルバム'}
+                      onClickCard={() => openAlbum(a.id)}
+                      showTopBookmark
+                      isBookmarked={albumBookmarkedSet.has(a.id)}
+                      onToggleBookmark={(e) => { e.stopPropagation(); toggleAlbumBookmark(a.id) }}
+                      bottomMetaVariant="account"
+                      accountAvatarUrl={a.owner?.avatarUrl ?? null}
+                      accountLabel={a.owner?.username ? `@${a.owner.username}` : (a.owner?.displayName || 'ユーザー')}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
             )}
           </div>
         </div>
       )}
 
       {showFullscreenVideo && selectedVideo && (
-        <div className="fixed inset-0 z-40 bg-black">
-          <video
-            ref={fullscreenVideoRef}
-            src={selectedVideo.playback_url}
-            className="w-full h-full object-cover"
-            poster={derivePosterUrl(selectedVideo.playback_url, selectedVideo.storage_path) || "/placeholder.jpg"}
-            muted
-            loop
-            autoPlay
-            playsInline
-            {...{ 'webkit-playsinline': 'true' }}
-            preload="auto"
-            controls={false}
-          />
-
-          <div className="absolute top-6 left-6 z-10">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                const el = fullscreenVideoRef.current
-                if (el) {
-                  try {
-                    el.pause()
-                  } catch {}
-                }
-                setShowFullscreenVideo(false)
-              }}
-              className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white border-none"
-            >
-              ＜
-            </Button>
-          </div>
-
-          <div className="absolute top-6 right-6 z-10">
-            <button
-              type="button"
-              onClick={() => setFullscreenMuted((prev) => !prev)}
-              className="p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition"
-              aria-label={fullscreenMuted ? "ミュート解除" : "ミュートにする"}
-            >
-              <SpeakerIcon muted={fullscreenMuted} />
-            </button>
-          </div>
-
-          <div className="absolute inset-0 flex">
-            <div className="flex-1 flex flex-col justify-end p-4 pb-32">
-              <div className="text-white">
-                <div className="mb-3">
-                  <button
-                    onClick={() => {
-                      setSelectedUser({
-                        id: selectedVideo.id,
-                        name: selectedOwnerHandle,
-                        avatar: selectedOwnerProfile?.avatar_url,
-                        isFollowing: bookmarkedVideoIds.has(selectedVideo.id),
-                      })
-                      setShowUserProfile(true)
-                    }}
-                    className="flex items-center gap-3 hover:opacity-80 transition-opacity"
-                  >
-                    <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden">
-                      {selectedOwnerProfile?.avatar_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={selectedOwnerProfile.avatar_url} alt={selectedOwnerHandle} className="w-full h-full object-cover" />
-                      ) : (
-                        selectedOwnerHandle.trim().replace(/^@/, "").charAt(0).toUpperCase() || "U"
-                      )}
-                    </div>
-                    <span className="text-white font-semibold text-sm">{selectedOwnerHandle}</span>
-                  </button>
-                </div>
-
-                {selectedVideo.title && (
-                  <div className="mb-2">
-                    <p className="text-white text-sm">{selectedVideo.title}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="w-16 flex flex-col items-center justify-center pb-32 gap-6">
-              <div className="flex flex-col items-center">
-                <button
-                  className="w-12 h-12 flex items-center justify-center"
-                  onClick={() => toggleVideoLike(selectedVideo.id)}
-                  aria-label={likedVideoIds.has(selectedVideo.id) ? "いいね解除" : "いいね"}
-                >
-                  <Heart className={`w-8 h-8 text-white drop-shadow-lg ${likedVideoIds.has(selectedVideo.id) ? "fill-red-500 text-red-500" : ""}`} />
-                </button>
-                <span className="text-white text-xs font-medium drop-shadow-lg mt-1">
-                  {videoLikeCounts[selectedVideo.id] ?? 0}
-                </span>
-              </div>
-
-              <div className="flex flex-col items-center">
-                <button
-                  onClick={() => toggleFavorite(selectedVideo.id)}
-                  className="w-12 h-12 flex items-center justify-center"
-                  aria-label={bookmarkedVideoIds.has(selectedVideo.id) ? "ブックマーク解除" : "ブックマーク"}
-                >
-                  <Bookmark
-                    className={`w-8 h-8 drop-shadow-lg ${
-                      bookmarkedVideoIds.has(selectedVideo.id) ? "fill-white text-white" : "text-white"
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex flex-col items-center">
-                <button
-                  className="w-12 h-12 flex items-center justify-center"
-                  onClick={async () => {
-                    try {
-                      const shareData = { title: selectedVideo.title || "動画", url: selectedVideo.playback_url }
-                      if (navigator.share) await navigator.share(shareData)
-                      else {
-                        await navigator.clipboard.writeText(shareData.url)
-                        // eslint-disable-next-line no-alert
-                        alert("リンクをコピーしました")
-                      }
-                    } catch {}
-                  }}
-                  aria-label="共有"
-                >
-                  <Send className="w-8 h-8 text-white drop-shadow-lg" />
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <div className="absolute bottom-16 left-0 right-0 px-4">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => openReservationForVideo(selectedVideo)}
-                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
-              >
-                今すぐ予約する
-              </button>
-              <button
-                type="button"
-                onClick={() => openStoreDetailForVideo(selectedVideo, { keepFullscreen: true })}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
-              >
-                もっと見る…
-              </button>
-            </div>
-          </div>
-        </div>
+        <VideoFullscreenOverlay
+          open={showFullscreenVideo}
+          video={{
+            id: selectedVideo.id,
+            playback_url: selectedVideo.playback_url,
+            poster_url: derivePosterUrl(selectedVideo.playback_url, selectedVideo.storage_path),
+            title: selectedVideo.title ?? undefined,
+            caption: selectedVideo.caption ?? undefined,
+          }}
+          ownerHandle={selectedOwnerHandle}
+          ownerAvatarUrl={selectedOwnerProfile?.avatar_url}
+          liked={likedVideoIds.has(selectedVideo.id)}
+          likeCount={videoLikeCounts[selectedVideo.id] ?? 0}
+          onToggleLike={() => toggleVideoLike(selectedVideo.id)}
+          bookmarked={bookmarkedVideoIds.has(selectedVideo.id)}
+          onToggleBookmark={() => toggleFavorite(selectedVideo.id)}
+          onShare={async () => {
+            try {
+              const shareData = { title: selectedVideo.title || "動画", url: selectedVideo.playback_url }
+              if (navigator.share) await navigator.share(shareData)
+              else { await navigator.clipboard.writeText(shareData.url); alert("リンクをコピーしました") }
+            } catch {}
+          }}
+          onClose={() => setShowFullscreenVideo(false)}
+          onReserve={() => openReservationForVideo(selectedVideo, { keepFullscreen: true })}
+          onMore={() => openStoreDetailForVideo(selectedVideo, { keepFullscreen: true })}
+          muted={fullscreenMuted}
+          onToggleMuted={() => setFullscreenMuted((prev) => !prev)}
+        />
       )}
+
+      {/* Album Viewer Modal */}
+      <AlbumViewerOverlay
+        open={Boolean(openAlbumId)}
+        assets={albumAssets}
+        index={albumIndex}
+        loading={albumLoading}
+        onClose={() => { setOpenAlbumId(null); setAlbumAssets([]); setAlbumIndex(0) }}
+        onPrev={() => setAlbumIndex((i) => Math.max(0, i - 1))}
+        onNext={() => setAlbumIndex((i) => Math.min(albumAssets.length - 1, i + 1))}
+        title={albums.find((a) => a.id === openAlbumId)?.title || albums.find((a) => a.id === openAlbumId)?.description || null}
+        ownerAvatarUrl={albums.find((a) => a.id === openAlbumId)?.owner?.avatarUrl ?? null}
+        ownerLabel={(() => { const a = albums.find((x) => x.id === openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
+        description={albums.find((a) => a.id === openAlbumId)?.description || null}
+        liked={openAlbumId ? albumLikedSet.has(openAlbumId) : false}
+        onToggleLike={() => { if (openAlbumId) toggleAlbumLike(openAlbumId) }}
+        bookmarked={openAlbumId ? albumBookmarkedSet.has(openAlbumId) : false}
+        onToggleBookmark={() => { if (openAlbumId) toggleAlbumBookmark(openAlbumId) }}
+      />
 
       <Navigation />
     </div>
@@ -1708,3 +1718,4 @@ function derivePosterUrl(playbackUrl?: string | null, storagePath?: string | nul
     return null
   }
 }
+
