@@ -819,9 +819,9 @@ export default function SearchPage() {
                 onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit() }}
               />
             </div>
-            <Button onClick={handleSearchSubmit} className="bg-orange-600 hover:bg-orange-700 text-white" disabled={!searchTerm.trim() || searchLoading}>
-              検索
-            </Button>
+              <Button onClick={handleSearchSubmit} className="bg-orange-600 hover:bg-orange-700 text-white" disabled={!searchTerm.trim() || searchLoading}>                                                       
+                検索
+              </Button>
             {isSearchMode && (
               <Button variant="ghost" onClick={() => setIsSearchMode(false)} className="text-black hover:text-gray-800">
                 キャンセル
@@ -1506,26 +1506,32 @@ export default function SearchPage() {
       {!isSearchMode && (
         <div className="px-6 py-4 bg-white overflow-y-auto scrollbar-hide">
           <div className="space-y-6">
-            {didSearch && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">検索結果</h2>
-                <div className="flex items-center gap-2">
-                  {searchError ? (
-                    <span className="text-sm text-red-500">{searchError}</span>
-                  ) : (
-                    <span className="text-sm text-gray-600">{searchResults.length}件</span>
-                  )}
-                  {didSearch && (
-                    <button onClick={() => performSearch(searchTerm)} disabled={searchLoading} className="p-1 hover:bg-gray-100 rounded transition-colors">
-                      <RefreshCw className={`w-4 h-4 text-gray-600 ${searchLoading ? 'animate-spin' : ''}`} />
+              {didSearch && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold">検索結果</h2>
+                  <div className="flex items-center gap-2">
+                    {searchLoading && <span className="text-sm text-gray-600">検索中...</span>}
+                    {!searchLoading && !searchError && (
+                      <span className="text-sm text-gray-600">{searchResults.length}件</span>
+                    )}
+                    <button
+                      onClick={clearSearch}
+                      className="p-1 hover:bg-gray-100 rounded transition-colors text-sm text-gray-600"
+                      disabled={searchLoading}
+                    >
+                      クリア
                     </button>
-                  )}
+                  </div>
                 </div>
-              </div>
-              {searchLoading ? (
-                <div className="flex justify-center py-8"><div className="text-gray-500">検索中...</div></div>
-              ) : (
+                {searchError ? (
+                  <div className="flex flex-col items-center py-8">
+                    <div className="text-red-500 mb-2">{searchError}</div>
+                    <button onClick={() => performSearch(searchTerm)} className="text-blue-600 hover:text-blue-700 underline">再試行</button>
+                  </div>
+                ) : searchLoading ? (
+                  <div className="flex justify-center py-8"><div className="text-gray-500">検索中...</div></div>
+                ) : (
                 <div className="grid grid-cols-2 gap-3">
                   {searchResults.map((v) => {
                     const ownerProfile = v.owner_id ? ownerProfiles[v.owner_id] : undefined
@@ -1550,7 +1556,7 @@ export default function SearchPage() {
               )}
             </div>
             )}
-            {!didSearch && !isLatestCategory && !isGuidebookCategory && (
+              {!didSearch && !isLatestCategory && !isGuidebookCategory && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">{selectedCategory}</h2>
@@ -1622,7 +1628,7 @@ export default function SearchPage() {
             )}
 
             {/* Supabase videos list (play on demand) */}
-            {!didSearch && isLatestCategory && (
+              {!didSearch && isLatestCategory && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">{selectedCategory}</h2>
@@ -1725,7 +1731,7 @@ export default function SearchPage() {
             </div>
             )}
 
-            {!didSearch && isGuidebookCategory && (
+              {!didSearch && isGuidebookCategory && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-semibold">{selectedCategory}</h2>
