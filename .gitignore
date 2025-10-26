@@ -28,3 +28,5 @@ next-env.d.ts
 # Secrets
 keys/service-account.json
 keys/
+
+.DS_Store 

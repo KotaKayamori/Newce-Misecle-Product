@@ -84,6 +84,15 @@ export default function ProfilePage() {
   const [imagePreviews, setImagePreviews] = useState<string[]>([])
   const [uploadProgress, setUploadProgress] = useState<number>(0)
 
+  // パスワード再設定用のstate
+  const [currentPassword, setCurrentPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [showPasswordSuccess, setShowPasswordSuccess] = useState(false)
+  const [resetEmailSent, setResetEmailSent] = useState(false)
+  const [resetEmailAddress, setResetEmailAddress] = useState<string | null>(null)
+
   // プロフィールデータの初期化
   useEffect(() => {
     if (userProfile) {
@@ -133,6 +142,148 @@ export default function ProfilePage() {
       setSelectedAge(userProfile.age || "")
     }
     setShowGenderAgeModal(true)
+  }
+
+  // パスワード変更関数
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast({
+        title: "入力エラー",
+        description: "すべての項目を入力してください",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "パスワードエラー",
+        description: "新しいパスワードが一致しません",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "パスワードエラー",
+        description: "新しいパスワードは6文字以上で入力してください",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (currentPassword === newPassword) {
+      toast({
+        title: "パスワードエラー",
+        description: "現在のパスワードと同じパスワードは使用できません",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setIsChangingPassword(true)
+
+    try {
+      // 現在のパスワードで再認証
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user?.email || '',
+        password: currentPassword
+      })
+
+      if (signInError) {
+        toast({
+          title: "認証エラー",
+          description: "現在のパスワードが正しくありません",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // パスワード更新
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+
+      if (updateError) {
+        console.error('Password update error:', updateError)
+        toast({
+          title: "更新エラー",
+          description: updateError.message || "パスワードの更新に失敗しました",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // 成功時の処理
+      setCurrentPassword("")
+      setNewPassword("")
+      setConfirmPassword("")
+      toast({
+        title: "パスワードを変更しました",
+        description: "再ログインしてください。",
+      })
+
+      await supabase.auth.signOut()
+      router.replace("/auth/login?password_changed=1")
+
+    } catch (error: any) {
+      console.error('Password change error:', error)
+      toast({
+        title: "エラー",
+        description: "予期しないエラーが発生しました",
+        variant: "destructive",
+      })
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
+  // パスワード忘れた場合の処理
+  const handleForgotPassword = async () => {
+    if (!user?.email) {
+      toast({
+        title: "エラー",
+        description: "メールアドレスが取得できません",
+        variant: "destructive",
+      })
+      return
+    }
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`
+      })
+
+      if (error) {
+        toast({
+          title: "送信エラー",
+          description: error.message,
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "送信完了",
+        description: "パスワードリセット用のメールを送信しました。メールを確認してください。",
+      })
+
+      setResetEmailSent(true)
+      setResetEmailAddress(user.email)
+
+    } catch (error: any) {
+      console.error('Password reset error:', error)
+      toast({
+        title: "エラー",
+        description: "予期しないエラーが発生しました",
+        variant: "destructive",
+      })
+      setResetEmailSent(false)
+      setResetEmailAddress(null)
+    }
   }
 
   // メール送信成功画面
@@ -185,6 +336,37 @@ export default function ProfilePage() {
             >
               {emailSuccessType === "contact" ? "別のお問い合わせを送信" : "別の報告を送信"}
             </Button>
+          </div>
+        </div>
+        
+        <Navigation />
+      </div>
+    )
+  }
+
+  // パスワード変更成功画面
+  if (showPasswordSuccess) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-6 pb-20">
+        <div className="text-center space-y-6 max-w-md mx-auto">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle className="w-12 h-12 text-green-600" />
+          </div>
+          
+          <div className="space-y-3">
+            <h2 className="text-2xl font-bold text-gray-900">パスワード変更完了</h2>
+            <p className="text-gray-600 leading-relaxed">
+              パスワードが正常に変更されました。<br />
+              新しいパスワードでログインしてください。
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="bg-green-50 p-4 rounded-lg">
+              <p className="text-sm text-green-800">
+                セキュリティのため、定期的にパスワードを変更することをお勧めします。
+              </p>
+            </div>
           </div>
         </div>
         
@@ -1282,18 +1464,20 @@ export default function ProfilePage() {
           <h1 className="text-xl font-semibold">アカウント設定</h1>
         </div>
 
-        {/* Start of updated content for showAccountSettings */}
         <div className="px-6 py-4 space-y-6">
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-800">パスワード再設定</h2>
 
-            <div className="space-y-4">
+            <form onSubmit={handlePasswordChange} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">現在のパスワード</label>
                 <input
                   type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   placeholder="現在のパスワードを入力してください"
+                  required
                 />
               </div>
 
@@ -1301,8 +1485,12 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">新しいパスワード</label>
                 <input
                   type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="新しいパスワードを入力してください"
+                  placeholder="新しいパスワードを入力してください（6文字以上）"
+                  minLength={6}
+                  required
                 />
               </div>
 
@@ -1310,21 +1498,68 @@ export default function ProfilePage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">新しいパスワードをもう一度入力</label>
                 <input
                   type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                   placeholder="新しいパスワードをもう一度入力してください"
+                  minLength={6}
+                  required
                 />
               </div>
 
-              <p className="text-orange-600 text-sm">パスワードを忘れた場合はこちら</p>
+              {/* パスワード要件の表示 */}
+              <div className="bg-blue-50 p-3 rounded-md">
+                <p className="text-sm text-blue-800 font-medium mb-1">パスワード要件:</p>
+                <ul className="text-xs text-blue-700 space-y-1">
+                  <li className={`flex items-center gap-2 ${newPassword.length >= 6 ? 'text-green-700' : ''}`}>
+                    <span className={newPassword.length >= 6 ? '✓' : '•'}>6文字以上</span>
+                  </li>
+                  <li className={`flex items-center gap-2 ${newPassword && confirmPassword && newPassword === confirmPassword ? 'text-green-700' : ''}`}>
+                    <span className={newPassword && confirmPassword && newPassword === confirmPassword ? '✓' : '•'}>確認パスワードと一致</span>
+                  </li>
+                  <li className={`flex items-center gap-2 ${newPassword && currentPassword && newPassword !== currentPassword ? 'text-green-700' : ''}`}>
+                    <span className={newPassword && currentPassword && newPassword !== currentPassword ? '✓' : '•'}>現在のパスワードと異なる</span>
+                  </li>
+                </ul>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword || newPassword !== confirmPassword}
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                {isChangingPassword ? "変更中..." : "パスワードを変更する"}
+              </Button>
+            </form>
+
+            <div className="border-t pt-4">
+              <button
+                onClick={handleForgotPassword}
+                className="text-orange-600 text-sm hover:text-orange-700 transition-colors underline"
+              >
+                パスワードを忘れた場合はこちら
+              </button>
+              <p className="text-xs text-gray-500 mt-2">
+                パスワードリセット用のメールが送信されます
+              </p>
+
+              {resetEmailSent && (
+                <div className="mt-3 bg-green-50 border border-green-200 text-green-800 p-3 rounded-md text-sm">
+                  パスワードリセット用のメールを
+                  {resetEmailAddress ? `「${resetEmailAddress}」` : "登録メールアドレス"}
+                  に送信しました。メール内のリンクから再設定を完了してください。
+                </div>
+              )}
             </div>
           </div>
         </div>
-        {/* End of updated content for showAccountSettings */}
 
         <Navigation />
       </div>
     )
   }
+
+          
 
   if (showLocationSettings) {
     return (
