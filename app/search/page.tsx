@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase"
 import { toggleLike } from "@/lib/likes"
 import { useBookmark } from "@/hooks/useBookmark"
 import GuidebookTab from "@/components/GuidebookTab"
+import { useToast } from "@/hooks/use-toast" // 追加
 
 type SupabaseVideoRow = {
   id: string
@@ -130,6 +131,7 @@ export default function SearchPage() {
   const [likedVideoIds, setLikedVideoIds] = useState<Set<string>>(new Set())
   const likeMutationRef = useRef<Set<string>>(new Set())
   const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
+  const { toast } = useToast() 
 
   useEffect(() => {
     document.body.classList.add("scrollbar-hide")
@@ -144,8 +146,12 @@ export default function SearchPage() {
     likeMutationRef.current.add(videoId)
     try {
       const result = await toggleLike(videoId, wasLiked)
-      if ((result as any)?.needLogin) { // TODO: 型を詰める
-        router.push("/auth/login")
+      if ((result as any)?.needLogin) { // 未ログイン時はページ遷移せず通知のみ
+        toast({
+          title: "ログインが必要です",
+          description: "いいねするにはログインしてください。",
+          variant: "destructive",
+        })
         return
       }
       const nowLiked = (result as any)?.liked ?? !wasLiked // TODO: 型を詰める
@@ -428,7 +434,13 @@ export default function SearchPage() {
       })
     } catch (error: any) { // TODO: 型を詰める
       if (error?.message === "ログインが必要です") {
-        router.push("/auth/login")
+        // 未ログイン時はページ遷移せず通知のみ
+        toast({
+          title: "ログインが必要です",
+          description: "ブックマークするにはログインしてください。",
+          variant: "destructive",
+        })
+        return
       }
     }
   }

@@ -705,6 +705,23 @@ export default function ProfilePage() {
     )
   }
 
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-black pb-20 flex items-center justify-center">
+        <div className="text-white text-center px-6">
+          <p className="text-gray-300 mb-4">プロフィールを表示するにはログインが必要です</p>
+          <Button 
+            onClick={() => router.push('/auth/login')}
+            className="bg-orange-600 hover:bg-orange-700"
+          >
+            ログインする
+          </Button>
+        </div>
+        <Navigation />
+      </div>
+    )
+  }
+
   const menuItems = [
     {
       category: "アカウント",

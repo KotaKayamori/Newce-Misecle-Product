@@ -1,60 +1,32 @@
 "use client"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { useAuth } from "@/components/auth-provider"
-import { AuthForm } from "@/components/auth-form"
 
 export default function HomePage() {
   const router = useRouter()
-  const { user, loading } = useAuth()
 
   useEffect(() => {
-    const handleEmailVerification = async () => {
-      // URLハッシュから認証情報を確認
-      const hashParams = new URLSearchParams(window.location.hash.substring(1))
-      const type = hashParams.get('type')
-      const accessToken = hashParams.get('access_token')
+    const hash = window.location.hash
+    const hashParams = new URLSearchParams(hash.slice(1))
+    const type = hashParams.get("type")
+    const accessToken = hashParams.get("access_token")
+    const code = new URLSearchParams(window.location.search).get("code")
 
-      // メール認証からのアクセスの場合は、/registerにリダイレクト
-      if (type === 'signup' && accessToken) {
-        console.log('Email verification detected on home page, redirecting to register')
-        router.push(`/register${window.location.hash}`)
-        return
-      }
-
-      // 通常のログイン状態チェック
-      if (!loading && user) {
-        console.log('User is logged in, redirecting to search')
-        router.replace("/search")
-      }
-      
-      // ログアウト状態の場合はログインフォームを表示
-      if (!loading && !user) {
-        console.log('User is not logged in, showing login form')
-      }
+    // メール認証（サインアップ確認）: /register に誘導
+    if (type === "signup" && (accessToken || code)) {
+      router.push(`/register${hash}`)
+      return
     }
 
-    handleEmailVerification()
-  }, [user, loading, router])
+    // パスワードリカバリー: /auth/reset-password に誘導（保険）
+    if (type === "recovery") {
+      router.push(`/auth/reset-password${hash}`)
+      return
+    }
 
-  // ローディング中は何も表示しない
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-      </div>
-    )
-  }
+    // それ以外は常に /search へ
+    router.replace("/search")
+  }, [router])
 
-  // メール認証パラメータがある場合は、AuthFormで処理
-  const hashParams = new URLSearchParams(window.location.hash.substring(1))
-  const isEmailVerification = hashParams.get('type') === 'signup' && hashParams.get('access_token')
-
-  // ログイン済みでメール認証でない場合はnullを返す（useEffectでリダイレクトされる）
-  if (user && !isEmailVerification) {
-    return null
-  }
-
-  // 未ログインまたはメール認証の場合はAuthFormを表示
-  return <AuthForm />
+  return null
 }
