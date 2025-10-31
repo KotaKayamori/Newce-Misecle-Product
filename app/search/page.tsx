@@ -774,10 +774,10 @@ export default function SearchPage() {
   const selectedOwnerProfile = selectedVideo?.owner_id ? ownerProfiles[selectedVideo.owner_id] : undefined
   const selectedOwnerHandle = selectedOwnerProfile?.username
     ? `@${selectedOwnerProfile.username}`
-    : selectedOwnerProfile?.display_name || "ユーザー"
+    : (selectedOwnerProfile?.display_name || "ユーザー");
 
   return (
-    <div className="min-h-screen bg-white pb-20 overflow-y-auto scrollbar-hide">
+   <div className="min-h-screen bg-white pb-20 overflow-y-auto scrollbar-hide">
       {/* Search Header */}
       <div className="bg-white px-6 py-4">
         {(isSearchMode || didSearch) ? (
@@ -812,30 +812,31 @@ export default function SearchPage() {
             </div>
           </div>
         )}
+        </div> 
+    </div>   
+  )
 
-        {/* Category Tabs - only show when not in search mode */}
-        {!isSearchMode && (
-          <div className="mb-4">
-            <div className="flex overflow-x-auto scrollbar-hide pb-2 gap-1">
-              {categoryTabs.map(
-                (category) => (
-                  <button
-                    key={category}
-                    onClick={() => setSelectedCategory(category)}
-                    className={`flex-shrink-0 px-4 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
-                      selectedCategory === category ? "text-black" : "text-gray-600 hover:text-gray-800"
-                    }`}
-                  >
-                    {category}
-                    {selectedCategory === category && (
-                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500 rounded-full"></div>
-                    )}
-                  </button>
-                ),
-              )}
+      {/* Category Tabs - only show when not in search mode */}
+      {!isSearchMode && (
+        <div className="mb-4">
+        <div className="flex overflow-x-auto scrollbar-hide pb-2 gap-1">
+        {categoryTabs.map((category) => (
+        <button
+        key={category}
+        onClick={() => setSelectedCategory(category)}
+        className={`flex-shrink-0 px-4 py-2 text-sm font-medium transition-colors relative whitespace-nowrap ${
+          selectedCategory === category ? "text-black" : "text-gray-600 hover:text-gray-800"
+        }`}
+         >
+          {category}
+          {selectedCategory === category && (
+            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-orange-500 rounded-full" />
+            )}
+            </button>
+            ))}
             </div>
-          </div>
-        )}
+            </div>
+          )}
 
         {/* Search Categories - show when in search mode */}
         {isSearchMode && (
@@ -903,7 +904,7 @@ export default function SearchPage() {
             </div>
           </div>
         )}
-      </div>
+    
 
       {/* User Profile Modal */}
       {showUserProfile && selectedUser && (
@@ -1477,7 +1478,10 @@ export default function SearchPage() {
                               <Bookmark
                                 className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-white"}`}
                               />
-                              <div className="absolute top-2 right-2 z-10">
+                            </button>
+                          </div> 
+
+                              {/* <div className="absolute top-2 right-2 z-10">
                                 <button
                                   type="button"
                                   onClick={(e) => toggleFavorite(video.id, e)}
@@ -1490,13 +1494,13 @@ export default function SearchPage() {
                                     }`}
                                   />
                                 </button>
-                              </div>
+                              </div> */}
                               {/* Play button overlay */}
                               <div
                                 className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
                                 onClick={(e) => {
                                   e.stopPropagation()
-                                  openRandomVideoFullscreen(video)
+                                  openRandomVideoFullscreen(v)
                                 }}
                               >
                                 <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
@@ -1589,7 +1593,7 @@ export default function SearchPage() {
             </div>
             )}
           </div>
-        </div>
+       </div>
       )}
 
       {showFullscreenVideo && selectedVideo && (
@@ -1705,4 +1709,3 @@ function derivePosterUrl(playbackUrl?: string | null, storagePath?: string | nul
     return null
   }
 }
-
