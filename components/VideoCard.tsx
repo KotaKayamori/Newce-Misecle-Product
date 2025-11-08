@@ -10,6 +10,8 @@ interface VideoCardProps {
   posterUrl: string
   title?: string | null
   onClickCard?: () => void
+  cardAriaLabel?: string
+  cardTitleAttribute?: string
 
   // Top-right bookmark circle button
   showTopBookmark?: boolean
@@ -22,6 +24,10 @@ interface VideoCardProps {
   accountLabel?: string | null
   dateLabel?: string | null
   showSmallBookmark?: boolean
+  footer?: React.ReactNode
+  videoSrc?: string
+  videoRef?: React.Ref<HTMLVideoElement>
+  onBottomClick?: (e: React.MouseEvent) => void
 }
 
 export default function VideoCard(props: VideoCardProps) {
@@ -29,6 +35,8 @@ export default function VideoCard(props: VideoCardProps) {
     posterUrl,
     title,
     onClickCard,
+    cardAriaLabel,
+    cardTitleAttribute,
     showTopBookmark = false,
     isBookmarked = false,
     onToggleBookmark,
@@ -37,15 +45,24 @@ export default function VideoCard(props: VideoCardProps) {
     accountLabel,
     dateLabel,
     showSmallBookmark = false,
+    footer,
+    videoSrc,
+    videoRef,
+    onBottomClick,
   } = props
 
   return (
-    <Card className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow">
+    <Card
+      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+      aria-label={cardAriaLabel}
+      title={cardTitleAttribute}
+    >
       <CardContent className="p-0">
         <div className="aspect-[9/16] relative">
           {/* Use poster as thumbnail; do not autoplay */}
           <video
-            src={undefined as any}
+            ref={videoRef}
+            src={videoSrc}
             poster={posterUrl}
             className="w-full h-full object-cover rounded-t-lg cursor-pointer"
             playsInline
@@ -84,8 +101,17 @@ export default function VideoCard(props: VideoCardProps) {
           </div>
         </div>
 
-        {bottomMetaVariant !== "none" && (
-          <div className="p-3 cursor-pointer hover:bg-gray-50 transition-colors">
+        {footer ? (
+          footer
+        ) : bottomMetaVariant !== "none" ? (
+          <div
+            className={`p-3 transition-colors ${onBottomClick ? "cursor-pointer hover:bg-gray-50" : ""}`}
+            onClick={(e) => {
+              if (!onBottomClick) return
+              e.stopPropagation()
+              onBottomClick(e)
+            }}
+          >
             <h3 className="font-semibold text-sm mb-2 line-clamp-2">{title || ""}</h3>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -120,7 +146,7 @@ export default function VideoCard(props: VideoCardProps) {
               )}
             </div>
           </div>
-        )}
+        ) : null}
       </CardContent>
     </Card>
   )
