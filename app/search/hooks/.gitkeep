@@ -1,0 +1,7 @@
+# このディレクトリには以下のカスタムフックが配置されます:
+# - useSearchVideos.ts
+# - useAlbums.ts
+# - useFilters.ts
+# - useVideoPlayer.ts
+
+

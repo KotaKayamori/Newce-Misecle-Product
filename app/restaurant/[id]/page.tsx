@@ -8,7 +8,6 @@ import { Star, MapPin, Clock, Phone, Heart, Share2, ExternalLink, Percent, Users
 import Navigation from "@/components/navigation"
 import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { getRestaurantById } from "@/lib/mock-data"
 
 export default function RestaurantDetailPage() {
   const router = useRouter()
@@ -51,11 +50,6 @@ export default function RestaurantDetailPage() {
       setShowReservationButton(false)
     }
   }, [showDetails])
-
-  useEffect(() => {
-    const restaurantData = getRestaurantById(Number(params.id))
-    setRestaurant(restaurantData)
-  }, [params.id])
 
   const menuItems = [
     {
