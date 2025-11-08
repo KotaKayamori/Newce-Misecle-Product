@@ -2,7 +2,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Heart, ThumbsUp, Calendar, Gift, AlertCircle, Bell } from "lucide-react"
 import Navigation from "@/components/navigation"
-import { mockNotifications } from "@/lib/mock-data"
 
 export default function MessagesPage() {
   const getNotificationColor = (type: string) => {
@@ -73,36 +72,8 @@ export default function MessagesPage() {
           </div>
 
           <TabsContent value="notifications" className="mt-4">
-            <div className="px-6 py-4">
-              <div className="space-y-0">
-                {mockNotifications.map((notification, index) => {
-                  const IconComponent = getNotificationIcon(notification.type)
-                  return (
-                    <div key={notification.id}>
-                      <div className={`p-4 ${!notification.read ? "bg-gray-50/30" : ""}`}>
-                        <div className="flex gap-3 relative">
-                          <div className={`p-2 rounded-full ${getNotificationColor(notification.type)}`}>
-                            <IconComponent className="w-4 h-4" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-1">
-                              <h3 className="font-semibold text-sm">{notification.title}</h3>
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs text-gray-500">{notification.time}</span>
-                              </div>
-                            </div>
-                            <p className="text-sm text-gray-600">{notification.message}</p>
-                          </div>
-                          {!notification.read && (
-                            <div className="absolute left-0 top-1/2 transform -translate-y-1/2 -translate-x-3 w-2 h-2 bg-red-500 rounded-full"></div>
-                          )}
-                        </div>
-                      </div>
-                      {index < mockNotifications.length - 1 && <div className="border-b border-gray-200 mx-4"></div>}
-                    </div>
-                  )
-                })}
-              </div>
+            <div className="px-6 py-12 text-center text-gray-600">
+              通知機能は現在準備中です。
             </div>
           </TabsContent>
 

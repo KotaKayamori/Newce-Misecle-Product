@@ -1,0 +1,7 @@
+# このディレクトリには以下のモーダルコンポーネントが配置されます:
+# - FilterModal.tsx
+# - UserProfileModal.tsx
+# - StoreDetailModal.tsx
+# - ReservationModal.tsx (または共通コンポーネントを使用)
+
+

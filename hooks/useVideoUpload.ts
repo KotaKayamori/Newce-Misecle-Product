@@ -53,10 +53,10 @@ export function useVideoUpload() {
       return
     }
 
-    // 100MB 目安（必要に応じて変更）
-    const MAX = 100 * 1024 * 1024
+    // 1GB 上限（必要に応じて変更）
+    const MAX = 1024 * 1024 * 1024
     if (file.size > MAX) {
-      setError("ファイルサイズが大きすぎます（上限100MB）")
+      setError("ファイルサイズが大きすぎます（上限1GB）")
       setState("error")
       return
     }

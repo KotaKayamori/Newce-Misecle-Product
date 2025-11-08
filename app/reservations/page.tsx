@@ -1,15 +1,8 @@
 "use client"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import Navigation from "@/components/navigation"
-import { mockReservations } from "@/lib/mock-data"
 
 export default function ReservationsPage() {
-  const holdReservations = mockReservations.filter((reservation) => reservation.status === "仮押さえ中")
-  const confirmedReservations = mockReservations.filter((reservation) => reservation.status === "予約確定")
-  const pastReservations = mockReservations.filter(
-    (reservation) => reservation.status === "来店済み" || reservation.status === "キャンセル済み",
-  )
-
   return (
     <div className="min-h-screen bg-white pb-20">
       <div className="bg-white">

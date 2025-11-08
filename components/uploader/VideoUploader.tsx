@@ -18,7 +18,7 @@ const CATEGORY_OPTIONS: { value: VideoCategory; label: string }[] = [
 ]
 
 const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
-const MAX_VIDEO_BYTES = 100 * 1024 * 1024
+const MAX_VIDEO_BYTES = 1024 * 1024 * 1024
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
 type PhotoUploadState = "idle" | "uploading" | "success" | "error"
@@ -144,7 +144,7 @@ export default function VideoUploader() {
       return
     }
     if (selectedFile.size > MAX_VIDEO_BYTES) {
-      setFormatError("ファイルサイズが大きすぎます（上限100MB）")
+      setFormatError("ファイルサイズが大きすぎます（上限1GB）")
       return
     }
     await upload(selectedFile, {
@@ -561,7 +561,7 @@ export default function VideoUploader() {
               {isAlbumMode
                 ? "jpeg / png / webp（1枚10MB以下・複数可）"
                 : isVideoMode
-                  ? "mp4 / webm / mov（上限100MB）"
+                  ? "mp4 / webm / mov（上限1GB）"
                   : ""}
             </p>
             {isVideoMode && error && (
