@@ -57,6 +57,7 @@ export type RestaurantInfo = {
   distance: string
   rating: number
   caption?: string
+  tel?: string | null
 }
 
 // オーナープロフィールの型

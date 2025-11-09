@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
         playback_url: video.playback_url ?? video.public_url,
         caption: video.caption ?? video.influencer_comment ?? null,
         store_info: video.store_info ?? null,
+        tel: video.tel ?? null,
         created_at: video.created_at,
         user: profile
           ? {

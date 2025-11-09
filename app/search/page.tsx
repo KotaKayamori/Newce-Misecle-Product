@@ -27,6 +27,7 @@ import {
 import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
+import type { RestaurantInfo } from "./types"
 
 type SupabaseVideoRow = {
   id: string
@@ -98,18 +99,7 @@ export default function SearchPage() {
 
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<
-    | {
-        id: string
-        restaurantName: string
-        restaurantEmail: string
-        genre: string
-        distance: string
-        rating: number
-        caption?: string
-      }
-    | null
-  >(null)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantInfo | null>(null)
   const [reservationData, setReservationData] = useState({
     name: "",
     people: 2,
@@ -341,7 +331,12 @@ export default function SearchPage() {
   const handleRefreshAlbums = albums.refreshAlbums
 
   const handleOpenUserProfile = (user: { id: string; name: string | null; avatar?: string | null; isFollowing: boolean }) => {
-    setSelectedUser(user)
+    setSelectedUser({
+      id: user.id,
+      name: user.name ?? "ゲスト",
+      avatar: user.avatar,
+      isFollowing: user.isFollowing,
+    })
     setShowUserProfile(true)
   }
 

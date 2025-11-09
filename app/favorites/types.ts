@@ -39,10 +39,13 @@ export interface ReservationFormData {
 }
 
 export interface SelectedRestaurant {
+  id: string
   restaurantName: string
+  restaurantEmail?: string
   rating?: string | number
   genre?: string
   distance?: string
   caption?: string
+  tel?: string | null
   [key: string]: any
 }

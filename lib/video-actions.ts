@@ -6,6 +6,8 @@ export type BasicVideo = {
   title?: string | null
   category?: string | null
   caption?: string | null
+  store_info?: unknown
+  tel?: string | null
 }
 
 export function normalizeOptionalText(input?: string | null): string | undefined {
@@ -17,6 +19,24 @@ export function normalizeOptionalText(input?: string | null): string | undefined
 export function mapVideoToRestaurant(video: BasicVideo | null | undefined) {
   if (!video) return null
   const title = (video.title || "おすすめ動画").toString().trim() || "おすすめ動画"
+  const caption =
+    normalizeOptionalText(video.caption) ||
+    normalizeOptionalText((video as any)?.captionText) ||
+    normalizeOptionalText((video as any)?.influencer_comment)
+
+  const rawStoreInfo = (video as any)?.store_info ?? (video as any)?.storeInfo
+  let extractedTel: string | null = normalizeOptionalText((video as any)?.tel)
+  if (rawStoreInfo) {
+    const storeInfo = typeof rawStoreInfo === "string" ? safeParse(rawStoreInfo) : rawStoreInfo
+    if (storeInfo && typeof storeInfo === "object") {
+      const telCandidate =
+        normalizeOptionalText((storeInfo as any)?.tel) ||
+        normalizeOptionalText((storeInfo as any)?.telephone) ||
+        normalizeOptionalText((storeInfo as any)?.phone) ||
+        normalizeOptionalText((storeInfo as any)?.phoneNumber)
+      if (telCandidate) extractedTel = telCandidate
+    }
+  }
   return {
     id: video.id,
     restaurantName: title,
@@ -24,6 +44,17 @@ export function mapVideoToRestaurant(video: BasicVideo | null | undefined) {
     genre: (video.category as any) || "おすすめ",
     distance: "—",
     rating: 0,
+    caption,
+    tel: extractedTel,
+  }
+}
+
+function safeParse(input: string) {
+  try {
+    return JSON.parse(input)
+  } catch (error) {
+    console.warn("Failed to parse store_info JSON", error)
+    return null
   }
 }
 
@@ -40,12 +71,7 @@ export function openStoreDetailForVideo(
 ) {
   const mapped = mapVideoToRestaurant(video)
   if (!mapped) return
-  const normalizedCaption =
-    normalizeOptionalText((video as any)?.caption) ||
-    normalizeOptionalText((video as any)?.influencer_comment) ||
-    normalizeOptionalText((video as any)?.captionText)
-
-  ctx.setSelectedRestaurant({ ...mapped, caption: normalizedCaption })
+  ctx.setSelectedRestaurant(mapped)
   ctx.setShowStoreDetailModal(true)
   if (!options?.keepFullscreen && ctx.setShowFullscreenVideo) ctx.setShowFullscreenVideo(false)
 }
@@ -68,5 +94,4 @@ export function openReservationForVideo(
   // デフォルトはフルスクリーンを維持。必要な場合のみ明示的に閉じる
   if (options?.keepFullscreen === false && ctx.setShowFullscreenVideo) ctx.setShowFullscreenVideo(false)
 }
-
 
