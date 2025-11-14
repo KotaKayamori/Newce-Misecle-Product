@@ -44,7 +44,7 @@ export default function AlbumCard(props: AlbumCardProps) {
   return (
     <Card className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow">
       <CardContent className="p-0">
-        <div className="aspect-[9/16] relative" onClick={onClickCard} role="button" aria-label={title ?? "アルバムを開く"}>
+        <div className="aspect-[4/5] relative" onClick={onClickCard} role="button" aria-label={title ?? "アルバムを開く"}>
           {/* Cover image */}
           {coverUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -103,5 +103,4 @@ export default function AlbumCard(props: AlbumCardProps) {
     </Card>
   )
 }
-
 

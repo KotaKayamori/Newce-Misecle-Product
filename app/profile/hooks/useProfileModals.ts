@@ -21,11 +21,6 @@ export function useProfileModals() {
   const [showProfileDetails, setShowProfileDetails] = useState(false)
   const [showOtherProfile, setShowOtherProfile] = useState(false)
   const [showLogoutConfirmation, setShowLogoutConfirmation] = useState(false)
-  const [showManagementScreen, setShowManagementScreen] = useState(false)
-  const [showNotificationBroadcast, setShowNotificationBroadcast] = useState(false)
-  const [showFollowers, setShowFollowers] = useState(false)
-  const [showFollowing, setShowFollowing] = useState(false)
-  const [showPosts, setShowPosts] = useState(false)
   const [showNotificationPermission, setShowNotificationPermission] = useState(false)
   const [showGenderAgeModal, setShowGenderAgeModal] = useState(false)
   const [showUploadModal, setShowUploadModal] = useState(false)
@@ -62,16 +57,6 @@ export function useProfileModals() {
     setShowOtherProfile,
     showLogoutConfirmation,
     setShowLogoutConfirmation,
-    showManagementScreen,
-    setShowManagementScreen,
-    showNotificationBroadcast,
-    setShowNotificationBroadcast,
-    showFollowers,
-    setShowFollowers,
-    showFollowing,
-    setShowFollowing,
-    showPosts,
-    setShowPosts,
     showNotificationPermission,
     setShowNotificationPermission,
     showGenderAgeModal,
@@ -82,4 +67,3 @@ export function useProfileModals() {
     setShowMyVideosModal,
   }
 }
-

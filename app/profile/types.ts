@@ -21,10 +21,3 @@ export type PasswordChangeData = {
   newPassword: string
   confirmPassword: string
 }
-
-// 通知ブロードキャストデータ
-export type NotificationBroadcastData = {
-  title: string
-  body: string
-}
-
