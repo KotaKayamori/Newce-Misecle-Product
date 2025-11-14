@@ -33,7 +33,8 @@ export default function VideoUploader() {
   const [dragOver, setDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [title, setTitle] = useState("")
-  const [category, setCategory] = useState<VideoCategory | "">("")
+  // { changed code } 単一→複数選択に変更
+  const [categories, setCategories] = useState<VideoCategory[]>([])
   const [caption, setCaption] = useState("")
 
   const [photoFiles, setPhotoFiles] = useState<File[]>([])
@@ -100,11 +101,13 @@ export default function VideoUploader() {
       resetPhoto()
     } else if (value === "album") {
       resetVideo()
-      setCategory("")
+      // { changed code }
+      setCategories([])
     } else {
       resetVideo()
       resetPhoto()
-      setCategory("")
+      // { changed code }
+      setCategories([])
     }
   }
 
@@ -138,7 +141,15 @@ export default function VideoUploader() {
   }, [])
 
   const doVideoUpload = async () => {
-    if (!selectedFile || !category) return
+    if (!selectedFile) {
+      setFormatError("動画ファイルを選択してください")
+      return
+    }
+    // { changed code } カテゴリの必須チェックを複数対応に
+    if (!categories.length) {
+      setFormatError("カテゴリを1つ以上選択してください")
+      return
+    }
     if (!selectedFile.type.startsWith("video/")) {
       setFormatError("動画ファイルを選択してください")
       return
@@ -147,9 +158,13 @@ export default function VideoUploader() {
       setFormatError("ファイルサイズが大きすぎます（上限1GB）")
       return
     }
+
+    // { changed code } APIへはラベルの配列（テキスト）で送る
+    const categoryValues = categories.map((v) => String(v))
+
     await upload(selectedFile, {
       title: title.trim(),
-      category: category as VideoCategory,
+      categories: categoryValues,
       caption: caption.trim() || undefined,
     })
   }
@@ -299,8 +314,8 @@ export default function VideoUploader() {
       return
     }
     if (mode === "video") {
-      if (!category) {
-        setFormatError("カテゴリを選択してください")
+      if (!categories.length) {
+        setFormatError("カテゴリを1つ以上選択してください")
         return
       }
       await doVideoUpload()
@@ -315,7 +330,8 @@ export default function VideoUploader() {
     resetVideo()
     resetPhoto()
     setTitle("")
-    setCategory("")
+    // { changed code }
+    setCategories([])
     setCaption("")
   }
 
@@ -325,7 +341,8 @@ export default function VideoUploader() {
   const isUploading = isVideoMode ? state === "uploading" : photoState === "uploading"
   const isValid =
     isVideoMode
-      ? Boolean(title.trim() && category && selectedFile)
+      // { changed code } カテゴリ複数対応
+      ? Boolean(title.trim() && categories.length > 0 && selectedFile)
       : isAlbumMode
         ? Boolean(title.trim() && photoFiles.length > 0)
         : false
@@ -395,24 +412,39 @@ export default function VideoUploader() {
             />
           </div>
 
+          {/* { changed code } カテゴリUIを複数選択(チェックボックス)に */}
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
               カテゴリ <span className="text-red-500">*</span>
+              <span className="ml-2 text-xs text-gray-500">(複数選択可)</span>
             </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value as VideoCategory)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:text-gray-500"
-              required={!isAlbumMode}
-              disabled={isAlbumMode}
-            >
-              <option value="">カテゴリを選択してください</option>
-              {CATEGORY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+
+            <div className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${isAlbumMode ? "opacity-60 pointer-events-none" : ""}`}>
+              {CATEGORY_OPTIONS.map((opt) => {
+                const checked = categories.includes(opt.value)
+                return (
+                  <label key={opt.value} className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      disabled={isAlbumMode}
+                      checked={checked}
+                      onChange={(e) => {
+                        setCategories((prev) => {
+                          if (e.target.checked) {
+                            return Array.from(new Set([...prev, opt.value]))
+                          } else {
+                            return prev.filter((v) => v !== opt.value)
+                          }
+                        })
+                      }}
+                    />
+                    <span className="text-sm text-gray-800">{opt.label}</span>
+                  </label>
+                )
+              })}
+            </div>
+
             {isAlbumMode && (
               <p className="text-xs text-gray-500">アルバムではカテゴリ選択は不要です</p>
             )}
@@ -598,7 +630,7 @@ export default function VideoUploader() {
               <div className="space-y-2">
                 <p className="text-sm font-medium">タイトル: {title}</p>
                 <p className="text-sm">
-                  カテゴリ: {CATEGORY_OPTIONS.find((opt) => opt.value === category)?.label || category}
+                  カテゴリ: {categories.map((v) => CATEGORY_OPTIONS.find((o) => o.value === v)?.label || v).join("、")}
                 </p>
                 <video src={publicUrl} controls className="w-full max-h-40 rounded" />
               </div>
