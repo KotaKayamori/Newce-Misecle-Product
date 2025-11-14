@@ -8,6 +8,7 @@ import { ReservationModal } from "./components/modals/ReservationModal"
 import { SearchControls } from "./components/SearchControls"
 import { SearchResultsSection } from "./components/SearchResultsSection"
 import { CategoryVideosSection } from "./components/CategoryVideosSection"
+import { LatestVideosSection } from "./components/LatestVideosSection"
 import { GuidebookSection } from "./components/GuidebookSection"
 import { derivePosterUrl } from "./utils"
 import { useFilters } from "./hooks/useFilters"
@@ -94,6 +95,7 @@ export default function SearchPage() {
   const handleKeywordSelect = (keyword: string) => {
     setSearchTerm(keyword)
     setIsSearchMode(false)
+    search.clearSearch()
   }
 
   const [showReservationModal, setShowReservationModal] = useState(false)
@@ -108,9 +110,6 @@ export default function SearchPage() {
     message: "",
   })
 
-  const [supabaseVideos, setSupabaseVideos] = useState<SupabaseVideoRow[]>([])
-  const [latestVideosLoading, setLatestVideosLoading] = useState(false)
-  const [latestVideosError, setLatestVideosError] = useState<string | null>(null)
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<SupabaseVideoRow | null>(null)
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
@@ -135,27 +134,6 @@ export default function SearchPage() {
   const likeMutationRef = useRef<Set<string>>(new Set())
   const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
 
-  const latestCategoryVideos = useMemo<VideoData[]>(() => {
-    return supabaseVideos.map((video) => {
-      const ownerProfile = video.owner_id ? ownerProfiles[video.owner_id] : undefined
-      const username = ownerProfile?.username || ownerProfile?.display_name || "user"
-      return {
-        id: video.id,
-        title: video.title || video.caption || "動画",
-        category: "最新動画",
-        public_url: video.playback_url,
-        caption: video.caption || undefined,
-        store_info: undefined,
-        created_at: video.created_at,
-        user: {
-          id: video.owner_id || video.id,
-          name: ownerProfile?.display_name || username,
-          username,
-          avatar_url: ownerProfile?.avatar_url || undefined,
-        },
-      }
-    })
-  }, [supabaseVideos, ownerProfiles])
 
   useEffect(() => {
     document.body.classList.add("scrollbar-hide")
@@ -283,6 +261,7 @@ export default function SearchPage() {
   function handleClearSearch() {
     setSearchTerm("")
     search.clearSearch()
+    setIsSearchMode(false)
   }
 
   // When opening fullscreen, ensure playback state is updated
@@ -339,11 +318,7 @@ export default function SearchPage() {
   }, [bookmarkedVideoIds])
 
   const handleRefreshVideos = () => {
-    if (isGuidebookCategory) return
-    if (isLatestCategory) {
-      fetchLatestVideos()
-      return
-    }
+    if (isLatestCategory || isGuidebookCategory) return
     const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
     refreshVideos(categoryForFetch, 10)
   }
@@ -368,75 +343,6 @@ export default function SearchPage() {
     fetchVideos(categoryForFetch, 10)
   }, [selectedCategory, fetchVideos])
 
-  const fetchLatestVideos = useCallback(async () => {
-    setLatestVideosLoading(true)
-    setLatestVideosError(null)
-    try {
-      const { data, error } = await supabase
-        .from("videos")
-        .select("id, owner_id, playback_url, storage_path, title, caption, created_at, video_likes(count)")
-        .order("created_at", { ascending: false })
-      if (error) throw error
-      const arr = (data as SupabaseVideoRow[]) || []
-      const randomVideos = getRandomSample(arr, 10)
-      const likeMap: Record<string, number> = {}
-      randomVideos.forEach((row) => {
-        likeMap[row.id] = row.video_likes?.[0]?.count ?? 0
-      })
-      setSupabaseVideos(randomVideos)
-      setVideoLikeCounts(likeMap)
-
-      const ownerIds = Array.from(new Set(randomVideos.map((row) => row.owner_id).filter((id): id is string => Boolean(id))))
-      if (ownerIds.length > 0) {
-        const { data: profileRows, error: profileErr } = await supabase
-          .from("user_profiles")
-          .select("id, username, display_name, avatar_url")
-          .in("id", ownerIds)
-        if (!profileErr && profileRows) {
-          setOwnerProfiles((prev) => {
-            const next = { ...prev }
-            ;(profileRows as any[]).forEach((p) => {
-              next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
-            })
-            return next
-          })
-        }
-      }
-
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-      if (user) {
-        if (randomVideos.length > 0) {
-          const videoIds = randomVideos.map((row) => row.id)
-          const { data: likedRows, error: likedErr } = await supabase
-            .from("video_likes")
-            .select("video_id")
-            .eq("user_id", user.id)
-            .in("video_id", videoIds)
-          if (!likedErr && likedRows) {
-            setLikedVideoIds(new Set((likedRows as any[]).map((r) => r.video_id)))
-          } else {
-            setLikedVideoIds(new Set())
-          }
-        } else {
-          setLikedVideoIds(new Set())
-        }
-      } else {
-        setLikedVideoIds(new Set())
-      }
-    } catch (e) {
-      console.warn("latest videos load error", e)
-      setSupabaseVideos([])
-      setLatestVideosError("最新動画の取得に失敗しました")
-    } finally {
-      setLatestVideosLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchLatestVideos()
-  }, [fetchLatestVideos])
 
   useEffect(() => {
     if (showFullscreenVideo) {
@@ -548,6 +454,7 @@ export default function SearchPage() {
         onSearchChange={setSearchTerm}
         onSearchSubmit={handleSearchSubmit}
         onSearchModeChange={setIsSearchMode}
+        onClearSearch={handleClearSearch}
         onSelectCategory={setSelectedCategory}
         onPopularKeywordsRefresh={handlePopularKeywordsRefresh}
         onKeywordSelect={handleKeywordSelect}
@@ -629,14 +536,10 @@ export default function SearchPage() {
               onToggleFavorite={toggleFavorite}
             />
 
-            <CategoryVideosSection
+            <LatestVideosSection
               visible={!search.didSearch && isLatestCategory}
               categoryLabel={selectedCategory}
-              videos={latestCategoryVideos}
-              loading={latestVideosLoading}
-              error={latestVideosError}
               bookmarkedVideoIds={bookmarkedVideoIds}
-              onRefresh={fetchLatestVideos}
               onVideoSelect={openRandomVideoFullscreen}
               onToggleFavorite={toggleFavorite}
             />
@@ -734,14 +637,3 @@ export default function SearchPage() {
 //     </svg>
 //   )
 // }
-
-function getRandomSample<T>(items: T[], size: number): T[] {
-  if (items.length <= size) return [...items]
-  const result = [...items]
-  for (let i = result.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[result[i], result[j]] = [result[j], result[i]]
-  }
-  return result.slice(0, size)
-}
-

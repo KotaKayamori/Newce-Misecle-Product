@@ -19,6 +19,7 @@ interface SearchControlsProps {
   onSelectCategory: (category: string) => void
   onPopularKeywordsRefresh: () => void
   onKeywordSelect: (keyword: string) => void
+  onClearSearch: () => void
 }
 
 export function SearchControls({
@@ -36,6 +37,7 @@ export function SearchControls({
   onSelectCategory,
   onPopularKeywordsRefresh,
   onKeywordSelect,
+  onClearSearch,
 }: SearchControlsProps) {
   return (
     <div className="bg-white">
@@ -47,6 +49,11 @@ export function SearchControls({
         onSearchChange={onSearchChange}
         onSearchSubmit={onSearchSubmit}
         onSearchModeChange={onSearchModeChange}
+        onClearSearch={onClearSearch}
+        popularKeywordsSet={popularKeywordsSet}
+        popularKeywordsSets={popularKeywordsSets}
+        onPopularKeywordsRefresh={onPopularKeywordsRefresh}
+        onKeywordSelect={onKeywordSelect}
       />
 
       <CategoryTabs
