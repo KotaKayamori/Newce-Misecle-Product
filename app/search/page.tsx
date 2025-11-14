@@ -72,7 +72,7 @@ export default function SearchPage() {
   const [selectedUser, setSelectedUser] = useState<
     | {
         id: string
-        name: string
+        name: string | null
         avatar?: string | null
         isFollowing?: boolean
       }
