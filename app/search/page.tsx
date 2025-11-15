@@ -14,7 +14,7 @@ import { derivePosterUrl } from "./utils"
 import { useFilters } from "./hooks/useFilters"
 import { useSearchVideos } from "./hooks/useSearchVideos"
 import { useAlbums } from "./hooks/useAlbums"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
 import { useRandomVideos, type VideoData } from "@/hooks/useRandomVideos"
 import { supabase } from "@/lib/supabase"
@@ -27,6 +27,7 @@ import {
 import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
+import type { RestaurantInfo } from "./types"
 
 type SupabaseVideoRow = {
   id: string
@@ -94,22 +95,12 @@ export default function SearchPage() {
   const handleKeywordSelect = (keyword: string) => {
     setSearchTerm(keyword)
     setIsSearchMode(false)
+    search.clearSearch()
   }
 
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<
-    | {
-        id: string
-        restaurantName: string
-        restaurantEmail: string
-        genre: string
-        distance: string
-        rating: number
-        caption?: string
-      }
-    | null
-  >(null)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantInfo | null>(null)
   const [reservationData, setReservationData] = useState({
     name: "",
     people: 2,
@@ -119,8 +110,6 @@ export default function SearchPage() {
     message: "",
   })
 
-  const [supabaseVideos, setSupabaseVideos] = useState<SupabaseVideoRow[]>([])
-  const playersRef = useRef<Record<string, HTMLVideoElement | null>>({})
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<SupabaseVideoRow | null>(null)
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
@@ -144,6 +133,7 @@ export default function SearchPage() {
   const [likedVideoIds, setLikedVideoIds] = useState<Set<string>>(new Set())
   const likeMutationRef = useRef<Set<string>>(new Set())
   const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
+
 
   useEffect(() => {
     document.body.classList.add("scrollbar-hide")
@@ -271,17 +261,12 @@ export default function SearchPage() {
   function handleClearSearch() {
     setSearchTerm("")
     search.clearSearch()
+    setIsSearchMode(false)
   }
 
-  // When opening fullscreen, try to play proactively and pause other inline players
+  // When opening fullscreen, ensure playback state is updated
   useEffect(() => {
     if (showFullscreenVideo && selectedVideo) {
-      try {
-        Object.values(playersRef.current).forEach((el) => {
-          if (el) try { el.pause() } catch {}
-        })
-      } catch {}
-
       const id = requestAnimationFrame(() => {
         const el = fullscreenVideoRef.current
         if (el) {
@@ -341,7 +326,12 @@ export default function SearchPage() {
   const handleRefreshAlbums = albums.refreshAlbums
 
   const handleOpenUserProfile = (user: { id: string; name: string | null; avatar?: string | null; isFollowing: boolean }) => {
-    setSelectedUser(user)
+    setSelectedUser({
+      id: user.id,
+      name: user.name ?? "ゲスト",
+      avatar: user.avatar,
+      isFollowing: user.isFollowing,
+    })
     setShowUserProfile(true)
   }
 
@@ -353,76 +343,6 @@ export default function SearchPage() {
     fetchVideos(categoryForFetch, 10)
   }, [selectedCategory, fetchVideos])
 
-  // Load all videos from Supabase storage-backed table
-  useEffect(() => {
-    let aborted = false
-    ;(async () => {
-      try {
-        const { data, error } = await supabase
-          .from("videos")
-          .select("id, owner_id, playback_url, storage_path, title, caption, created_at, video_likes(count)")
-          .order("created_at", { ascending: false })
-        if (error) throw error
-        if (aborted) return
-        const arr = (data as SupabaseVideoRow[]) || []
-        setSupabaseVideos(arr)
-        const likeMap: Record<string, number> = {}
-        arr.forEach((row) => {
-          likeMap[row.id] = row.video_likes?.[0]?.count ?? 0
-        })
-        setVideoLikeCounts(likeMap)
-
-        const ownerIds = Array.from(new Set(arr.map((row) => row.owner_id).filter((id): id is string => Boolean(id))))
-        if (ownerIds.length > 0) {
-          const { data: profileRows, error: profileErr } = await supabase
-            .from("user_profiles")
-            .select("id, username, display_name, avatar_url")
-            .in("id", ownerIds)
-          if (!profileErr && profileRows && !aborted) {
-            setOwnerProfiles((prev) => {
-              const next = { ...prev }
-              ;(profileRows as any[]).forEach((p) => {
-                next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
-              })
-              return next
-            })
-          }
-        }
-
-        const {
-          data: { user },
-        } = await supabase.auth.getUser()
-        if (aborted) return
-        if (user) {
-          if (arr.length > 0) {
-            const videoIds = arr.map((row) => row.id)
-            const { data: likedRows, error: likedErr } = await supabase
-              .from("video_likes")
-              .select("video_id")
-              .eq("user_id", user.id)
-              .in("video_id", videoIds)
-            if (!likedErr && likedRows) {
-              setLikedVideoIds(new Set((likedRows as any[]).map((r) => r.video_id)))
-            } else {
-              setLikedVideoIds(new Set())
-            }
-          } else {
-            setLikedVideoIds(new Set())
-          }
-        } else {
-          setLikedVideoIds(new Set())
-        }
-      } catch (e) {
-        if (!aborted) {
-          console.warn("search videos load error", e)
-          setSupabaseVideos([])
-        }
-      }
-    })()
-    return () => {
-      aborted = true
-    }
-  }, [])
 
   useEffect(() => {
     if (showFullscreenVideo) {
@@ -534,6 +454,7 @@ export default function SearchPage() {
         onSearchChange={setSearchTerm}
         onSearchSubmit={handleSearchSubmit}
         onSearchModeChange={setIsSearchMode}
+        onClearSearch={handleClearSearch}
         onSelectCategory={setSelectedCategory}
         onPopularKeywordsRefresh={handlePopularKeywordsRefresh}
         onKeywordSelect={handleKeywordSelect}
@@ -618,13 +539,9 @@ export default function SearchPage() {
             <LatestVideosSection
               visible={!search.didSearch && isLatestCategory}
               categoryLabel={selectedCategory}
-              videos={supabaseVideos}
-              ownerProfiles={ownerProfiles}
               bookmarkedVideoIds={bookmarkedVideoIds}
-              playersRef={playersRef}
-              onVideoSelect={selectSupabaseVideo}
+              onVideoSelect={openRandomVideoFullscreen}
               onToggleFavorite={toggleFavorite}
-              onOpenUserProfile={handleOpenUserProfile}
             />
 
             <GuidebookSection

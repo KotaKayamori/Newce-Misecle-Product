@@ -1,5 +1,9 @@
 "use client"
 
+import { useState } from "react"
+
+import { Button } from "@/components/ui/button"
+import { PhoneDialCard } from "@/components/dial/PhoneDialCard"
 import type { ReservationFormData, SelectedRestaurant } from "@/app/favorites/types"
 
 interface ReservationModalProps {
@@ -11,21 +15,40 @@ interface ReservationModalProps {
   onSubmit: () => void
 }
 
-export function ReservationModal({ open, restaurant, data, onChange, onClose, onSubmit }: ReservationModalProps) {
+export function ReservationModal({
+  open,
+  restaurant,
+  data: _data,
+  onChange: _onChange,
+  onClose,
+  onSubmit,
+}: ReservationModalProps) {
+  const [showDialCard, setShowDialCard] = useState(false)
+
   if (!open || !restaurant) return null
+
+  const handleReserveClick = () => {
+    setShowDialCard(true)
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-hide">
         <div className="flex items-center justify-between p-4">
-          <button onClick={onClose} className="text-lg">
+          <Button variant="ghost" size="sm" onClick={onClose}>
             ＜
-          </button>
+          </Button>
           <h2 className="text-lg font-semibold">お店を予約する</h2>
           <div className="w-8"></div>
         </div>
 
         <div className="p-6 space-y-6">
+          {/**
+           * 旧入力フォームはコメントアウトで保持しています。
+           * 復元する際は下記コメントを外してください。
+           */}
+
+          {/**
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-3">お名前</label>
             <input
@@ -115,8 +138,34 @@ export function ReservationModal({ open, restaurant, data, onChange, onClose, on
           >
             予約リクエストを送信
           </button>
+          */}
+
+          <div className="space-y-3 rounded-lg border border-orange-200 bg-orange-50 p-4 text-sm text-orange-800">
+            <p className="font-semibold">【ご予約に関するご注意とお願い】</p>
+            <ul className="space-y-2 list-disc list-inside">
+              <li>直前キャンセルや無断キャンセルは、店舗様にご迷惑がかかりますのでお控えください。</li>
+              <li>ご予約をキャンセルされる場合は、原則2日前までに店舗へご連絡をお願いいたします。</li>
+              <li>ご予約内容の確認や変更は、直接お店までご連絡ください。</li>
+              <li>混雑状況により、お電話がつながりにくい場合がございます。</li>
+            </ul>
+            <p className="text-xs text-orange-700">※掲載されている店舗情報は、公開情報をもとに掲載しています</p>
+          </div>
+
+          <Button
+            className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-lg font-semibold"
+            onClick={handleReserveClick}
+          >
+            予約はこちら
+          </Button>
         </div>
       </div>
+
+      <PhoneDialCard
+        open={showDialCard}
+        restaurantId={restaurant.id}
+        fallbackTel={restaurant.tel ?? null}
+        onClose={() => setShowDialCard(false)}
+      />
     </div>
   )
 }
