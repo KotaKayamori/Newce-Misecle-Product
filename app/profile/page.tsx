@@ -266,8 +266,8 @@ export default function ProfilePage() {
         { icon: HelpCircle, label: "お問い合わせ", onClick: () => setShowContactForm(true) },
         { icon: HelpCircle, label: "よくある質問", onClick: () => setShowFAQ(true) },
         { icon: HelpCircle, label: "アプリの不具合や、改善要望を報告", onClick: () => setShowBugReportForm(true) },
-        { icon: HelpCircle, label: "サービスサイトはこちら", onClick: () => window.open("https://example-service-site.jp", "_blank") },
-        { icon: HelpCircle, label: "店舗様はこちら", onClick: () => window.open("https://example-for-stores.jp", "_blank") },
+        { icon: HelpCircle, label: "サービスサイトはこちら", onClick: () => window.open("https://service.newce.co.jp", "_blank") },
+        { icon: HelpCircle, label: "店舗様はこちら", onClick: () => window.open("https://ad.newce.co.jp", "_blank") },
       ],
     },
     // 運営機能セクションは削除済み
