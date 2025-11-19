@@ -9,6 +9,7 @@ export interface VideoData {
   public_url: string
   caption?: string
   store_info?: string | null
+  tel?: string | null
   created_at: string
   user: {
     id: string

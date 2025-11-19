@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Settings, Store, Bell, Shield, HelpCircle, Upload, Play, Star, Users, Megaphone } from "lucide-react"
+import { Settings, Store, Bell, Shield, HelpCircle, Upload, Play, Star } from "lucide-react"
 import Navigation from "@/components/navigation"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
@@ -12,8 +12,6 @@ import { useProfileModals } from "./hooks/useProfileModals"
 import { GenderAgeScreen } from "./components/GenderAgeScreen"
 import { ProfileEditScreen } from "./components/ProfileEditScreen"
 import { LogoutConfirmScreen } from "./components/LogoutConfirmScreen"
-import { NotificationBroadcastScreen } from "./components/NotificationBroadcastScreen"
-import { ManagementScreen } from "./components/ManagementScreen"
 import { ReviewsScreen } from "./components/ReviewsScreen"
 import { NotificationsScreen } from "./components/NotificationsScreen"
 import { VisitedStoresScreen } from "./components/VisitedStoresScreen"
@@ -29,7 +27,6 @@ import { EmailSuccessScreen } from "./components/EmailSuccessScreen"
 import { PasswordSuccessScreen } from "./components/PasswordSuccessScreen"
 import { UploadScreen } from "./components/UploadScreen"
 import { MyVideosScreen } from "./components/MyVideosScreen"
-import { StatsScreen } from "./components/StatsScreen"
 import { NotificationPermissionScreen } from "./components/NotificationPermissionScreen"
 
 export default function ProfilePage() {
@@ -65,16 +62,6 @@ export default function ProfilePage() {
     setShowProfileEdit,
     showLogoutConfirmation,
     setShowLogoutConfirmation,
-    showManagementScreen,
-    setShowManagementScreen,
-    showNotificationBroadcast,
-    setShowNotificationBroadcast,
-    showFollowers,
-    setShowFollowers,
-    showFollowing,
-    setShowFollowing,
-    showPosts,
-    setShowPosts,
     showNotificationPermission,
     setShowNotificationPermission,
     showGenderAgeModal,
@@ -90,7 +77,6 @@ export default function ProfilePage() {
   const [emailSuccessType, setEmailSuccessType] = useState<"contact" | "bug">("contact")
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false)
   const [isSavingGenderAge, setIsSavingGenderAge] = useState(false)
-  const [statsInitialTab, setStatsInitialTab] = useState<"followers" | "following" | "posts">("followers")
 
   useEffect(() => {
     if (error === "PROFILE_NOT_FOUND") {
@@ -259,47 +245,27 @@ export default function ProfilePage() {
     setShowNotificationPermission(false)
   }
 
-  const openStatsScreen = (tab: "followers" | "following" | "posts") => {
-    setStatsInitialTab(tab)
-    setShowFollowers(tab === "followers")
-    setShowFollowing(tab === "following")
-    setShowPosts(tab === "posts")
-  }
-
   const menuItems = [
     {
       category: "アカウント",
       items: [
         { icon: Upload, label: "コンテンツをアップロード", onClick: () => setShowUploadModal(true) },
         { icon: Play, label: "自分の動画", onClick: () => setShowMyVideosModal(true) },
-        { icon: Settings, label: "プロフィールを編集", onClick: () => setShowProfileEdit(true) },
         { icon: Settings, label: "パスワード設定", onClick: () => setShowAccountSettings(true) },
-        { icon: Bell, label: "お知らせメール設定", onClick: () => setShowEmailSettings(true) },
         { icon: Shield, label: "ログアウト", onClick: () => handleLogout() },
       ],
     },
     {
-      category: "活動履歴",
+      category: "店舗",
       items: [
-        { icon: Star, label: "レビューとコメント", onClick: () => setShowReviews(true) },
         { icon: Store, label: "これまで来店した店舗", onClick: () => setShowVisitedStores(true) },
-        { icon: Bell, label: "通知一覧", onClick: () => setShowNotifications(true) },
-      ],
-    },
-    {
-      category: "コミュニティ",
-      items: [
-        { icon: Users, label: "フォロワー一覧", onClick: () => openStatsScreen("followers") },
-        { icon: Users, label: "フォロー中一覧", onClick: () => openStatsScreen("following") },
-        { icon: Play, label: "投稿ライブラリ", onClick: () => openStatsScreen("posts") },
       ],
     },
     {
       category: "通知とプライバシー",
       items: [
         { icon: Bell, label: "位置情報の設定", onClick: () => setShowLocationSettings(true) },
-        { icon: Bell, label: "プッシュ通知を有効化", onClick: () => setShowNotificationPermission(true) },
-        { icon: Settings, label: "端末の通知設定ガイド", onClick: () => setShowPushNotificationSettings(true) },
+        { icon: Bell, label: "プッシュ通知設定", onClick: () => setShowNotificationPermission(true) },
         { icon: Shield, label: "ミュートにしている店舗", onClick: () => setShowMutedStoresSettings(true) },
       ],
     },
@@ -308,16 +274,12 @@ export default function ProfilePage() {
       items: [
         { icon: HelpCircle, label: "お問い合わせ", onClick: () => setShowContactForm(true) },
         { icon: HelpCircle, label: "よくある質問", onClick: () => setShowFAQ(true) },
-        { icon: HelpCircle, label: "不具合・改善要望", onClick: () => setShowBugReportForm(true) },
+        { icon: HelpCircle, label: "アプリの不具合や、改善要望を報告", onClick: () => setShowBugReportForm(true) },
+        { icon: HelpCircle, label: "サービスサイトはこちら", onClick: () => window.open("https://service.newce.co.jp", "_blank") },
+        { icon: HelpCircle, label: "店舗様はこちら", onClick: () => window.open("https://ad.newce.co.jp", "_blank") },
       ],
     },
-    {
-      category: "運営機能",
-      items: [
-        { icon: Store, label: "店舗管理者向け画面", onClick: () => setShowManagementScreen(true) },
-        { icon: Megaphone, label: "お知らせ配信", onClick: () => setShowNotificationBroadcast(true) },
-      ],
-    },
+    // 運営機能セクションは削除済み
   ]
 
   if (!user) {
@@ -426,13 +388,7 @@ export default function ProfilePage() {
     )
   }
 
-  if (showNotificationBroadcast) {
-    return <NotificationBroadcastScreen onClose={() => setShowNotificationBroadcast(false)} />
-  }
 
-  if (showManagementScreen) {
-    return <ManagementScreen onClose={() => setShowManagementScreen(false)} />
-  }
 
   if (showReviews) {
     return <ReviewsScreen onClose={() => setShowReviews(false)} visitHistory={visitHistory} />
@@ -503,19 +459,6 @@ export default function ProfilePage() {
 
   if (showMyVideosModal) {
     return <MyVideosScreen onClose={() => setShowMyVideosModal(false)} />
-  }
-
-  if (showFollowers || showFollowing || showPosts) {
-    return (
-      <StatsScreen
-        onClose={() => {
-          setShowFollowers(false)
-          setShowFollowing(false)
-          setShowPosts(false)
-        }}
-        initialTab={statsInitialTab}
-      />
-    )
   }
 
   if (showNotificationPermission) {

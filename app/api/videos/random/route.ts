@@ -11,11 +11,17 @@ export async function GET(request: NextRequest) {
     const categoryMap: Record<string, string> = {
       "今日のおすすめ": "today_recommended",
       "今人気のお店": "popular_now",
-      "SNSで人気のお店": "sns_popular",
+      "SNSで人気のお店": "sns_pupular",
       "Z世代に人気のお店": "gen_z_popular",
       "デートにおすすめのお店": "date_recommended",
     }
-    const dbCategoryCode: string | null = category ? (categoryMap[category] ?? null) : null
+    const knownCodes = new Set(Object.values(categoryMap))
+    const resolveCategoryCode = (input?: string | null) => {
+      if (!input) return null
+      if (knownCodes.has(input)) return input
+      return categoryMap[input] ?? null
+    }
+    const dbCategoryCode: string | null = resolveCategoryCode(category)
 
     // RPCは text[] 受け取り想定。単一カテゴリでも配列化して渡す
     let rpcQuery = supabase.rpc("get_random_videos", {
@@ -34,15 +40,16 @@ export async function GET(request: NextRequest) {
     interface Video {
       id: string
       title: string
-      category?: string
+      category?: string | null
       categories?: string[]
-      public_url?: string
-      playback_url?: string
-      caption?: string
-      influencer_comment?: string
-      store_info?: any
+      public_url?: string | null
+      playback_url?: string | null
+      caption?: string | null
+      influencer_comment?: string | null
+      store_info?: unknown
+      tel?: string | null
       created_at: string
-      user_profiles?: UserProfile[] | UserProfile
+      user_profiles?: UserProfile[] | UserProfile | null
     }
 
     interface UserProfile {
@@ -70,10 +77,11 @@ export async function GET(request: NextRequest) {
           category: categories[0] ?? null,
           // 新: 複数カテゴリを返す
           categories,
-          public_url: video.public_url ?? video.playback_url,
-          playback_url: video.playback_url ?? video.public_url,
+          public_url: video.public_url ?? video.playback_url ?? null,
+          playback_url: video.playback_url ?? video.public_url ?? null,
           caption: video.caption ?? video.influencer_comment ?? null,
           store_info: video.store_info ?? null,
+          tel: video.tel ?? null,
           created_at: video.created_at,
           // 常にオブジェクトで返す（nullを避ける）
           user: {
