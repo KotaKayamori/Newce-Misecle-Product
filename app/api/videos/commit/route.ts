@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server"
 import { createServerClient } from "@/lib/auth"
-import { ca } from "date-fns/locale"
 
 type Body = {
   path?: string
   publicUrl?: string
   title?: string
   caption?: string
-  category?: string
+  categories?: string[] // 変更: category -> categories(string[])
 }
 
 export async function POST(request: Request) {
@@ -45,6 +44,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to resolve public URL" }, { status: 400 })
     }
 
+    // 入力検証: categories(string[]) 必須
+    const categoriesRaw = Array.isArray(body.categories) ? body.categories : []
+    const categories = categoriesRaw
+      .map((c) => (typeof c === "string" ? c.trim() : ""))
+      .filter((c) => c.length > 0)
+
+    if (categories.length === 0) {
+      return NextResponse.json({ error: "categories is required (string[])" }, { status: 400 })
+    }
+
     // Insert into videos (public feed)
     const insertPayload = {
       owner_id: userId,
@@ -52,12 +61,11 @@ export async function POST(request: Request) {
       storage_path: path,
       title: body.title?.trim() || null,
       caption: body.caption?.trim() || null,
-      category: body.category || null,
+      categories, // 変更: categories列に保存
     }
 
     const { error: vErr } = await supabase.from("videos").insert(insertPayload)
     if (vErr) {
-      // Unique violation (same path) → treat as conflict
       const status = vErr.message?.toLowerCase().includes("duplicate") ? 409 : 400
       return NextResponse.json({ error: vErr.message }, { status })
     }
@@ -70,7 +78,8 @@ export async function POST(request: Request) {
         public_url: playbackUrl,
         title: insertPayload.title,
         description: insertPayload.caption,
-        category: insertPayload.category,
+        // 互換用: user_videos 側が単一 category の場合は先頭を入れる（なければ null）
+        category: categories[0] ?? null,
       })
     } catch {}
 
@@ -79,4 +88,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: e?.message || "Unexpected error" }, { status: 500 })
   }
 }
-

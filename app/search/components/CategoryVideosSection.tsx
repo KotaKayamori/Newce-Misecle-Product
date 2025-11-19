@@ -53,20 +53,27 @@ export function CategoryVideosSection({
 
       {!loading && videos.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
-          {videos.map((video) => (
-            <VideoCard
-              key={video.id}
-              posterUrl={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
-              title={video.title}
-              onClickCard={() => onVideoSelect(video)}
-              showTopBookmark
-              isBookmarked={bookmarkedVideoIds.has(video.id)}
-              onToggleBookmark={(e) => onToggleFavorite(video.id, e)}
-              bottomMetaVariant="account"
-              accountAvatarUrl={video.user.avatar_url}
-              accountLabel={`@${video.user.username || video.user.name.toLowerCase().replace(/\s+/g, "_")}`}
-            />
-          ))}
+          {videos.map((video) => {
+            const user = video.user ?? {}
+            const baseName = typeof user.name === "string" ? user.name : ""
+            const normalized = baseName.length > 0 ? baseName.toLowerCase().replace(/\s+/g, "_") : "user"
+            const accountLabel = user.username ? `@${user.username}` : `@${normalized}`
+
+            return (
+              <VideoCard
+                key={video.id}
+                posterUrl={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
+                title={video.title}
+                onClickCard={() => onVideoSelect(video)}
+                showTopBookmark
+                isBookmarked={bookmarkedVideoIds.has(video.id)}
+                onToggleBookmark={(e) => onToggleFavorite(video.id, e)}
+                bottomMetaVariant="account"
+                accountAvatarUrl={user?.avatar_url ?? null}
+                accountLabel={accountLabel}
+              />
+            )
+          })}
         </div>
       )}
 

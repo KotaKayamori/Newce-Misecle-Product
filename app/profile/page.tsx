@@ -181,8 +181,14 @@ export default function ProfilePage() {
     }, 5000)
   }
 
-  const handleSaveGenderAge = async (gender: string, age: string) => {
-    if (!gender || !age) {
+  const genderOptions = ["男性", "女性", "その他"] as const
+  const ageOptions = ["10代", "20代", "30代", "40代", "50代以上"] as const
+
+  const handleSaveGenderAge = async (
+    gender: string,
+    age: string
+  ) => {
+    if (!genderOptions.includes(gender as any) || !ageOptions.includes(age as any)) {
       toast({
         title: "入力エラー",
         description: "性別と年齢を選択してください",
@@ -193,7 +199,10 @@ export default function ProfilePage() {
 
     setIsSavingGenderAge(true)
     try {
-      const success = await updateProfile({ gender, age })
+      const success = await updateProfile({
+        gender: gender as "男性" | "女性" | "その他",
+        age: age as "10代" | "20代" | "30代" | "40代" | "50代以上",
+      })
       if (success) {
         toast({
           title: "更新完了",
@@ -266,12 +275,42 @@ export default function ProfilePage() {
         { icon: HelpCircle, label: "お問い合わせ", onClick: () => setShowContactForm(true) },
         { icon: HelpCircle, label: "よくある質問", onClick: () => setShowFAQ(true) },
         { icon: HelpCircle, label: "アプリの不具合や、改善要望を報告", onClick: () => setShowBugReportForm(true) },
-        { icon: HelpCircle, label: "サービスサイトはこちら", onClick: () => window.open("https://example-service-site.jp", "_blank") },
-        { icon: HelpCircle, label: "店舗様はこちら", onClick: () => window.open("https://example-for-stores.jp", "_blank") },
+        { icon: HelpCircle, label: "サービスサイトはこちら", onClick: () => window.open("https://service.newce.co.jp", "_blank") },
+        { icon: HelpCircle, label: "店舗様はこちら", onClick: () => window.open("https://ad.newce.co.jp", "_blank") },
       ],
     },
     // 運営機能セクションは削除済み
   ]
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-white pb-20">
+        {/* Header */}
+        <div className="bg-white px-6 py-4">
+          <div className="relative flex items-center justify-center">
+            <h1 className="text-xl font-semibold">マイページ</h1>
+          </div>
+        </div>
+
+        {/* Login Required (お気に入りページと同様の見た目) */}
+        <div className="px-6 py-12">
+          <div className="text-center">
+            <h1 className="text-xl font-semibold text-gray-900 mb-2">ログインが必要です</h1>
+            <p className="text-gray-600 mb-6">プロフィールを表示するにはログインしてください。</p>
+            <Button
+              onClick={() => router.push("/auth/login")}
+              className="bg-orange-600 hover:bg-orange-700 text-white px-6 py-2 rounded-full"
+            >
+              ログインする
+            </Button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <Navigation />
+      </div>
+    )
+  }
 
   if (showEmailSuccess) {
     return (

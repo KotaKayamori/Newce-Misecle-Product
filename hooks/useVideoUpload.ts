@@ -14,7 +14,8 @@ export type VideoCategory =
 
 export type VideoMeta = {
   title: string
-  category: VideoCategory
+  // { changed code } 単一→複数（テキスト配列）
+  categories: string[]
   caption?: string
 }
 
@@ -47,8 +48,14 @@ export function useVideoUpload() {
       return
     }
 
-    if (!meta.category) {
-      setError("振り分けカテゴリを選択してください")
+    // { changed code } カテゴリ配列の検証
+    if (!Array.isArray(meta.categories) || meta.categories.length === 0) {
+      setError("カテゴリを1つ以上選択してください")
+      setState("error")
+      return
+    }
+    if (meta.categories.some((c) => typeof c !== "string" || !c.trim())) {
+      setError("カテゴリの指定が不正です")
       setState("error")
       return
     }
@@ -127,21 +134,22 @@ export function useVideoUpload() {
         console.warn("poster generation failed", e)
       }
 
-      // Save metadata to server (videos table) and keep user_videos for migration
+      // Save metadata to server (videos table)
       try {
         const body = {
           path,
           publicUrl: pub.publicUrl,
           title: meta.title.trim(),
-          category: meta.category,
+          // { changed code } APIへ categories を渡す
+          categories: meta.categories.map((c) => c.trim()),
           caption: meta.caption?.trim() || undefined,
         }
-        
+
         const {
           data: { session },
         } = await supabase.auth.getSession()
         const accessToken = session?.access_token
-        
+
         const res = await fetch("/api/videos/commit", {
           method: "POST",
           headers: {
@@ -150,7 +158,7 @@ export function useVideoUpload() {
           },
           body: JSON.stringify(body),
         })
-        
+
         if (!res.ok) {
           const j = await res.json().catch(() => ({}))
           throw new Error(j?.error || "動画情報の保存に失敗しました")
