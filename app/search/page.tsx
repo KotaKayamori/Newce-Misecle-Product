@@ -40,6 +40,20 @@ type SupabaseVideoRow = {
   video_likes?: { count?: number }[]
 }
 
+const CATEGORY_SLUG_MAP: Record<string, string> = {
+  "今日のおすすめ": "today_recommended",
+  "今人気のお店": "popular_now",
+  "SNSで人気のお店": "sns_pupular",
+  "Z世代に人気のお店": "gen_z_popular",
+  "デートにおすすめ": "date_recommended",
+  "デートにおすすめのお店": "date_recommended",
+}
+
+function resolveCategorySlug(category?: string | null) {
+  if (!category) return undefined
+  return CATEGORY_SLUG_MAP[category] ?? category
+}
+
 export default function SearchPage() {
   const router = useRouter()
   const { videos, loading, error, fetchVideos, refreshVideos } = useRandomVideos()
@@ -73,7 +87,7 @@ export default function SearchPage() {
   const [selectedUser, setSelectedUser] = useState<
     | {
         id: string
-        name: string
+        name: string | null
         avatar?: string | null
         isFollowing?: boolean
       }
@@ -319,8 +333,8 @@ export default function SearchPage() {
 
   const handleRefreshVideos = () => {
     if (isLatestCategory || isGuidebookCategory) return
-    const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
-    refreshVideos(categoryForFetch, 10)
+    const categorySlug = selectedCategory === "今日のおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    refreshVideos(categorySlug, 10)
   }
 
   const handleRefreshAlbums = albums.refreshAlbums
@@ -339,8 +353,8 @@ export default function SearchPage() {
 
   useEffect(() => {
     if (selectedCategory === "最新動画" || selectedCategory === "ガイドブック") return
-    const categoryForFetch = selectedCategory === "今日のおすすめ" ? undefined : selectedCategory
-    fetchVideos(categoryForFetch, 10)
+    const categorySlug = selectedCategory === "今日のおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    fetchVideos(categorySlug, 10)
   }, [selectedCategory, fetchVideos])
 
 
