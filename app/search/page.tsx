@@ -106,10 +106,10 @@ export default function SearchPage() {
     setPopularKeywordsSet((prev) => (prev + 1) % popularKeywordsSets.length)
   }
 
-  const handleKeywordSelect = (keyword: string) => {
+  const handleKeywordSelect = async (keyword: string) => {
     setSearchTerm(keyword)
     setIsSearchMode(false)
-    search.clearSearch()
+    await search.performSearch(keyword)
   }
 
   const [showReservationModal, setShowReservationModal] = useState(false)

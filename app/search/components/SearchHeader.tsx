@@ -49,8 +49,8 @@ export function SearchHeader({
           onClick={() => onSearchModeChange(true)}
         >
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
-          <div className="pl-10 pr-4 py-2 border border-black rounded-full bg-white text-gray-600">
-            {searchTerm.trim() ? searchTerm : "店舗名・ジャンル・キーワードで検索"}
+          <div className="pl-10 pr-4 py-2 border border-black rounded-full bg-white text-gray-400">
+            {searchTerm.trim() ? searchTerm : "検索ワードを入力"}
           </div>
         </div>
         <Button
