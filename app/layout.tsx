@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { AuthProvider } from "@/components/auth-provider"
+import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css"
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const gaId = process.env.NEXT_PUBLIC_GA_ID;
   const supabaseOrigin = (() => {
     try {
       return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL as string).origin
@@ -34,6 +36,7 @@ export default function RootLayout({
         )}
       </head>
       <body className={GeistSans.className}>
+        {gaId && <GoogleAnalytics gaId={gaId} />}
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
