@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const categoryMap: Record<string, string> = {
       "今日のおすすめ": "today_recommended",
       "今人気のお店": "popular_now",
-      "SNSで人気のお店": "sns_pupular",
+      "SNSで人気のお店": "sns_popular",
       "Z世代に人気のお店": "gen_z_popular",
       "デートにおすすめのお店": "date_recommended",
     }

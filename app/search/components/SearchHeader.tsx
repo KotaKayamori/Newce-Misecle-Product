@@ -79,7 +79,7 @@ export function SearchHeader({
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
                 <Input
-                  placeholder="店舗名・ジャンル・キーワードで検索"
+                  placeholder="検索ワードを入力"
                   className="pl-10 rounded-full border-black text-black placeholder:text-gray-400"
                   autoFocus
                   value={searchTerm}
