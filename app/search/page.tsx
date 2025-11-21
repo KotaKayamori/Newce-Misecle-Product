@@ -43,7 +43,7 @@ type SupabaseVideoRow = {
 const CATEGORY_SLUG_MAP: Record<string, string> = {
   "今日のおすすめ": "today_recommended",
   "今人気のお店": "popular_now",
-  "SNSで人気のお店": "sns_pupular",
+  "SNSで人気のお店": "sns_popular",
   "Z世代に人気のお店": "gen_z_popular",
   "デートにおすすめ": "date_recommended",
   "デートにおすすめのお店": "date_recommended",
