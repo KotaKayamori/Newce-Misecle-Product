@@ -162,8 +162,9 @@ export function ReservationModal({
 
       <PhoneDialCard
         open={showDialCard}
-        restaurantId={restaurant.id}
+        stores={restaurant.stores}
         fallbackTel={restaurant.tel ?? null}
+        fallbackName={restaurant.restaurantName}
         onClose={() => setShowDialCard(false)}
       />
     </div>

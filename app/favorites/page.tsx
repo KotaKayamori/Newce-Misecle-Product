@@ -227,7 +227,16 @@ export default function FavoritesPage() {
           onShare={async () => { try { if ((navigator as any).share) { await (navigator as any).share({ url: fsVideo.playback_url }) } else { await navigator.clipboard.writeText(fsVideo.playback_url); alert("リンクをコピーしました") } } catch {} }}
           onClose={() => setFsOpen(false)}
           onReserve={() => { openReserveShared({ setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo: setFsOpen as any }, { id: fsVideo.id, title: fsVideo.title as any } as any, { keepFullscreen: true }) }}
-          onMore={() => { openStoreShared({ setSelectedRestaurant, setShowStoreDetailModal }, { id: fsVideo.id, title: fsVideo.title as any, caption: fsVideo.caption as any } as any, { keepFullscreen: true }) }}
+          onMore={() => {
+            const videoForModal = {
+              id: fsVideo.id,
+              title: fsVideo.title as any,
+              caption: fsVideo.caption as any,
+              owner_label: fsOwnerHandle || null,
+              owner_avatar_url: fsOwnerAvatar || null,
+            }
+            openStoreShared({ setSelectedRestaurant, setShowStoreDetailModal }, videoForModal as any, { keepFullscreen: true })
+          }}
           muted={fsMuted}
           onToggleMuted={() => setFsMuted((m) => !m)}
         />

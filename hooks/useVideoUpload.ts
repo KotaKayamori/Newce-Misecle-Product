@@ -12,11 +12,14 @@ export type VideoCategory =
   | "gen_z_popular" 
   | "date_recommended"
 
+const STORE_INPUT_COUNT = 3
+
 export type VideoMeta = {
   title: string
   // { changed code } 単一→複数（テキスト配列）
   categories: string[]
   caption?: string
+  stores?: { name?: string | null; tel?: string | null }[]
 }
 
 export function useVideoUpload() {
@@ -59,6 +62,14 @@ export function useVideoUpload() {
       setState("error")
       return
     }
+
+    const sanitizedStores = Array.isArray(meta.stores)
+      ? meta.stores.slice(0, STORE_INPUT_COUNT).map((store) => {
+          const name = typeof store?.name === "string" ? store.name.trim() : ""
+          const tel = typeof store?.tel === "string" ? store.tel.trim() : ""
+          return { name: name || null, tel: tel || null }
+        })
+      : []
 
     // 1GB 上限（必要に応じて変更）
     const MAX = 1024 * 1024 * 1024
@@ -143,6 +154,7 @@ export function useVideoUpload() {
           // { changed code } APIへ categories を渡す
           categories: meta.categories.map((c) => c.trim()),
           caption: meta.caption?.trim() || undefined,
+          stores: sanitizedStores,
         }
 
         const {

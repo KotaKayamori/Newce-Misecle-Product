@@ -55,9 +55,9 @@ export function CategoryVideosSection({
         <div className="grid grid-cols-2 gap-3">
           {videos.map((video) => {
             const user = video.user ?? {}
-            const baseName = typeof user.name === "string" ? user.name : ""
-            const normalized = baseName.length > 0 ? baseName.toLowerCase().replace(/\s+/g, "_") : "user"
-            const accountLabel = user.username ? `@${user.username}` : `@${normalized}`
+            const username = typeof user.username === "string" && user.username.trim().length > 0 ? user.username.trim() : null
+            const displayName = typeof user.name === "string" && user.name.trim().length > 0 ? user.name.trim() : null
+            const accountLabel = username ? `@${username}` : (displayName || "ユーザー")
 
             return (
               <VideoCard

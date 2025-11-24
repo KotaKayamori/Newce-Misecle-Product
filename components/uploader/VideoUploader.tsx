@@ -20,6 +20,8 @@ const CATEGORY_OPTIONS: { value: VideoCategory; label: string }[] = [
 const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MAX_VIDEO_BYTES = 1024 * 1024 * 1024
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+const STORE_INPUT_COUNT = 3
+const createDefaultStores = () => Array.from({ length: STORE_INPUT_COUNT }, () => ({ name: "", tel: "" }))
 
 type PhotoUploadState = "idle" | "uploading" | "success" | "error"
 
@@ -36,6 +38,7 @@ export default function VideoUploader() {
   // { changed code } 単一→複数選択に変更
   const [categories, setCategories] = useState<VideoCategory[]>([])
   const [caption, setCaption] = useState("")
+  const [stores, setStores] = useState(createDefaultStores)
 
   const [photoFiles, setPhotoFiles] = useState<File[]>([])
   const [photoError, setPhotoError] = useState("")
@@ -99,15 +102,16 @@ export default function VideoUploader() {
     setFormatError("")
     if (value === "video") {
       resetPhoto()
+      setStores(createDefaultStores())
     } else if (value === "album") {
       resetVideo()
-      // { changed code }
       setCategories([])
+      setStores(createDefaultStores())
     } else {
       resetVideo()
       resetPhoto()
-      // { changed code }
       setCategories([])
+      setStores(createDefaultStores())
     }
   }
 
@@ -162,10 +166,16 @@ export default function VideoUploader() {
     // { changed code } APIへはラベルの配列（テキスト）で送る
     const categoryValues = categories.map((v) => String(v))
 
+    const storePayload = stores.map((store) => ({
+      name: store.name.trim(),
+      tel: store.tel.trim(),
+    }))
+
     await upload(selectedFile, {
       title: title.trim(),
       categories: categoryValues,
       caption: caption.trim() || undefined,
+      stores: storePayload,
     })
   }
 
@@ -330,9 +340,9 @@ export default function VideoUploader() {
     resetVideo()
     resetPhoto()
     setTitle("")
-    // { changed code }
     setCategories([])
     setCaption("")
+    setStores(createDefaultStores())
   }
 
   const isVideoMode = mode === "video"
@@ -459,6 +469,47 @@ export default function VideoUploader() {
               className="w-full rounded-md border border-gray-300 px-3 py-2 h-24 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
             />
           </div>
+
+          {mode === "video" && (
+            <div className="space-y-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-medium text-gray-700">紹介店舗（最大3件・任意）</span>
+                <span className="text-xs text-gray-500">店舗名か電話番号のみでも入力できます</span>
+              </div>
+              {stores.map((store, index) => (
+                <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    value={store.name}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setStores((prev) => {
+                        const next = [...prev]
+                        next[index] = { ...next[index], name: value }
+                        return next
+                      })
+                    }}
+                    placeholder={`店舗${index + 1}の名称（任意）`}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <input
+                    type="tel"
+                    value={store.tel}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setStores((prev) => {
+                        const next = [...prev]
+                        next[index] = { ...next[index], tel: value }
+                        return next
+                      })
+                    }}
+                    placeholder={`店舗${index + 1}の電話番号（任意）`}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
