@@ -23,7 +23,7 @@ export function SearchHistory({
     <div className="bg-white relative z-10">
       <div className="space-y-6 max-h-[60vh] overflow-y-auto scrollbar-hide bg-white px-6 py-4">
         {/* Search History */}
-        <div className="bg-white">
+        {/* <div className="bg-white">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-black">検索履歴</h3>
             <button
@@ -50,7 +50,7 @@ export function SearchHistory({
               </div>
             ))}
           </div>
-        </div>
+        </div> */}
 
         {/* Popular Genres/Keywords */}
         <div className="bg-white">

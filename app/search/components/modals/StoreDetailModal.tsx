@@ -1,8 +1,9 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Star } from "lucide-react"
 import type { RestaurantInfo } from "../../types"
+
+const sanitizeTelLink = (tel?: string | null) => tel?.replace(/[^\d+]/g, "") ?? ""
 
 interface StoreDetailModalProps {
   open: boolean
@@ -21,10 +22,43 @@ export function StoreDetailModal({
 }: StoreDetailModalProps) {
   if (!open || !restaurant) return null
 
+  const ownerLabel = restaurant.ownerLabel || null
+  const primaryLabel = ownerLabel || restaurant.restaurantName || "店舗情報"
+  const secondaryLabel = ownerLabel
+    ? restaurant.restaurantName
+    : [restaurant.genre, restaurant.distance].filter((text) => text && text.trim().length > 0).join(" / ")
+  const avatarFallback = primaryLabel.replace(/^@/, "").charAt(0).toUpperCase() || "U"
+  const storeEntries = (() => {
+    const entries = (restaurant.stores ?? []).map((store, index) => {
+      const sanitizedTel = sanitizeTelLink(store.tel)
+      return {
+        key: `${store.name}-${index}`,
+        order: index + 1,
+        name: store.name,
+        telLabel: store.tel ?? "",
+        sanitizedTel,
+        hasTel: sanitizedTel.length > 0,
+      }
+    })
+
+    if (!entries.length && restaurant.tel) {
+      const sanitizedTel = sanitizeTelLink(restaurant.tel)
+      entries.push({
+        key: "primary-tel",
+        order: 1,
+        name: restaurant.restaurantName || "店舗情報",
+        telLabel: restaurant.tel,
+        sanitizedTel,
+        hasTel: sanitizedTel.length > 0,
+      })
+    }
+
+    return entries
+  })()
+
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-hide">
-        {/* Header */}
+      <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4">
           <Button variant="ghost" size="sm" onClick={onClose}>
             ＜
@@ -34,39 +68,24 @@ export function StoreDetailModal({
         </div>
 
         <div className="p-6 space-y-6">
-          {/* 店舗名 */}
-          <div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">{restaurant.restaurantName}</h3>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-              <span>{restaurant.rating}</span>
-              <span>•</span>
-              <span>{restaurant.genre}</span>
-              <span>•</span>
-              <span>{restaurant.distance}</span>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden">
+              {restaurant.ownerAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={restaurant.ownerAvatarUrl} alt={ownerLabel ?? "user"} className="w-full h-full object-cover" />
+              ) : (
+                avatarFallback
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-gray-800">{primaryLabel}</p>
+              {secondaryLabel && <p className="text-xs text-gray-600">{secondaryLabel}</p>}
             </div>
           </div>
 
-          {/* 店舗情報 */}
-          {/* 店舗情報セクションは今後の拡張用に保持 */}
-          {/*
           <div className="space-y-4">
-            <h4 className="font-semibold text-gray-800">店舗情報</h4>
-            <div className="flex items-center justify-center rounded-lg bg-gray-50 py-6 text-sm text-gray-500">
-              {EMPTY_STORE_INFO_MESSAGE}
-            </div>
-          </div>
-          */}
-
-          {/* インフルエンサーの感想 */}
-          <div className="space-y-4">
-            <h4 className="font-semibold text-gray-800">詳細情報</h4>
-            {restaurant?.caption ? (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">
-                  {restaurant.caption}
-                </p>
-              </div>
+            {restaurant.caption ? (
+              <div className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{restaurant.caption}</div>
             ) : (
               <div className="flex items-center justify-center rounded-lg bg-gray-50 py-6 text-sm text-gray-500">
                 {EMPTY_INFLUENCER_COMMENT_MESSAGE}
@@ -74,17 +93,41 @@ export function StoreDetailModal({
             )}
           </div>
 
-          {/* 予約ボタン */}
-          <Button
-            className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-lg font-semibold"
-            onClick={onReserve}
-          >
-            この店舗を予約する
-          </Button>
+          {!!storeEntries.length && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-800">紹介店舗一覧</h3>
+              <div className="space-y-3">
+                {storeEntries.map((store) => (
+                  <div key={store.key} className="rounded-lg border border-gray-200 p-3">
+                    <p className="text-sm font-semibold text-gray-800">
+                      店舗{store.order}
+                      <span className="ml-2 text-gray-700">{store.name}</span>
+                    </p>
+                    {store.hasTel ? (
+                      <Button asChild variant="outline" className="mt-2 w-full text-sm font-semibold text-orange-700">
+                        <a href={`tel:${store.sanitizedTel}`}>{store.telLabel}</a>
+                      </Button>
+                    ) : (
+                      <Button variant="outline" disabled className="mt-2 w-full text-sm text-gray-500">
+                        電話番号が見つかりません
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="pt-2">
+            <Button
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-lg font-semibold"
+              onClick={onReserve}
+            >
+              この店舗を予約する
+            </Button>
+          </div>
         </div>
       </div>
     </div>
   )
 }
-
-

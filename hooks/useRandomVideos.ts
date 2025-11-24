@@ -4,19 +4,27 @@ import { useState, useEffect, useCallback } from 'react'
 
 export interface VideoData {
   id: string
+  owner_id?: string | null
   title: string
-  category: string
+  category: string | null
+  categories?: string[] | null
   public_url: string
-  caption?: string
+  caption?: string | null
   store_info?: string | null
   tel?: string | null
   created_at: string
   user: {
-    id: string
-    name: string
-    username: string
-    avatar_url?: string
+    id: string | null
+    name: string | null
+    username: string | null
+    avatar_url?: string | null
   }
+  store_1_name?: string | null
+  store_1_tel?: string | null
+  store_2_name?: string | null
+  store_2_tel?: string | null
+  store_3_name?: string | null
+  store_3_tel?: string | null
 }
 
 export function useRandomVideos() {

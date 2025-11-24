@@ -7,6 +7,7 @@ type Body = {
   title?: string
   caption?: string
   categories?: string[] // 変更: category -> categories(string[])
+  stores?: { name?: string | null; tel?: string | null }[]
 }
 
 export async function POST(request: Request) {
@@ -54,6 +55,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "categories is required (string[])" }, { status: 400 })
     }
 
+    const stores = Array.isArray(body.stores)
+      ? body.stores.slice(0, 3).map((store) => {
+          const name = typeof store?.name === "string" ? store.name.trim() : ""
+          const tel = typeof store?.tel === "string" ? store.tel.trim() : ""
+          return { name: name || null, tel: tel || null }
+        })
+      : []
+
     // Insert into videos (public feed)
     const insertPayload = {
       owner_id: userId,
@@ -62,6 +71,12 @@ export async function POST(request: Request) {
       title: body.title?.trim() || null,
       caption: body.caption?.trim() || null,
       categories, // 変更: categories列に保存
+      store_1_name: stores[0]?.name ?? null,
+      store_1_tel: stores[0]?.tel ?? null,
+      store_2_name: stores[1]?.name ?? null,
+      store_2_tel: stores[1]?.tel ?? null,
+      store_3_name: stores[2]?.name ?? null,
+      store_3_tel: stores[2]?.tel ?? null,
     }
 
     const { error: vErr } = await supabase.from("videos").insert(insertPayload)

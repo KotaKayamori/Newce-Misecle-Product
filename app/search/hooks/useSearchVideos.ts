@@ -25,7 +25,7 @@ export function useSearchVideos() {
       const pattern = `%${escapeIlike(trimmed)}%`
       const { data, error } = await supabase
         .from("videos")
-        .select("id, owner_id, playback_url, storage_path, title, caption, created_at, video_likes(count)")
+        .select("id, owner_id, playback_url, storage_path, title, caption, created_at, video_likes(count), store_1_name, store_1_tel, store_2_name, store_2_tel, store_3_name, store_3_tel")
         .or(`title.ilike.${pattern},caption.ilike.${pattern}`)
         .order("created_at", { ascending: false })
         .limit(40)
@@ -60,5 +60,4 @@ export function useSearchVideos() {
     clearSearch,
   }
 }
-
 

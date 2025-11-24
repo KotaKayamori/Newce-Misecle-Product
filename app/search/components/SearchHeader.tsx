@@ -44,13 +44,17 @@ export function SearchHeader({
   return (
     <div className="bg-white px-6 py-4">
       <div className="flex items-center gap-3 mb-4">
-        <div
-          className="flex-1 relative cursor-pointer"
-          onClick={() => onSearchModeChange(true)}
-        >
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
-          <div className="pl-10 pr-4 py-2 border border-black rounded-full bg-white text-gray-600">
-            {searchTerm.trim() ? searchTerm : "店舗名・ジャンル・キーワードで検索"}
+        <div className="flex-1" onClick={() => onSearchModeChange(true)}>
+          <div className="relative rounded-full border border-black p-[3px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black w-4 h-4 pointer-events-none" />
+              <Input
+                readOnly
+                value={searchTerm}
+                placeholder="検索ワードを入力"
+                className="pl-10 rounded-full border border-black text-black placeholder:text-gray-400 cursor-pointer"
+              />
+            </div>
           </div>
         </div>
         <Button
@@ -79,7 +83,7 @@ export function SearchHeader({
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
                 <Input
-                  placeholder="店舗名・ジャンル・キーワードで検索"
+                  placeholder="検索ワードを入力"
                   className="pl-10 rounded-full border-black text-black placeholder:text-gray-400"
                   autoFocus
                   value={searchTerm}

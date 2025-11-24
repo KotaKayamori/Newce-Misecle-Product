@@ -8,6 +8,12 @@ export type BasicVideo = {
   caption?: string | null
   store_info?: unknown
   tel?: string | null
+  store_1_name?: string | null
+  store_1_tel?: string | null
+  store_2_name?: string | null
+  store_2_tel?: string | null
+  store_3_name?: string | null
+  store_3_tel?: string | null
 }
 
 export function normalizeOptionalText(input?: string | null): string | undefined {
@@ -18,14 +24,26 @@ export function normalizeOptionalText(input?: string | null): string | undefined
 
 export function mapVideoToRestaurant(video: BasicVideo | null | undefined) {
   if (!video) return null
-  const title = (video.title || "おすすめ動画").toString().trim() || "おすすめ動画"
+  const stores = [1, 2, 3]
+    .map((index) => {
+      const name = normalizeOptionalText((video as any)[`store_${index}_name`])
+      const tel = normalizeOptionalText((video as any)[`store_${index}_tel`])
+      if (!name && !tel) return null
+      return { name: name ?? "店舗情報", tel: tel ?? null }
+    })
+    .filter(Boolean) as { name: string; tel: string | null }[]
+
+  const primaryStore = stores.length > 0 ? stores[0] : null
+
+  const fallbackTitle = (video.title || "おすすめ動画").toString().trim() || "おすすめ動画"
+  const title = primaryStore?.name || fallbackTitle
   const caption =
     normalizeOptionalText(video.caption) ||
     normalizeOptionalText((video as any)?.captionText) ||
     normalizeOptionalText((video as any)?.influencer_comment)
 
   const rawStoreInfo = (video as any)?.store_info ?? (video as any)?.storeInfo
-  let extractedTel: string | null = normalizeOptionalText((video as any)?.tel)
+  let extractedTel: string | null = primaryStore?.tel || normalizeOptionalText((video as any)?.tel)
   if (rawStoreInfo) {
     const storeInfo = typeof rawStoreInfo === "string" ? safeParse(rawStoreInfo) : rawStoreInfo
     if (storeInfo && typeof storeInfo === "object") {
@@ -37,6 +55,12 @@ export function mapVideoToRestaurant(video: BasicVideo | null | undefined) {
       if (telCandidate) extractedTel = telCandidate
     }
   }
+  const ownerLabel =
+    (video as any)?.owner_label ??
+    (video as any)?.ownerLabel ??
+    undefined
+  const ownerAvatarUrl = (video as any)?.owner_avatar_url ?? (video as any)?.ownerAvatarUrl ?? null
+
   return {
     id: video.id,
     restaurantName: title,
@@ -46,6 +70,9 @@ export function mapVideoToRestaurant(video: BasicVideo | null | undefined) {
     rating: 0,
     caption,
     tel: extractedTel,
+    ownerLabel: ownerLabel ?? null,
+    ownerAvatarUrl,
+    stores: stores.length > 0 ? stores : undefined,
   }
 }
 
@@ -94,4 +121,3 @@ export function openReservationForVideo(
   // デフォルトはフルスクリーンを維持。必要な場合のみ明示的に閉じる
   if (options?.keepFullscreen === false && ctx.setShowFullscreenVideo) ctx.setShowFullscreenVideo(false)
 }
-
