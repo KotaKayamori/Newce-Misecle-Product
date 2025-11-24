@@ -38,6 +38,13 @@ type SupabaseVideoRow = {
   caption: string | null
   created_at: string
   video_likes?: { count?: number }[]
+  tel?: string | null
+  store_1_name?: string | null
+  store_1_tel?: string | null
+  store_2_name?: string | null
+  store_2_tel?: string | null
+  store_3_name?: string | null
+  store_3_tel?: string | null
 }
 
 const CATEGORY_SLUG_MAP: Record<string, string> = {
@@ -191,7 +198,17 @@ export default function SearchPage() {
   }
 
   function openStoreDetailForVideo(video: SupabaseVideoRow | null, options?: { keepFullscreen?: boolean }) {
-    openStoreShared({ setSelectedRestaurant, setShowStoreDetailModal, setShowFullscreenVideo }, video as any, options)
+    if (!video) return
+    const owner = video.owner_id ? ownerProfiles[video.owner_id] : null
+    const ownerLabel = owner?.username ? `@${owner.username}` : owner?.display_name ?? null
+    const videoWithOwner = owner
+      ? {
+          ...video,
+          owner_label: ownerLabel,
+          owner_avatar_url: owner?.avatar_url ?? null,
+        }
+      : video
+    openStoreShared({ setSelectedRestaurant, setShowStoreDetailModal, setShowFullscreenVideo }, videoWithOwner as any, options)
   }
 
   function openRandomVideoFullscreen(video: VideoData) {
@@ -233,6 +250,13 @@ export default function SearchPage() {
         normalizeOptionalText(video.caption) ?? null,
       created_at: video.created_at,
       video_likes: [],
+      tel: video.tel ?? null,
+      store_1_name: video.store_1_name ?? null,
+      store_1_tel: video.store_1_tel ?? null,
+      store_2_name: video.store_2_name ?? null,
+      store_2_tel: video.store_2_tel ?? null,
+      store_3_name: video.store_3_name ?? null,
+      store_3_tel: video.store_3_tel ?? null,
     })
     setShowFullscreenVideo(true)
   }
