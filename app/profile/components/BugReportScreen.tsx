@@ -9,9 +9,10 @@ import { useToast } from "@/hooks/use-toast"
 interface BugReportScreenProps {
   onClose: () => void
   onSuccess: (type: "contact" | "bug", message: string) => void
+  onShowFAQ: () => void
 }
 
-export function BugReportScreen({ onClose, onSuccess }: BugReportScreenProps) {
+export function BugReportScreen({ onClose, onSuccess, onShowFAQ }: BugReportScreenProps) {
   const { toast } = useToast()
   const [bugSending, setBugSending] = useState(false)
 
@@ -60,35 +61,57 @@ export function BugReportScreen({ onClose, onSuccess }: BugReportScreenProps) {
         <Button variant="ghost" onClick={onClose} className="text-black">
           ＜
         </Button>
-        <h1 className="text-xl font-semibold">不具合・改善要望</h1>
+        <h1 className="text-2xl font-semibold">Misecle不具合・改善要望報告フォーム</h1>
       </div>
 
-      <div className="px-6 py-4">
-        <form onSubmit={handleBugSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">詳細</label>
-            <textarea
-              name="bugMessage"
-              rows={10}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-              placeholder="不具合の内容や改善要望を詳しくご記入ください"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-2">※ 報告内容は開発チームに送信され、アプリの改善に活用されます</p>
-          </div>
+      <div className="px-6 py-4 space-y-6">
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            アプリの使い方に関しては
+            <button
+              type="button"
+              onClick={() => {
+                onClose()
+                onShowFAQ()
+              }}
+              className="text-blue-600 hover:text-blue-700 underline mx-1"
+            >
+              よくある質問
+            </button>
+            をご確認ください。
+          </p>
 
-          <Button
-            type="submit"
-            disabled={bugSending}
-            className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold disabled:bg-gray-300"
-          >
-            {bugSending ? "送信中..." : "送信する"}
-          </Button>
-        </form>
+          <form onSubmit={handleBugSubmit} className="space-y-4">
+            <div className="bg-gray-200 p-6 rounded-lg">
+              <div className="bg-white rounded-md">
+                <textarea
+                  name="bugMessage"
+                  rows={8}
+                  className="w-full px-4 py-3 border-0 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                  placeholder="こちらにご記入ください..."
+                  required
+                />
+              </div>
+            </div>
+
+            <p className="text-gray-600 text-sm">
+              アプリについてのご意見・ご要望・不具合報告などをお送りください。お問い合わせいただいた内容は、開発チームが確認いたします。
+            </p>
+
+            <p className="text-xs text-gray-500 mb-2">※ 不具合・改善要望は support@newce.co.jp に送信されます</p>
+
+            <Button
+              type="submit"
+              disabled={bugSending}
+              className="w-full bg-orange-600 hover:bg-orange-700 text-white py-3 text-lg font-semibold"
+            >
+              {bugSending ? "送信中..." : "送信する"}
+            </Button>
+          </form>
+        </div>
       </div>
 
       <Navigation />
     </div>
   )
 }
-

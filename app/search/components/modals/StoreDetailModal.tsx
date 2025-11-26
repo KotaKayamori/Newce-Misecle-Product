@@ -28,33 +28,17 @@ export function StoreDetailModal({
     ? restaurant.restaurantName
     : [restaurant.genre, restaurant.distance].filter((text) => text && text.trim().length > 0).join(" / ")
   const avatarFallback = primaryLabel.replace(/^@/, "").charAt(0).toUpperCase() || "U"
-  const storeEntries = (() => {
-    const entries = (restaurant.stores ?? []).map((store, index) => {
-      const sanitizedTel = sanitizeTelLink(store.tel)
-      return {
-        key: `${store.name}-${index}`,
-        order: index + 1,
-        name: store.name,
-        telLabel: store.tel ?? "",
-        sanitizedTel,
-        hasTel: sanitizedTel.length > 0,
-      }
-    })
-
-    if (!entries.length && restaurant.tel) {
-      const sanitizedTel = sanitizeTelLink(restaurant.tel)
-      entries.push({
-        key: "primary-tel",
-        order: 1,
-        name: restaurant.restaurantName || "店舗情報",
-        telLabel: restaurant.tel,
-        sanitizedTel,
-        hasTel: sanitizedTel.length > 0,
-      })
+  const storeEntries = (restaurant.stores ?? []).map((store, index) => {
+    const sanitizedTel = sanitizeTelLink(store.tel)
+    return {
+      key: `${store.name}-${index}`,
+      order: index + 1,
+      name: store.name,
+      telLabel: store.tel ?? "",
+      sanitizedTel,
+      hasTel: sanitizedTel.length > 0,
     }
-
-    return entries
-  })()
+  })
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
@@ -92,31 +76,6 @@ export function StoreDetailModal({
               </div>
             )}
           </div>
-
-          {!!storeEntries.length && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-800">紹介店舗一覧</h3>
-              <div className="space-y-3">
-                {storeEntries.map((store) => (
-                  <div key={store.key} className="rounded-lg border border-gray-200 p-3">
-                    <p className="text-sm font-semibold text-gray-800">
-                      店舗{store.order}
-                      <span className="ml-2 text-gray-700">{store.name}</span>
-                    </p>
-                    {store.hasTel ? (
-                      <Button asChild variant="outline" className="mt-2 w-full text-sm font-semibold text-orange-700">
-                        <a href={`tel:${store.sanitizedTel}`}>{store.telLabel}</a>
-                      </Button>
-                    ) : (
-                      <Button variant="outline" disabled className="mt-2 w-full text-sm text-gray-500">
-                        電話番号が見つかりません
-                      </Button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className="pt-2">
             <Button
