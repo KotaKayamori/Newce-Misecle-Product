@@ -38,7 +38,6 @@ type SupabaseVideoRow = {
   caption: string | null
   created_at: string
   video_likes?: { count?: number }[]
-  tel?: string | null
   store_1_name?: string | null
   store_1_tel?: string | null
   store_2_name?: string | null
@@ -250,7 +249,6 @@ export default function SearchPage() {
         normalizeOptionalText(video.caption) ?? null,
       created_at: video.created_at,
       video_likes: [],
-      tel: video.tel ?? null,
       store_1_name: video.store_1_name ?? null,
       store_1_tel: video.store_1_tel ?? null,
       store_2_name: video.store_2_name ?? null,

@@ -46,8 +46,8 @@ export interface SelectedRestaurant {
   genre?: string
   distance?: string
   caption?: string
-  tel?: string | null
   [key: string]: any
   ownerLabel?: string | null
   ownerAvatarUrl?: string | null
+  stores?: { name: string; tel: string | null }[]
 }
