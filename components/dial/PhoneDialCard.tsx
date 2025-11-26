@@ -3,14 +3,12 @@
 interface PhoneDialCardProps {
   open: boolean
   stores?: { name: string; tel: string | null }[]
-  fallbackTel?: string | null
-  fallbackName?: string | null
   onClose: () => void
 }
 
 const sanitizeTel = (input?: string | null) => (typeof input === "string" ? input.replace(/[^\d+]/g, "") : "")
 
-export function PhoneDialCard({ open, stores, fallbackTel, fallbackName, onClose }: PhoneDialCardProps) {
+export function PhoneDialCard({ open, stores, onClose }: PhoneDialCardProps) {
   if (!open) return null
 
   const storeEntries = (stores ?? []).map((store, index) => {
@@ -24,9 +22,6 @@ export function PhoneDialCard({ open, stores, fallbackTel, fallbackName, onClose
     }
   })
 
-  const fallbackDisplayTel = fallbackTel?.trim() ?? ""
-  const fallbackEntry = storeEntries.length === 0 ? sanitizeTel(fallbackDisplayTel) : ""
-
   const handleCall = (tel: string) => {
     if (!tel) return
     window.location.href = `tel:${tel}`
@@ -38,35 +33,16 @@ export function PhoneDialCard({ open, stores, fallbackTel, fallbackName, onClose
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-[90%] max-w-md rounded-3xl bg-[#2F2E30] bg-opacity-90 p-4 text-center shadow-2xl space-y-4">
         {storeEntries.length === 0 ? (
-          fallbackEntry ? (
-            <div className="space-y-3">
-              <button
-                type="button"
-                className="w-full rounded-[22px] bg-[#24A3FF] py-3 text-base font-semibold text-white shadow transition hover:bg-[#1f8ede]"
-                onClick={() => handleCall(fallbackEntry)}
-              >
-                {fallbackDisplayTel} に発信
-              </button>
-              <button
-                type="button"
-                className="w-full rounded-[22px] bg-[#504f52] py-3 text-base font-semibold text-white/90 hover:bg-[#5c5b5f]"
-                onClick={onClose}
-              >
-                キャンセル
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-white text-sm">電話番号が見つかりませんでした</p>
-              <button
-                type="button"
-                className="w-full rounded-[22px] bg-[#504f52] py-3 text-base font-semibold text-white/90 hover:bg-[#5c5b5f]"
-                onClick={onClose}
-              >
-                閉じる
-              </button>
-            </div>
-          )
+          <div className="space-y-3">
+            <p className="text-white text-sm">電話番号が見つかりませんでした</p>
+            <button
+              type="button"
+              className="w-full rounded-[22px] bg-[#504f52] py-3 text-base font-semibold text-white/90 hover:bg-[#5c5b5f]"
+              onClick={onClose}
+            >
+              閉じる
+            </button>
+          </div>
         ) : (
           <div className="space-y-3">
             {storeEntries.map((store, idx) => (

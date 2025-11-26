@@ -63,7 +63,6 @@ export type RestaurantInfo = {
   distance: string
   rating: number
   caption?: string
-  tel?: string | null
   ownerLabel?: string | null
   ownerAvatarUrl?: string | null
   stores?: { name: string; tel: string | null }[]

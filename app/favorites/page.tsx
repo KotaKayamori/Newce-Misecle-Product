@@ -189,10 +189,13 @@ export default function FavoritesPage() {
             <LikedAlbumsSection
               albums={likedAlbums}
               loading={likedAlbumsLoading}
+              needLogin={needLogin}
               ownerProfiles={albumOwnerProfiles}
               bookmarkedAlbumSet={bookmarkedAlbumSet}
               onAlbumClick={openAlbumOverlay}
               onToggleBookmark={toggleAlbumBookmark}
+              onLoginRequest={() => router.push("/auth/login")}
+              onExploreAlbums={() => router.push("/search")}
             />
           </TabsContent>
 
@@ -201,9 +204,12 @@ export default function FavoritesPage() {
             <SavedAlbumsSection
               albums={savedAlbums}
               loading={savedAlbumsLoading}
+              needLogin={needLogin}
               ownerProfiles={albumOwnerProfiles}
               onAlbumClick={openAlbumOverlay}
               onToggleBookmark={toggleAlbumBookmark}
+              onLoginRequest={() => router.push("/auth/login")}
+              onExploreAlbums={() => router.push("/search")}
             />
           </TabsContent>
 

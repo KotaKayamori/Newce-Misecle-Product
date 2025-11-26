@@ -7,7 +7,6 @@ export type BasicVideo = {
   category?: string | null
   caption?: string | null
   store_info?: unknown
-  tel?: string | null
   store_1_name?: string | null
   store_1_tel?: string | null
   store_2_name?: string | null
@@ -42,19 +41,7 @@ export function mapVideoToRestaurant(video: BasicVideo | null | undefined) {
     normalizeOptionalText((video as any)?.captionText) ||
     normalizeOptionalText((video as any)?.influencer_comment)
 
-  const rawStoreInfo = (video as any)?.store_info ?? (video as any)?.storeInfo
-  let extractedTel: string | null = primaryStore?.tel || normalizeOptionalText((video as any)?.tel)
-  if (rawStoreInfo) {
-    const storeInfo = typeof rawStoreInfo === "string" ? safeParse(rawStoreInfo) : rawStoreInfo
-    if (storeInfo && typeof storeInfo === "object") {
-      const telCandidate =
-        normalizeOptionalText((storeInfo as any)?.tel) ||
-        normalizeOptionalText((storeInfo as any)?.telephone) ||
-        normalizeOptionalText((storeInfo as any)?.phone) ||
-        normalizeOptionalText((storeInfo as any)?.phoneNumber)
-      if (telCandidate) extractedTel = telCandidate
-    }
-  }
+  const extractedTel: string | null = primaryStore?.tel ?? null
   const ownerLabel =
     (video as any)?.owner_label ??
     (video as any)?.ownerLabel ??
@@ -69,19 +56,9 @@ export function mapVideoToRestaurant(video: BasicVideo | null | undefined) {
     distance: "—",
     rating: 0,
     caption,
-    tel: extractedTel,
     ownerLabel: ownerLabel ?? null,
     ownerAvatarUrl,
     stores: stores.length > 0 ? stores : undefined,
-  }
-}
-
-function safeParse(input: string) {
-  try {
-    return JSON.parse(input)
-  } catch (error) {
-    console.warn("Failed to parse store_info JSON", error)
-    return null
   }
 }
 

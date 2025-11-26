@@ -1,6 +1,6 @@
 "use client"
 
-import { Bookmark, RefreshCw } from "lucide-react"
+import { Play } from "lucide-react"
 import VideoCard from "@/components/VideoCard"
 import { FALLBACK_VIDEO_URL } from "@/lib/media"
 import { derivePosterUrl } from "@/app/favorites/utils"
@@ -30,14 +30,7 @@ export function SavedVideosSection({
   onVideoClick,
 }: SavedVideosSectionProps) {
   if (loading) {
-    return (
-      <div className="flex justify-center py-8">
-        <div className="text-gray-500 flex items-center gap-2">
-          <RefreshCw className="w-4 h-4 animate-spin" />
-          ブックマークを読み込み中...
-        </div>
-      </div>
-    )
+    return <div className="py-8 text-center text-gray-500">読み込み中…</div>
   }
 
   if (error) {
@@ -54,7 +47,7 @@ export function SavedVideosSection({
   if (needLogin) {
     return (
       <div className="text-center py-12">
-        <Bookmark className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <Play className="w-16 h-16 text-gray-300 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-gray-600 mb-2">ログインが必要です</h3>
         <p className="text-gray-500 mb-4">ログインして、保存した動画を見ましょう</p>
         <button
@@ -70,14 +63,14 @@ export function SavedVideosSection({
   if (videos.length === 0) {
     return (
       <div className="text-center py-12">
-        <Bookmark className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <Play className="w-16 h-16 text-gray-300 mx-auto mb-4" />
         <h3 className="text-lg font-semibold text-gray-600 mb-2">保存した動画がありません</h3>
         <p className="text-gray-500 mb-4">気になる動画を見つけてブックマークしましょう</p>
         <button
           onClick={onExploreVideos}
           className="bg-orange-600 text-white px-6 py-2 rounded-full hover:bg-orange-700 transition-colors"
         >
-          動画を探す
+          動画を見る
         </button>
       </div>
     )

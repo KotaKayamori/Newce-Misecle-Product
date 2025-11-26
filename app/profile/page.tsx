@@ -445,6 +445,10 @@ export default function ProfilePage() {
       <BugReportScreen
         onClose={() => setShowBugReportForm(false)}
         onSuccess={(type, message) => showEmailSuccessMessage(type, message)}
+        onShowFAQ={() => {
+          setShowBugReportForm(false)
+          setShowFAQ(true)
+        }}
       />
     )
   }
