@@ -47,14 +47,11 @@ export function PhoneDialCard({ open, stores, onClose }: PhoneDialCardProps) {
           <div className="space-y-3">
             {storeEntries.map((store, idx) => (
               <div key={store.key} className="rounded-2xl bg-white/95 px-4 py-3 text-left">
-                <p className="text-sm font-semibold text-gray-800 mb-2">
-                  店舗{idx + 1}
-                  <span className="ml-2 text-gray-700">{store.name}</span>
-                </p>
+                <p className="text-sm font-semibold text-gray-800 mb-2">{store.name}</p>
                 {store.sanitizedTel ? (
                   <button
                     type="button"
-                    className="w-full rounded-2xl bg-[#24A3FF] py-2 text-base font-semibold text-white shadow transition hover:bg-[#1f8ede]"
+                    className="w-full rounded-2xl bg-orange-600 py-2 text-base font-semibold text-white shadow transition hover:bg-orange-700"
                     onClick={() => handleCall(store.sanitizedTel)}
                   >
                     {store.displayTel} に発信
