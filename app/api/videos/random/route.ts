@@ -7,25 +7,6 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '10')
     const category = searchParams.get('category')
 
-    // let query = supabase
-    //   .from('videos')
-    //   .select(`
-    //     id,
-    //     title,
-    //     category,
-    //     public_url,
-    //     store_info,
-    //     influencer_comment,
-    //     created_at,
-    //     user_id,
-    //     user_profiles!inner (
-    //       id,
-    //       name,
-    //       username,
-    //       avatar_url
-    //     )
-    //   `)
-
     // カテゴリフィルタリング
     const categoryMap: Record<string, string> = {
       '今日のおすすめ': 'today_recommended',
@@ -49,11 +30,6 @@ export async function GET(request: NextRequest) {
     })
 
     const { data: videos, error } = await rpcQuery
-
-    // ランダムに取得（PostgreSQLのrandom()関数を使用）
-    // const { data: videos, error } = await query
-    //   .order('random()', { ascending: true })
-    //   .limit(limit)
 
     if (error) {
       console.error('Videos fetch error:', error)
@@ -82,42 +58,94 @@ export async function GET(request: NextRequest) {
     }
 
     // データ形式を整形
-    const formattedVideos = videos?.map((video) => {
-      const profileFromRpc = Array.isArray(video.user_profiles) ? video.user_profiles[0] : video.user_profiles
-      const ownerProfile =
-        ownerProfiles[video.owner_id as string] ?? profileFromRpc ?? null
+    interface UserProfile {
+      id?: string;
+      username?: string | null;
+      display_name?: string | null;
+      name?: string | null;
+      avatar_url?: string | null;
+    }
+
+    interface Video {
+      id: string;
+      owner_id?: string | null;
+      title: string;
+      categories: string[];
+      public_url?: string | null;
+      playback_url?: string | null;
+      caption?: string | null;
+      influencer_comment?: string | null;
+      store_info?: any;
+      store_1_name?: string | null;
+      store_1_tel?: string | null;
+      store_2_name?: string | null;
+      store_2_tel?: string | null;
+      store_3_name?: string | null;
+      store_3_tel?: string | null;
+      created_at: string;
+      user_profiles?: UserProfile[] | UserProfile | null;
+    }
+
+    interface FormattedVideo {
+      id: string;
+      owner_id: string | null;
+      title: string;
+      categories: string[];
+      public_url?: string | null;
+      playback_url?: string | null;
+      caption: string | null;
+      store_info: any;
+      store_1_name: string | null;
+      store_1_tel: string | null;
+      store_2_name: string | null;
+      store_2_tel: string | null;
+      store_3_name: string | null;
+      store_3_tel: string | null;
+      created_at: string;
+      user: {
+      id: string | null;
+      name: string | null;
+      username: string | null;
+      avatar_url: string | null;
+      };
+    }
+
+    const formattedVideos: FormattedVideo[] = (videos as Video[] | undefined)?.map((video: Video) => {
+      const profileFromRpc = Array.isArray(video.user_profiles) ? video.user_profiles[0] : video.user_profiles;
+      const ownerProfile: UserProfile | null =
+      ownerProfiles[video.owner_id as string] ?? profileFromRpc ?? null;
 
       return {
-        id: video.id,
-        owner_id: video.owner_id ?? null,
-        title: video.title,
-        category: video.category,
-        public_url: video.public_url ?? video.playback_url,
-        playback_url: video.playback_url ?? video.public_url,
-        caption: video.caption ?? video.influencer_comment ?? null,
-        store_info: video.store_info ?? null,
-        store_1_name: video.store_1_name ?? null,
-        store_1_tel: video.store_1_tel ?? null,
-        store_2_name: video.store_2_name ?? null,
-        store_2_tel: video.store_2_tel ?? null,
-        store_3_name: video.store_3_name ?? null,
-        store_3_tel: video.store_3_tel ?? null,
-        created_at: video.created_at,
-        user: ownerProfile
-          ? {
-              id: ownerProfile.id ?? video.owner_id ?? null,
-              name: ownerProfile.display_name ?? ownerProfile.name ?? null,
-              username: ownerProfile.username ?? null,
-              avatar_url: ownerProfile.avatar_url ?? null,
-            }
-          : {
-              id: video.owner_id ?? null,
-              name: null,
-              username: null,
-              avatar_url: null,
-            },
-      }
-    }) || []
+      id: video.id,
+      owner_id: video.owner_id ?? null,
+      title: video.title,
+      categories: video.categories ?? [],
+      public_url: video.public_url ?? video.playback_url,
+      playback_url: video.playback_url ?? video.public_url,
+      caption: video.caption ?? video.influencer_comment ?? null,
+      store_info: video.store_info ?? null,
+      store_1_name: video.store_1_name ?? null,
+      store_1_tel: video.store_1_tel ?? null,
+      store_2_name: video.store_2_name ?? null,
+      store_2_tel: video.store_2_tel ?? null,
+      store_3_name: video.store_3_name ?? null,
+      store_3_tel: video.store_3_tel ?? null,
+      created_at: video.created_at,
+      user: ownerProfile
+        ? {
+          id: ownerProfile.id ?? video.owner_id ?? null,
+          name: ownerProfile.display_name ?? ownerProfile.name ?? null,
+          username: ownerProfile.username ?? null,
+          avatar_url: ownerProfile.avatar_url ?? null,
+        }
+        : {
+          id: video.owner_id ?? null,
+          name: null,
+          username: null,
+          avatar_url: null,
+        },
+      };
+    }) || [];
 
     return NextResponse.json({ 
       videos: formattedVideos,

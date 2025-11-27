@@ -12,7 +12,7 @@ interface BookmarkedVideo {
   videos: {
     id: string
     title: string
-    category: string
+    categories: string[]
     playback_url: string
     caption: string
     created_at: string
@@ -216,7 +216,7 @@ export default function BookmarksPage() {
                           const restaurantData = {
                             id: video.id,
                             restaurantName: video.title || '店舗名',
-                            genre: video.category || '和食',
+                            genre: video.categories[0] || '和食',
                             distance: "0.5km",
                             rating: 4.5,
                             restaurantEmail: 'info@restaurant.jp'
@@ -234,7 +234,7 @@ export default function BookmarksPage() {
                           const restaurantData = {
                             id: video.id,
                             restaurantName: video.title || '店舗名',
-                            genre: video.category || '和食',
+                            genre: video.categories[0] || '和食',
                             distance: "0.5km",
                             rating: 4.5,
                             restaurantEmail: 'info@restaurant.jp'

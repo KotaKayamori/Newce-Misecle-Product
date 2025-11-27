@@ -93,7 +93,7 @@ export default function SearchPage() {
   const [selectedUser, setSelectedUser] = useState<
     | {
         id: string
-        name: string | null
+        name: string
         avatar?: string | null
         isFollowing?: boolean
       }
@@ -216,7 +216,7 @@ export default function SearchPage() {
 
     if (video.user?.id) {
       setOwnerProfiles((prev) => {
-        const existing = prev[video.user!.id]
+        const existing = prev[video.user!.id!]
         const nextProfile = {
           username: video.user?.username,
           display_name: video.user?.name,
@@ -230,7 +230,7 @@ export default function SearchPage() {
         ) {
           return prev
         }
-        return { ...prev, [video.user!.id]: nextProfile }
+        return { ...prev, [video.user!.id!]: nextProfile }
       })
     }
 
@@ -361,7 +361,7 @@ export default function SearchPage() {
 
   const handleRefreshAlbums = albums.refreshAlbums
 
-  const handleOpenUserProfile = (user: { id: string; name: string | null; avatar?: string | null; isFollowing: boolean }) => {
+  const handleOpenUserProfile = (user: { id: string; name: string; avatar?: string | null; isFollowing: boolean }) => {
     setSelectedUser({
       id: user.id,
       name: user.name ?? "ゲスト",
