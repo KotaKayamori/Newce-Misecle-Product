@@ -30,6 +30,9 @@ export function CategoryVideosSection({
 }: CategoryVideosSectionProps) {
   if (!visible) return null
 
+  const hasVideos = videos.length > 0
+  const showInitialLoading = loading && !hasVideos
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -51,7 +54,7 @@ export function CategoryVideosSection({
         <div className="text-sm text-red-500">{error}</div>
       )}
 
-      {!loading && videos.length > 0 && (
+      {hasVideos && (
         <div className="grid grid-cols-2 gap-3">
           {videos.map((video) => {
             const user = video.user ?? {}
@@ -77,13 +80,13 @@ export function CategoryVideosSection({
         </div>
       )}
 
-      {loading && (
+      {showInitialLoading && (
         <div className="flex justify-center py-8">
           <div className="text-gray-500">動画を読み込み中...</div>
         </div>
       )}
 
-      {!loading && videos.length === 0 && !error && (
+      {!loading && !error && !hasVideos && (
         <div className="flex flex-col items-center py-12 text-gray-500">
           現在表示できる動画がありません
         </div>
