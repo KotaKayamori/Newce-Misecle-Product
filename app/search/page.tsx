@@ -495,7 +495,6 @@ export default function SearchPage() {
         onPopularKeywordsRefresh={handlePopularKeywordsRefresh}
         onKeywordSelect={handleKeywordSelect}
       />
-    
 
       {/* User Profile Modal */}
       <UserProfileModal

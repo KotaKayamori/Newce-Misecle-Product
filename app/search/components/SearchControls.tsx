@@ -2,7 +2,6 @@
 
 import { SearchHeader } from "./SearchHeader"
 import { CategoryTabs } from "./CategoryTabs"
-import { SearchHistory } from "./SearchHistory"
 
 interface SearchControlsProps {
   isSearchMode: boolean
@@ -61,14 +60,6 @@ export function SearchControls({
         selectedCategory={selectedCategory}
         onSelectCategory={onSelectCategory}
         isSearchMode={isSearchMode}
-      />
-
-      <SearchHistory
-        isSearchMode={isSearchMode}
-        popularKeywordsSet={popularKeywordsSet}
-        popularKeywordsSets={popularKeywordsSets}
-        onPopularKeywordsRefresh={onPopularKeywordsRefresh}
-        onKeywordSelect={onKeywordSelect}
       />
     </div>
   )

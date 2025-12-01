@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search } from "lucide-react"
@@ -41,9 +42,21 @@ export function SearchHeader({
       onSearchModeChange(false)
     }
   }
+
+  // ★ クライアント側だけでランダムセットに差し替えるためのローカル state
+  const [displaySetIndex, setDisplaySetIndex] = useState(popularKeywordsSet)
+
+  useEffect(() => {
+    // マウント後に一度だけランダム選択
+    if (popularKeywordsSets.length > 0) {
+      const randomIndex = Math.floor(Math.random() * popularKeywordsSets.length)
+      setDisplaySetIndex(randomIndex)
+    }
+  }, [popularKeywordsSets.length])
+
   return (
     <div className="bg-white px-6 py-4">
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 mb-3">
         <div className="flex-1" onClick={() => onSearchModeChange(true)}>
           <div className="relative rounded-full border border-black p-[3px]">
             <div className="relative">
@@ -67,6 +80,23 @@ export function SearchHeader({
         >
           検索
         </Button>
+      </div>
+
+      {/* 検索バー直下の人気キーワード */}
+      <div className="mt-1">
+        <div className="flex flex-wrap gap-2">
+          {popularKeywordsSets[displaySetIndex]?.map((keyword) => (
+            <button
+              key={keyword}
+              type="button"
+              onClick={() => onKeywordSelect(keyword)}
+              className="px-3 py-1 text-xs rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-1.5"
+            >
+              <Search className="w-3 h-3 text-gray-500" />
+              <span>{keyword}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {isSearchMode && (
