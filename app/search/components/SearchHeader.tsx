@@ -83,17 +83,17 @@ export function SearchHeader({
       </div>
 
       {/* 検索バー直下の人気キーワード */}
-      <div className="mt-1">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+      <div className="mt-1 -mx-6">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide px-6">
           <div className="flex gap-2 whitespace-nowrap">
             {popularKeywordsSets[displaySetIndex]?.map((keyword) => (
               <button
                 key={keyword}
                 type="button"
                 onClick={() => onKeywordSelect(keyword)}
-                className="px-4 py-1.5 text-sm rounded-full border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 flex items-center gap-2 flex-shrink-0"
+                className="px-4 py-1.5 text-sm rounded-full border border-black bg-white text-black hover:bg-gray-50 flex items-center gap-2 flex-shrink-0"
               >
-                <Search className="w-4 h-4 text-gray-500" />
+                <Search className="w-4 h-4 text-black" />
                 <span>{keyword}</span>
               </button>
             ))}
