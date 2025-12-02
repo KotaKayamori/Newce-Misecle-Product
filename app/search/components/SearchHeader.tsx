@@ -15,8 +15,7 @@ interface SearchHeaderProps {
   onSearchSubmit: () => void
   onSearchModeChange: (mode: boolean) => void
   onClearSearch: () => void
-  popularKeywordsSet: number
-  popularKeywordsSets: string[][]
+  popularKeywordsSets: string[]
   onPopularKeywordsRefresh: () => void
   onKeywordSelect: (keyword: string) => void
 }
@@ -30,7 +29,6 @@ export function SearchHeader({
   onSearchSubmit,
   onSearchModeChange,
   onClearSearch,
-  popularKeywordsSet,
   popularKeywordsSets,
   onPopularKeywordsRefresh,
   onKeywordSelect,
@@ -42,17 +40,6 @@ export function SearchHeader({
       onSearchModeChange(false)
     }
   }
-
-  // ★ クライアント側だけでランダムセットに差し替えるためのローカル state
-  const [displaySetIndex, setDisplaySetIndex] = useState(popularKeywordsSet)
-
-  useEffect(() => {
-    // マウント後に一度だけランダム選択
-    if (popularKeywordsSets.length > 0) {
-      const randomIndex = Math.floor(Math.random() * popularKeywordsSets.length)
-      setDisplaySetIndex(randomIndex)
-    }
-  }, [popularKeywordsSets.length])
 
   return (
     <div className="bg-white px-6 py-4">
@@ -86,12 +73,12 @@ export function SearchHeader({
       <div className="mt-1 -mx-6">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide px-3">
           <div className="flex gap-2 whitespace-nowrap">
-            {popularKeywordsSets[displaySetIndex]?.map((keyword) => (
+            {popularKeywordsSets?.map((keyword) => (
               <button
                 key={keyword}
                 type="button"
                 onClick={() => onKeywordSelect(keyword)}
-                className="px-3 py-1.5 text-sm rounded-full border border-gray-300 bg-white text-black hover:bg-gray-50 flex items-center gap-1.5 flex-shrink-0"
+                className="px-2 py-1.5 text-xs rounded-full border border-gray-300 bg-white text-black hover:bg-gray-50 flex items-center gap-1 flex-shrink-0"
               >
                 <Search className="w-4 h-4 text-gray-400" />
                 <span>{keyword}</span>
@@ -104,7 +91,7 @@ export function SearchHeader({
       {isSearchMode && (
         <>
           <div className="fixed inset-0 bg-black/40 z-40" onClick={handleCloseModal} />
-          <div className="fixed inset-x-0 top-0 h-1/2 bg-white z-50 rounded-b-3xl shadow-xl p-6 flex flex-col gap-4">
+          <div className="fixed inset-x-0 top-0 h-2/3 bg-white z-50 rounded-b-3xl shadow-xl p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">検索</h2>
               <Button variant="ghost" onClick={handleCloseModal} className="text-black">
@@ -138,7 +125,6 @@ export function SearchHeader({
             <div className="flex-1 overflow-y-auto">
               <SearchHistory
                 isSearchMode
-                popularKeywordsSet={popularKeywordsSet}
                 popularKeywordsSets={popularKeywordsSets}
                 onPopularKeywordsRefresh={onPopularKeywordsRefresh}
                 onKeywordSelect={(keyword) => {

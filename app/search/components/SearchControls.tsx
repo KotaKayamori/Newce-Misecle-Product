@@ -10,8 +10,7 @@ interface SearchControlsProps {
   searchLoading: boolean
   categories: string[]
   selectedCategory: string
-  popularKeywordsSet: number
-  popularKeywordsSets: string[][]
+  popularKeywordsSets: string[]
   onSearchChange: (value: string) => void
   onSearchSubmit: () => void
   onSearchModeChange: (mode: boolean) => void
@@ -28,7 +27,6 @@ export function SearchControls({
   searchLoading,
   categories,
   selectedCategory,
-  popularKeywordsSet,
   popularKeywordsSets,
   onSearchChange,
   onSearchSubmit,
@@ -49,7 +47,6 @@ export function SearchControls({
         onSearchSubmit={onSearchSubmit}
         onSearchModeChange={onSearchModeChange}
         onClearSearch={onClearSearch}
-        popularKeywordsSet={popularKeywordsSet}
         popularKeywordsSets={popularKeywordsSets}
         onPopularKeywordsRefresh={onPopularKeywordsRefresh}
         onKeywordSelect={onKeywordSelect}
