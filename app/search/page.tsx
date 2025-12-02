@@ -87,8 +87,6 @@ export default function SearchPage() {
   
   // Albums hook
   const albums = useAlbums(isGuidebookCategory)
-  // const [showVideoFeed, setShowVideoFeed] = useState(false)
-  // const [selectedVideoIndex, setSelectedVideoIndex] = useState(0)
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<
     | {
@@ -99,23 +97,56 @@ export default function SearchPage() {
       }
     | null
   >(null)
-  const [popularKeywordsSet, setPopularKeywordsSet] = useState(0)
-  const popularKeywordsSets = [
-    ["和食", "イタリアン", "焼肉", "寿司", "ラーメン"],
-    ["カフェ", "居酒屋", "フレンチ", "中華", "韓国料理"],
-    ["パスタ", "ピザ", "うどん", "そば", "天ぷら"],
-    ["ハンバーガー", "タイ料理", "インド料理", "スペイン料理", "メキシコ料理"],
-    ["ステーキ", "しゃぶしゃぶ", "お好み焼き", "たこ焼き", "串カツ"],
+  const allPopularKeywords = [
+    "和食", "イタリアン", "焼肉", "寿司", "ラーメン",
+    "カフェ", "居酒屋", "フレンチ", "中華", "韓国料理",
+    "パスタ", "ピザ", "うどん", "そば", "天ぷら",
+    "ハンバーガー", "インド料理", "スペイン料理", "カレー",
+    "ステーキ", "しゃぶしゃぶ", "お好み焼き", "たこ焼き", "串カツ",
+    "ビュッフェ", "バイキング", "スイーツ", "パンケーキ", "テイクアウト",
+    "バー", "ワイン", "日本酒", "クラフトビール", "ヴィーガン",
+    "個室", "食べ放題", "ランチ", "ディナー",
   ]
 
+  // ★ ランダムで選んだ10個の index を保持
+  const [popularKeywordIndexes, setPopularKeywordIndexes] = useState<number[]>([])
+
+  // 初回マウント時にランダム10個を選ぶ
+  useEffect(() => {
+    if (allPopularKeywords.length === 0) return
+    const shuffled = [...allPopularKeywords.keys()]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 10)
+    setPopularKeywordIndexes(shuffled)
+  }, []) // 初回のみ
+
+  // UI で使う 10 個だけを算出
+  const popularKeywordsForUi = useMemo(
+    () => popularKeywordIndexes.map((i) => allPopularKeywords[i]),
+    [popularKeywordIndexes, allPopularKeywords],
+  )
+
   const handlePopularKeywordsRefresh = () => {
-    setPopularKeywordsSet((prev) => (prev + 1) % popularKeywordsSets.length)
+    if (allPopularKeywords.length === 0) return
+    const shuffled = [...allPopularKeywords.keys()]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 10)
+    setPopularKeywordIndexes(shuffled)
   }
 
   const handleKeywordSelect = async (keyword: string) => {
     setSearchTerm(keyword)
     setIsSearchMode(false)
     await search.performSearch(keyword)
+  }
+
+  // タブ切り替え時に検索結果をクリアするハンドラ
+  const handleSelectCategory = (category: string) => {
+    setSelectedCategory(category)
+    // 検索状態をクリア
+    setSearchTerm("")
+    setIsSearchMode(false)
+    search.clearSearch()
   }
 
   const [showReservationModal, setShowReservationModal] = useState(false)
@@ -485,17 +516,15 @@ export default function SearchPage() {
         searchLoading={search.searchLoading}
         categories={categoryTabs}
         selectedCategory={selectedCategory}
-        popularKeywordsSet={popularKeywordsSet}
-        popularKeywordsSets={popularKeywordsSets}
+        popularKeywordsSets={popularKeywordsForUi}
         onSearchChange={setSearchTerm}
         onSearchSubmit={handleSearchSubmit}
         onSearchModeChange={setIsSearchMode}
         onClearSearch={handleClearSearch}
-        onSelectCategory={setSelectedCategory}
+        onSelectCategory={handleSelectCategory}
         onPopularKeywordsRefresh={handlePopularKeywordsRefresh}
         onKeywordSelect={handleKeywordSelect}
       />
-    
 
       {/* User Profile Modal */}
       <UserProfileModal

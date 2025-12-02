@@ -2,7 +2,6 @@
 
 import { SearchHeader } from "./SearchHeader"
 import { CategoryTabs } from "./CategoryTabs"
-import { SearchHistory } from "./SearchHistory"
 
 interface SearchControlsProps {
   isSearchMode: boolean
@@ -11,8 +10,7 @@ interface SearchControlsProps {
   searchLoading: boolean
   categories: string[]
   selectedCategory: string
-  popularKeywordsSet: number
-  popularKeywordsSets: string[][]
+  popularKeywordsSets: string[]
   onSearchChange: (value: string) => void
   onSearchSubmit: () => void
   onSearchModeChange: (mode: boolean) => void
@@ -29,7 +27,6 @@ export function SearchControls({
   searchLoading,
   categories,
   selectedCategory,
-  popularKeywordsSet,
   popularKeywordsSets,
   onSearchChange,
   onSearchSubmit,
@@ -50,7 +47,6 @@ export function SearchControls({
         onSearchSubmit={onSearchSubmit}
         onSearchModeChange={onSearchModeChange}
         onClearSearch={onClearSearch}
-        popularKeywordsSet={popularKeywordsSet}
         popularKeywordsSets={popularKeywordsSets}
         onPopularKeywordsRefresh={onPopularKeywordsRefresh}
         onKeywordSelect={onKeywordSelect}
@@ -61,14 +57,6 @@ export function SearchControls({
         selectedCategory={selectedCategory}
         onSelectCategory={onSelectCategory}
         isSearchMode={isSearchMode}
-      />
-
-      <SearchHistory
-        isSearchMode={isSearchMode}
-        popularKeywordsSet={popularKeywordsSet}
-        popularKeywordsSets={popularKeywordsSets}
-        onPopularKeywordsRefresh={onPopularKeywordsRefresh}
-        onKeywordSelect={onKeywordSelect}
       />
     </div>
   )
