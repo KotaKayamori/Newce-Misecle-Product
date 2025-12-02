@@ -6,7 +6,7 @@ type Body = {
   publicUrl?: string
   title?: string
   caption?: string
-  categories?: string[] // 変更: category -> categories(string[])
+  categories?: string[]
   stores?: { name?: string | null; tel?: string | null }[]
 }
 

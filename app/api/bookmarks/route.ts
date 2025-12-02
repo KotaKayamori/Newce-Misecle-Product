@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
         videos: {
           id: video?.id,
           title: video?.title || '無題の動画',
-          categories: video?.categories ?? [],
+          categories: video?.categories || [],
           playback_url: video?.playback_url,
           caption: video?.caption,
           created_at: video?.created_at,

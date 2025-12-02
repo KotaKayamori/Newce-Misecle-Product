@@ -29,9 +29,9 @@ export default function ReservationsPage() {
             <TabsContent value="current" className="mt-4">
               <div className="text-center py-12 px-6">
                 <p className="text-gray-600 text-base leading-relaxed">
-                  予約機能は準備中です。
+                  現在は、電話予約のみ対応中です。
                   <br />
-                  店舗準備が整い次第、随時予約機能を開放予定です。
+                  店舗準備が整い次第、随時ネット予約機能を開放予定です。
                 </p>
               </div>
             </TabsContent>
@@ -39,9 +39,9 @@ export default function ReservationsPage() {
             <TabsContent value="past" className="mt-4">
               <div className="text-center py-12 px-6">
                 <p className="text-gray-600 text-base leading-relaxed">
-                  予約機能は準備中です。
+                  現在は、電話予約のみ対応中です。
                   <br />
-                  店舗準備が整い次第、随時予約機能を開放予定です。
+                  店舗準備が整い次第、随時ネット予約機能を開放予定です。
                 </p>
               </div>
             </TabsContent>

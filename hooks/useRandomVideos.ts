@@ -6,7 +6,6 @@ export interface VideoData {
   id: string
   owner_id?: string | null
   title: string
-  category: string | null
   categories?: string[] | null
   public_url: string
   caption?: string | null
