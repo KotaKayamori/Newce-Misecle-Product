@@ -47,10 +47,10 @@ type SupabaseVideoRow = {
 }
 
 const CATEGORY_SLUG_MAP: Record<string, string> = {
-  "今日のおすすめ": "today_recommended",
-  "今人気のお店": "popular_now",
+  "あなたにおすすめ": "today_recommended",
+  "人気急上昇中のお店": "popular_now",
   "SNSで人気のお店": "sns_popular",
-  "Z世代に人気のお店": "gen_z_popular",
+  "若年層に人気のお店": "gen_z_popular",
   "デートにおすすめ": "date_recommended",
   "デートにおすすめのお店": "date_recommended",
 }
@@ -73,15 +73,15 @@ export default function SearchPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [_expandedCategory, _setExpandedCategory] = useState<string | null>(null) // TODO: 未使用
   const categoryTabs = [
-    "今日のおすすめ",
-    "今人気のお店",
+    "あなたにおすすめ",
+    "人気急上昇中のお店",
     "SNSで人気のお店",
-    "Z世代に人気のお店",
+    "若年層に人気のお店",
     "デートにおすすめのお店",
     "最新動画",
     "ガイドブック",
   ]
-  const [selectedCategory, setSelectedCategory] = useState("今日のおすすめ")
+  const [selectedCategory, setSelectedCategory] = useState("あなたにおすすめ")
   const isLatestCategory = selectedCategory === "最新動画"
   const isGuidebookCategory = selectedCategory === "ガイドブック"
   
@@ -386,7 +386,7 @@ export default function SearchPage() {
 
   const handleRefreshVideos = () => {
     if (isLatestCategory || isGuidebookCategory) return
-    const categorySlug = selectedCategory === "今日のおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
     refreshVideos(categorySlug, 10)
   }
 
@@ -406,7 +406,7 @@ export default function SearchPage() {
 
   useEffect(() => {
     if (selectedCategory === "最新動画" || selectedCategory === "ガイドブック") return
-    const categorySlug = selectedCategory === "今日のおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
     fetchVideos(categorySlug, 10)
   }, [selectedCategory, fetchVideos])
 

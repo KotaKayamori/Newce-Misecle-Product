@@ -9,10 +9,10 @@ export async function GET(request: NextRequest) {
 
     // カテゴリフィルタリング
     const categoryMap: Record<string, string> = {
-      '今日のおすすめ': 'today_recommended',
-      '今人気のお店': 'popular_now',
+      'あなたにおすすめ': 'today_recommended',
+      '人気急上昇中のお店': 'popular_now',
       'SNSで人気のお店': 'sns_pupular',
-      'Z世代に人気のお店': 'gen_z_popular',
+      '若年層に人気のお店': 'gen_z_popular',
       'デートにおすすめのお店': 'date_recommended'
     }
     const knownSlugs = new Set(Object.values(categoryMap))
