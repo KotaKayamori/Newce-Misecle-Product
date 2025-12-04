@@ -4,15 +4,13 @@ import { X } from "lucide-react"
 
 interface SearchHistoryProps {
   isSearchMode: boolean
-  popularKeywordsSet: number
-  popularKeywordsSets: string[][]
+  popularKeywordsSets: string[]
   onPopularKeywordsRefresh: () => void
   onKeywordSelect: (keyword: string) => void
 }
 
 export function SearchHistory({
   isSearchMode,
-  popularKeywordsSet,
   popularKeywordsSets,
   onPopularKeywordsRefresh,
   onKeywordSelect,
@@ -64,7 +62,7 @@ export function SearchHistory({
             </button>
           </div>
           <div className="flex flex-wrap gap-2 bg-white">
-            {popularKeywordsSets[popularKeywordsSet].map((genre, index) => (
+            {popularKeywordsSets.map((genre, index) => (
               <button
                 key={index}
                 onClick={() => onKeywordSelect(genre)}

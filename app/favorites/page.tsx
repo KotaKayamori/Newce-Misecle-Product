@@ -255,8 +255,10 @@ export default function FavoritesPage() {
           assets={albumFsAssets}
           index={albumFsIndex}
           onClose={() => setAlbumFsOpen(false)}
-          onPrev={() => setAlbumFsIndex((i) => Math.max(0, i - 1))}
-          onNext={() => setAlbumFsIndex((i) => Math.min(albumFsAssets.length - 1, i + 1))}
+          onIndexChange={(nextIndex) => {
+            const clamped = Math.max(0, Math.min(nextIndex, albumFsAssets.length - 1))
+            setAlbumFsIndex(clamped)
+          }}
           title={albumFsTitle}
           ownerAvatarUrl={albumFsOwnerAvatar}
           ownerLabel={albumFsOwnerLabel ?? undefined}

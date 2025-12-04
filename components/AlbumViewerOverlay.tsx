@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react"
 import { Heart, Bookmark, Send } from "lucide-react"
+import { ImageCarousel } from "./ImageCarousel"
 
 export type AlbumAsset = { id: string; url: string; order: number; width?: number | null; height?: number | null }
 
@@ -11,8 +12,7 @@ interface AlbumViewerOverlayProps {
   index: number
   loading?: boolean
   onClose: () => void
-  onPrev: () => void
-  onNext: () => void
+  onIndexChange: (nextIndex: number) => void
   // Optional meta
   title?: string | null
   ownerAvatarUrl?: string | null
@@ -34,8 +34,7 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
     index,
     loading = false,
     onClose,
-    onPrev,
-    onNext,
+    onIndexChange,
     title,
     ownerAvatarUrl,
     ownerLabel,
@@ -56,33 +55,18 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
   const [likeCountInternal, setLikeCountInternal] = useState<number>(likeCount ?? 0)
   const [bookmarkedInternal, setBookmarkedInternal] = useState(Boolean(bookmarked))
   const currentUrl = useMemo(() => assets?.[index]?.url || "", [assets, index])
+  const totalAssets = assets?.length ?? 0
+  const canPrev = index > 0
+  const canNext = index < totalAssets - 1
 
-  // Swipe handling for image navigation
-  const [touchStartX, setTouchStartX] = useState<number | null>(null)
-  const [touchDeltaX, setTouchDeltaX] = useState<number>(0)
-  const swipeThreshold = 50
-
-  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (!hasAssets) return
-    const t = e.touches[0]
-    setTouchStartX(t.clientX)
-    setTouchDeltaX(0)
+  const handlePrev = () => {
+    if (!canPrev) return
+    onIndexChange(index - 1)
   }
 
-  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (touchStartX == null) return
-    const t = e.touches[0]
-    setTouchDeltaX(t.clientX - touchStartX)
-  }
-
-  const handleTouchEnd = () => {
-    if (touchStartX == null) return
-    const dx = touchDeltaX
-    setTouchStartX(null)
-    setTouchDeltaX(0)
-    if (Math.abs(dx) < swipeThreshold) return
-    if (dx < 0) onNext()
-    else onPrev()
+  const handleNext = () => {
+    if (!canNext) return
+    onIndexChange(index + 1)
   }
 
   return (
@@ -100,30 +84,28 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
       ) : !hasAssets ? (
         <div className="flex h-full w-full items-center justify-center text-sm text-white/70">このアルバムには写真がありません。</div>
       ) : (
-        <div
-          className="absolute inset-0 flex items-center justify-center pb-32 pt-12"
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          <div className="relative">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={assets[index]?.url}
-              alt={`asset-${assets[index]?.id}`}
-              className="max-h-[85vh] w-full max-w-[100vw] object-contain"
+        <div className="absolute inset-0 flex items-center justify-center pb-32 pt-12">
+          <div className="relative flex items-center justify-center">
+            <ImageCarousel
+              images={assets.map((asset) => asset.url)}
+              currentIndex={index}
+              onIndexChange={onIndexChange}
+              showControls={false}
+              fit="contain"
+              className="w-screen max-w-[100vw] max-h-[85vh]"
+              imageClassName="max-h-[85vh]"
             />
             <span className="absolute right-0 top-0 rounded-full bg-black/70 px-2 py-1 text-xs font-medium text-white">
               {index + 1} / {assets.length}
             </span>
-            {/* Page indicator dots directly under image */}
             {assets.length > 1 && (
               <div className="absolute -bottom-8 left-0 right-0 flex items-center justify-center gap-3">
                 <button
                   type="button"
-                  onClick={onPrev}
+                  onClick={handlePrev}
+                  disabled={!canPrev}
                   aria-label="前へ"
-                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-black/50 text-white hover:bg-black/70"
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-30"
                 >
                   ‹
                 </button>
@@ -134,9 +116,10 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
                 </div>
                 <button
                   type="button"
-                  onClick={onNext}
+                  onClick={handleNext}
+                  disabled={!canNext}
                   aria-label="次へ"
-                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-black/50 text-white hover:bg-black/70"
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-30"
                 >
                   ›
                 </button>
@@ -280,5 +263,3 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
     </div>
   )
 }
-
-
