@@ -91,7 +91,7 @@ export function SearchHeader({
       {isSearchMode && (
         <>
           <div className="fixed inset-0 bg-black/40 z-40" onClick={handleCloseModal} />
-          <div className="fixed inset-x-0 top-0 h-2/3 bg-white z-50 rounded-b-3xl shadow-xl p-6 flex flex-col gap-4">
+          <div className="fixed inset-x-0 top-0 h-full bg-white z-50 rounded-b-3xl shadow-xl p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">検索</h2>
               <Button variant="ghost" onClick={handleCloseModal} className="text-black">
