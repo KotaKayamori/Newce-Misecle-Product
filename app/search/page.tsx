@@ -508,7 +508,7 @@ export default function SearchPage() {
     : (selectedOwnerProfile?.display_name || "ユーザー");
 
   return (
-   <div className="min-h-screen bg-white pb-20 overflow-y-auto scrollbar-hide">
+   <div className="min-h-screen bg-white pb-20 scrollbar-hide">
       <SearchControls
         isSearchMode={isSearchMode}
         didSearch={search.didSearch}
@@ -658,47 +658,23 @@ export default function SearchPage() {
 
       {/* Album Viewer Modal */}
       <><AlbumViewerOverlay
-    open={Boolean(albums.openAlbumId)}
-    assets={albums.albumAssets}
-    index={albums.albumIndex}
-    loading={albums.albumLoading}
-    onClose={albums.closeAlbum}
-    onPrev={() => albums.setAlbumIndex((i: number) => Math.max(0, i - 1))}
-    onNext={() => albums.setAlbumIndex((i: number) => Math.min(albums.albumAssets.length - 1, i + 1))}
-    title={albums.albums.find((a) => a.id === albums.openAlbumId)?.title || albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
-    ownerAvatarUrl={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.avatarUrl ?? null}
-    ownerLabel={(() => { const a = albums.albums.find((x) => x.id === albums.openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
-    description={albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
-    liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
-    onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
-    bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
-    onToggleBookmark={() => { if (albums.openAlbumId) albums.toggleAlbumBookmark(albums.openAlbumId) } } />
-    <Navigation />
-    </>
+      open={Boolean(albums.openAlbumId)}
+      assets={albums.albumAssets}
+      index={albums.albumIndex}
+      loading={albums.albumLoading}
+      onClose={albums.closeAlbum}
+      onPrev={() => albums.setAlbumIndex((i: number) => Math.max(0, i - 1))}
+      onNext={() => albums.setAlbumIndex((i: number) => Math.min(albums.albumAssets.length - 1, i + 1))}
+      title={albums.albums.find((a) => a.id === albums.openAlbumId)?.title || albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
+      ownerAvatarUrl={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.avatarUrl ?? null}
+      ownerLabel={(() => { const a = albums.albums.find((x) => x.id === albums.openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
+      description={albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
+      liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
+      onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
+      bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
+      onToggleBookmark={() => { if (albums.openAlbumId) albums.toggleAlbumBookmark(albums.openAlbumId) } } />
+      <Navigation />
+      </>
    </div>
   )
 }
-
-// function SpeakerIcon({ muted }: { muted: boolean }) {
-//   return (
-//     <svg
-//       width="24"
-//       height="24"
-//       viewBox="0 0 24 24"
-//       fill="none"
-//       stroke="currentColor"
-//       strokeWidth="1.8"
-//       strokeLinecap="round"
-//       strokeLinejoin="round"
-//     >
-//       <path d="M4.5 9.5v5h3.2L12 20V4l-4.3 5.5H4.5z" fill="currentColor" stroke="currentColor" />
-//       {!muted && (
-//         <>
-//           <path d="M15.2 9.2a3.3 3.3 0 010 5.6" />
-//           <path d="M17.4 7a5.6 5.6 0 010 10" />
-//         </>
-//       )}
-//       {muted && <line x1="16.2" y1="8" x2="21" y2="16" />}
-//     </svg>
-//   )
-// }
