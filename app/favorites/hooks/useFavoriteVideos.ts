@@ -242,7 +242,9 @@ export function useFavoriteVideos() {
             videos: {
               id: video.id,
               title: (video.title ?? "").toString(),
-              category: ((video as any).category ?? "").toString(),
+              categories: Array.isArray((video as any).categories)
+                ? (video as any).categories
+                : ((video as any).category ? [(video as any).category] : []),
               playback_url: video.playback_url ?? FALLBACK_VIDEO_URL,
               caption: (video.caption ?? "").toString(),
               created_at: video.created_at ?? new Date().toISOString(),

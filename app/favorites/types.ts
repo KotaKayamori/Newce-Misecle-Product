@@ -11,7 +11,7 @@ export interface FavoriteVideo {
 export interface BookmarkedVideo {
   id: string
   created_at: string
-  videos: FavoriteVideo & { category?: string | null }
+  videos: FavoriteVideo & { categories?: string[] | null }
 }
 
 export interface AlbumRow {

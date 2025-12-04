@@ -10,6 +10,7 @@ export function useAlbums(isActive: boolean) {
   const [albums, setAlbums] = useState<AlbumItem[]>([])
   const [albumsLoading, setAlbumsLoading] = useState(false)
   const [albumsError, setAlbumsError] = useState<string | null>(null)
+  const [albumAssetsMap, setAlbumAssetsMap] = useState<Record<string, AssetItem[]>>({})
   
   // Album like/bookmark state
   const [albumLikedSet, setAlbumLikedSet] = useState<Set<string>>(new Set())
@@ -21,20 +22,59 @@ export function useAlbums(isActive: boolean) {
   const [albumIndex, setAlbumIndex] = useState(0)
   const [albumLoading, setAlbumLoading] = useState(false)
 
+  const fetchAlbumList = async () => {
+    const res = await fetch('/api/guidebook/albums?random=10', { cache: 'no-store' })
+    if (!res.ok) throw new Error('アルバムの取得に失敗しました')
+    const json = await res.json().catch(() => ({}))
+    return Array.isArray(json?.items) ? json.items : []
+  }
+
+  const fetchAlbumAssets = async (albumId: string): Promise<AssetItem[]> => {
+    const res = await fetch(`/api/guidebook/albums/${albumId}/assets`, { cache: 'no-store' })
+    if (!res.ok) throw new Error('アルバムの取得に失敗しました')
+    const json = await res.json().catch(() => ({}))
+    return json?.items ?? []
+  }
+
+  const prefetchAlbumAssets = async (albumList: AlbumItem[], isCancelled?: () => boolean) => {
+    if (!albumList || albumList.length === 0) {
+      setAlbumAssetsMap({})
+      return
+    }
+    const entries = await Promise.all(
+      albumList.map(async (album) => {
+        try {
+          const items = await fetchAlbumAssets(album.id)
+          return [album.id, items] as const
+        } catch {
+          return [album.id, []] as const
+        }
+      })
+    )
+    if (isCancelled?.()) return
+    setAlbumAssetsMap(() => {
+      const next: Record<string, AssetItem[]> = {}
+      entries.forEach(([id, assets]) => {
+        next[id] = assets
+      })
+      return next
+    })
+  }
+
   // Fetch guidebook albums when tab is active
   useEffect(() => {
     if (!isActive) return
     
     let aborted = false
+    let cancelled = false
     ;(async () => {
       try {
         setAlbumsLoading(true)
         setAlbumsError(null)
-        const res = await fetch('/api/guidebook/albums?random=10', { cache: 'no-store' })
-        if (!res.ok) throw new Error('アルバムの取得に失敗しました')
-        const json = await res.json().catch(() => ({}))
+        const items = await fetchAlbumList()
         if (aborted) return
-        setAlbums(Array.isArray(json?.items) ? json.items : [])
+        setAlbums(items)
+        await prefetchAlbumAssets(items, () => cancelled || aborted)
       } catch (e) {
         if (aborted) return
         setAlbums([])
@@ -43,8 +83,11 @@ export function useAlbums(isActive: boolean) {
         if (!aborted) setAlbumsLoading(false)
       }
     })()
-    
-    return () => { aborted = true }
+
+    return () => {
+      aborted = true
+      cancelled = true
+    }
   }, [isActive])
 
   // Fetch album like/bookmark states for current user
@@ -152,13 +195,18 @@ export function useAlbums(isActive: boolean) {
   async function openAlbum(albumId: string) {
     try {
       setAlbumLoading(true)
-      const res = await fetch(`/api/guidebook/albums/${albumId}/assets`, { cache: "no-store" })
-      if (!res.ok) throw new Error("アルバムの取得に失敗しました")
-      const json = await res.json().catch(() => ({}))
-      const items: AssetItem[] = json?.items ?? []
+      const cached = albumAssetsMap[albumId]
+      if (cached) {
+        setAlbumAssets(cached)
+        setAlbumIndex(0)
+        setOpenAlbumId(albumId)
+        return
+      }
+      const items = await fetchAlbumAssets(albumId)
       setAlbumAssets(items)
       setAlbumIndex(0)
       setOpenAlbumId(albumId)
+      setAlbumAssetsMap((prev) => ({ ...prev, [albumId]: items }))
     } catch (e) {
       console.error("open album error", e)
       setAlbumAssets([])
@@ -172,10 +220,9 @@ export function useAlbums(isActive: boolean) {
     try {
       setAlbumsLoading(true)
       setAlbumsError(null)
-      const res = await fetch('/api/guidebook/albums?random=10', { cache: 'no-store' })
-      if (!res.ok) throw new Error('アルバムの取得に失敗しました')
-      const json = await res.json().catch(() => ({}))
-      setAlbums(Array.isArray(json?.items) ? json.items : [])
+      const items = await fetchAlbumList()
+      setAlbums(items)
+      await prefetchAlbumAssets(items)
     } catch (e) {
       setAlbums([])
       setAlbumsError(e instanceof Error ? e.message : '取得に失敗しました')
@@ -208,5 +255,3 @@ export function useAlbums(isActive: boolean) {
     refreshAlbums,
   }
 }
-
-
