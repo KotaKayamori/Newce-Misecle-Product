@@ -37,7 +37,7 @@ export function SearchControls({
   onClearSearch,
 }: SearchControlsProps) {
   return (
-    <div className="bg-white">
+    <div className="sticky top-0 z-30 bg-white">
       <SearchHeader
         isSearchMode={isSearchMode}
         didSearch={didSearch}
