@@ -54,7 +54,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   const [currentTime, setCurrentTime] = useState(0)
   const [isSeeking, setIsSeeking] = useState(false)  
   const [seekPercent, setSeekPercent] = useState(0)  
-
+  const [isPlaying, setIsPlaying] = useState(true)
 
   // 再生/一時停止トグル
   const handleTogglePlay = () => {
@@ -62,8 +62,10 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
     if (!v) return
     if (v.paused) {
       v.play().catch(() => {})
+      setIsPlaying(true)
     } else {
       v.pause()
+      setIsPlaying(false)
     }
   }
 
@@ -248,9 +250,21 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         </div>
       </div>
 
+      {/* Bottom CTA */}
+      <div className="absolute bottom-24 left-0 right-0 px-4 z-30">
+        <div className="flex gap-2">
+          <button type="button" onClick={onReserve} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
+            今すぐ予約する
+          </button>
+          <button type="button" onClick={onMore} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
+            もっと見る…
+          </button>
+        </div>
+      </div>
+
       {/* === ここに横スクロールのシークバーを追加 === */}
       {/* シークバー部分：ドラッグ対応＆リッチな見た目 */}
-      <div className="absolute bottom-28 left-0 right-0 px-4 z-30">
+      <div className="absolute bottom-16 left-0 right-0 px-4 z-30">
         <div
           className="w-full h-5 rounded-full bg-white/25 backdrop-blur-sm px-1 flex items-center"
         >
@@ -298,18 +312,22 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
           </div>
         </div>
       </div>
-
-      {/* Bottom CTA */}
-      <div className="absolute bottom-16 left-0 right-0 px-4 z-30">
-        <div className="flex gap-2">
-          <button type="button" onClick={onReserve} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
-            今すぐ予約する
-          </button>
-          <button type="button" onClick={onMore} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
-            もっと見る…
-          </button>
-        </div>
-      </div>
+      {/* 画面中央の再生ボタン（停止中のみ表示） */}
+      {!isPlaying && (
+        <button
+          type="button"
+          className="absolute inset-0 flex items-center justify-center z-30"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleTogglePlay()
+          }}
+          aria-label="再生"
+        >
+          <div className="w-16 h-16 rounded-full bg-black/60 flex items-center justify-center shadow-lg">
+            <div className="w-0 h-0 border-l-[18px] border-l-white border-t-[11px] border-t-transparent border-b-[11px] border-b-transparent ml-1" />
+          </div>
+        </button>
+      )}
     </div>
   )
 }
