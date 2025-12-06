@@ -52,8 +52,8 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
-  const [isSeeking, setIsSeeking] = useState(false)  
-  const [seekPercent, setSeekPercent] = useState(0)  
+  const [isSeeking, setIsSeeking] = useState(false)
+  const [seekPercent, setSeekPercent] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
 
   // 再生/一時停止トグル
@@ -141,11 +141,6 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         {...{ "webkit-playsinline": "true" }}
         preload="auto"
         controls={false}
-        // onClick={(e) => {
-        //   console.log("クリック")
-        //   e.stopPropagation()
-        //   handleTogglePlay()
-        // }}
       />
 
       {/* クリック判定用の透明レイヤ（video 全体をカバー） */}
@@ -153,7 +148,6 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         type="button"
         className="absolute inset-0 z-20 cursor-pointer"
         onClick={(e) => {
-          console.log("クリック")
           e.stopPropagation()
           handleTogglePlay()
         }}
