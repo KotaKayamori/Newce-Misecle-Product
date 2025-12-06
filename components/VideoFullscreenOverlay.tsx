@@ -251,7 +251,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       </div>
 
       {/* Bottom CTA */}
-      <div className="absolute bottom-24 left-0 right-0 px-4 z-30">
+      <div className="absolute bottom-20 left-0 right-0 px-4 z-30">
         <div className="flex gap-2">
           <button type="button" onClick={onReserve} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
             今すぐ予約する
@@ -309,7 +309,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       {!isPlaying && (
         <button
           type="button"
-          className="absolute inset-0 flex items-center justify-center z-30"
+          className="absolute inset-0 flex items-center justify-center z-20"
           onClick={(e) => {
             e.stopPropagation()
             handleTogglePlay()
