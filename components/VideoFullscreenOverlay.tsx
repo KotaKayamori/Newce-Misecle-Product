@@ -262,15 +262,11 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         </div>
       </div>
 
-      {/* === ここに横スクロールのシークバーを追加 === */}
-      {/* シークバー部分：ドラッグ対応＆リッチな見た目 */}
-      <div className="absolute bottom-16 left-0 right-0 px-4 z-30">
-        <div
-          className="w-full h-5 rounded-full bg-white/25 backdrop-blur-sm px-1 flex items-center"
-        >
+      {/* ★ 動画とフッターの“間”にシークバーを配置 */}
+      <div className="absolute inset-x-0 bottom-14 z-30">
+        <div className="w-full h-1 rounded-full bg-white/25 backdrop-blur-sm flex items-center">
           <div
-            className="relative w-full h-1.5 bg-white/30 rounded-full touch-pan-x"
-            // マウス
+            className="relative w-full h-1 bg-white/30 rounded-full touch-pan-x"
             onMouseDown={(e) => {
               const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
               handleSeekStart(e.clientX, rect)
@@ -284,7 +280,6 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
             onMouseLeave={() => {
               if (isSeeking) handleSeekEnd()
             }}
-            // タッチ
             onTouchStart={(e) => {
               const touch = e.touches[0]
               const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
@@ -297,14 +292,11 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
             }}
             onTouchEnd={handleSeekEnd}
           >
-            {/* 背景トラック */}
             <div className="absolute inset-0 rounded-full bg-white/20" />
-            {/* 進捗バー（終端=動画終わり） */}
             <div
               className="absolute inset-y-0 left-0 rounded-full bg-orange-500"
               style={{ width: `${progress * 100}%` }}
             />
-            {/* ハンドル */}
             <div
               className="absolute -top-1.5 w-4 h-4 rounded-full bg-white shadow-md border border-black/10"
               style={{ left: `calc(${progress * 100}% - 8px)` }}
@@ -312,6 +304,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
           </div>
         </div>
       </div>
+
       {/* 画面中央の再生ボタン（停止中のみ表示） */}
       {!isPlaying && (
         <button
