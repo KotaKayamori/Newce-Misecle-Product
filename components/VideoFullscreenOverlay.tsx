@@ -208,7 +208,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         </div>
 
         {/* Right actions */}
-        <div className="w-16 flex flex-col items-center justify-center pb-32 gap-6">
+        <div className="w-16 flex flex-col items-center justify-end pb-40 gap-6">
           <div className="flex flex-col items-center z-30">
             <button className="w-12 h-12 flex items-center justify-center" onClick={onToggleLike} aria-label={liked ? "いいね解除" : "いいね"}>
               <Heart
@@ -216,12 +216,17 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
                 style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 3px rgba(0,0,0,0.35))", ...(liked ? { stroke: 'none' } : {}) }}
               />
             </button>
-            <span
+            {/* <span
               className="text-white text-xs font-medium mt-1"
               style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 3px rgba(0,0,0,0.35))" }}
             >
               {likeCount}
-            </span>
+            </span> */}
+            <div className="relative h-4 w-16 overflow-hidden">
+              <div className="absolute whitespace-nowrap text-[12px] text-white animate-marquee">
+                いいね！ いいね！ いいね！ いいね！
+              </div>
+            </div>
           </div>
 
           <div className="flex flex-col items-center z-30">
