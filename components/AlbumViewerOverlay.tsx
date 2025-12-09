@@ -193,7 +193,10 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
                       if (onShare) return void onShare()
                       const url = currentUrl
                       if ((navigator as any).share) await (navigator as any).share({ url })
-                      else { await navigator.clipboard.writeText(url); alert("リンクをコピーしました") }
+                      else {
+                        await navigator.clipboard.writeText(url);
+                        alert("リンクをコピーしました");
+                      }
                     } catch {}
                   }}
                 >
