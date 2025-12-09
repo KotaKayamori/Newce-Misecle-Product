@@ -70,19 +70,19 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black">
+    <div className="fixed inset-0 z-50 bg-white">
       <button
         onClick={onClose}
-        className="absolute left-6 top-6 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white"
+        className="absolute left-3 top-6 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/60 text-black hover:bg-white/80 focus:outline-none focus:ring-2 focus:ring-white"
         aria-label="閉じる"
       >
         ＜
       </button>
 
       {loading ? (
-        <div className="flex h-full w-full items-center justify-center text-sm text-white/70">読み込み中...</div>
+        <div className="flex h-full w-full items-center justify-center text-sm text-black/70">読み込み中...</div>
       ) : !hasAssets ? (
-        <div className="flex h-full w-full items-center justify-center text-sm text-white/70">このアルバムには写真がありません。</div>
+        <div className="flex h-full w-full items-center justify-center text-sm text-black/70">このアルバムには写真がありません。</div>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center pb-32 pt-12">
           <div className="relative flex items-center justify-center">
@@ -90,10 +90,10 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
               images={assets.map((asset) => asset.url)}
               currentIndex={index}
               onIndexChange={onIndexChange}
-              showControls={false}
-              fit="contain"
+              // showControls={false}
               className="w-screen max-w-[100vw] max-h-[85vh]"
               imageClassName="max-h-[85vh]"
+              fit="contain"
             />
             <span className="absolute right-0 top-0 rounded-full bg-black/70 px-2 py-1 text-xs font-medium text-white">
               {index + 1} / {assets.length}
@@ -105,13 +105,13 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
                   onClick={handlePrev}
                   disabled={!canPrev}
                   aria-label="前へ"
-                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-30"
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white/50 text-black hover:bg-white/70 disabled:opacity-30"
                 >
                   ‹
                 </button>
                 <div className="flex items-center justify-center gap-2">
                   {assets.map((_, i) => (
-                    <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-white" : "bg-white/40"}`} />
+                    <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-black" : "bg-black/40"}`} />
                   ))}
                 </div>
                 <button
@@ -119,7 +119,7 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
                   onClick={handleNext}
                   disabled={!canNext}
                   aria-label="次へ"
-                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-black/50 text-white hover:bg-black/70 disabled:opacity-30"
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white/50 text-black hover:bg-white/70 disabled:opacity-30"
                 >
                   ›
                 </button>
@@ -127,8 +127,8 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
             )}
           </div>
           {/* Meta overlay (icon + title) - place next to back button to avoid overlap */}
-          <div className="absolute top-6 left-16 z-50 flex items-center gap-3 text-white">
-            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden">
+          <div className="absolute top-6 left-16 z-50 flex items-center gap-3 text-black">
+            <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden border border-gray-300">
               {ownerAvatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={ownerAvatarUrl} alt={ownerLabel ?? "user"} className="w-full h-full object-cover" />
@@ -137,8 +137,8 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
               )}
             </div>
             <div className="flex flex-col">
-              {ownerLabel && <span className="text-white font-semibold text-sm leading-none">{ownerLabel}</span>}
-              {title && <span className="text-white/90 text-xs leading-tight line-clamp-1 max-w-[60vw]">{title}</span>}
+              {ownerLabel && <span className="text-black font-semibold text-sm leading-none">{ownerLabel}</span>}
+              {title && <span className="text-black/90 text-xs leading-tight line-clamp-1 max-w-[60vw]">{title}</span>}
             </div>
           </div>
         </div>
