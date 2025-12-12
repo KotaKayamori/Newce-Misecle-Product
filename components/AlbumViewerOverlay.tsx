@@ -108,13 +108,6 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
           </div>
         </div>
       </div>
-      {/* <button
-        onClick={onClose}
-        className="absolute left-3 top-3 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/60 text-black hover:bg-white/80 focus:outline-none focus:ring-2 focus:ring-white"
-        aria-label="閉じる"
-      >
-        ＜
-      </button> */}
 
       {loading ? (
         <div className="flex h-full w-full items-center justify-center text-sm text-black/70">読み込み中...</div>
@@ -164,21 +157,6 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
                 </div>
               )}
             </div>
-            {/* Meta overlay (icon + title) - place next to back button to avoid overlap */}
-            {/* <div className="absolute top-4 left-16 z-50 flex items-center gap-3 text-black">
-              <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden border border-gray-300">
-                {ownerAvatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={ownerAvatarUrl} alt={ownerLabel ?? "user"} className="w-full h-full object-cover" />
-                ) : (
-                  (ownerLabel?.replace(/^@/, "").charAt(0).toUpperCase() || "U")
-                )}
-              </div>
-              <div className="flex flex-col">
-                {ownerLabel && <span className="text-black font-semibold text-sm leading-none">{ownerLabel}</span>}
-                {title && <span className="text-black/90 text-xs leading-tight line-clamp-1 max-w-[60vw]">{title}</span>}
-              </div>
-            </div> */}
           </div>
 
           {/* Bottom actions: いいね / 保存 / 共有（横並び・黒ボタン） */}
