@@ -45,14 +45,14 @@ export function SearchHeader({
     <div className="bg-white px-6 py-4">
       <div className="flex items-center gap-3 mb-3">
         <div className="flex-1" onClick={() => onSearchModeChange(true)}>
-          <div className="relative rounded-full border border-gray-300">
+          <div className="relative rounded-full border border-black">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-black w-4 h-4 pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
               <Input
                 readOnly
                 value={searchTerm}
                 placeholder="食べたいものを入れてみて"
-                className="h-12 pl-10 rounded-full border-none text-black placeholder:text-gray-400 cursor-pointer"
+                className="h-12 pl-10 rounded-full border-none text-black placeholder:text-black cursor-pointer"
               />
             </div>
           </div>
@@ -100,10 +100,10 @@ export function SearchHeader({
             </div>
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-black w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
                   placeholder="検索ワードを入力"
-                  className="pl-10 rounded-full border-black text-black placeholder:text-gray-400"
+                  className="h-12 pl-10 rounded-full border-none bg-gray-200 text-black placeholder:text-gray-400 focus:border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                   autoFocus
                   value={searchTerm}
                   onChange={(e) => onSearchChange(e.target.value)}
