@@ -52,6 +52,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
+  const [previewTime, setPreviewTime] = useState<number | null>(null)
   const [isSeeking, setIsSeeking] = useState(false)
   const [seekPercent, setSeekPercent] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
@@ -70,31 +71,58 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   }
 
   // シーク処理本体：0〜1 の割合から currentTime を決める
-  const applySeek = (percentage: number) => {
+  const applySeek = (percentage: number, forPreview = false) => {
     const v = videoRef.current
     if (!v || !duration) return
     const clamped = Math.min(Math.max(percentage, 0), 1)
     const newTime = duration * clamped
-    v.currentTime = newTime
-    setCurrentTime(newTime)
-    setSeekPercent(clamped)
+
+    if (forPreview) {
+      // プレビュー用に time だけ更新（確定はしない想定ならここで v.currentTime を動かさない選択肢もある）
+      setPreviewTime(newTime)
+      setSeekPercent(clamped)
+    } else {
+      v.currentTime = newTime
+      setCurrentTime(newTime)
+      setSeekPercent(clamped)
+      setPreviewTime(null)
+    }
   }
 
-  // シーク開始/ドラッグ/終了用ハンドラ
   const handleSeekStart = (clientX: number, rect: DOMRect) => {
     setIsSeeking(true)
     const p = (clientX - rect.left) / rect.width
-    applySeek(p)
+    // まずは「確定シーク」としても良ければ forPreview=false でOK
+    applySeek(p, true)
   }
 
   const handleSeekMove = (clientX: number, rect: DOMRect) => {
     if (!isSeeking) return
     const p = (clientX - rect.left) / rect.width
-    applySeek(p)
+    applySeek(p, true)
   }
 
   const handleSeekEnd = () => {
+    if (!isSeeking) return
     setIsSeeking(false)
+
+    // previewTime が入っていれば、その時点に確定シーク
+    if (previewTime != null && duration) {
+      const v = videoRef.current
+      if (v) {
+        v.currentTime = previewTime
+        setCurrentTime(previewTime)
+        setSeekPercent(previewTime / duration)
+      }
+    }
+    setPreviewTime(null)
+  }
+
+  const formatTime = (sec: number) => {
+    const s = Math.floor(sec)
+    const m = Math.floor(s / 60)
+    const r = s % 60
+    return `${m}:${r.toString().padStart(2, "0")}`
   }
 
   // timeupdate / loadedmetadata で状態更新
@@ -158,12 +186,12 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       <div className="absolute top-6 left-6 z-30">
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"                     // アイコンボタンサイズ
           onClick={() => {
             try { videoRef.current?.pause() } catch {}
             onClose()
           }}
-          className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white border-none"
+          className="h-10 w-10 bg-black/50 hover:bg-black/70 text-white border-none"
         >
           ＜
         </Button>
@@ -174,7 +202,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         <button
           type="button"
           onClick={onToggleMuted}
-          className="p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition"
+          className="h-10 w-10 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white transition"
           aria-label={muted ? "ミュート解除" : "ミュートにする"}
         >
           <SpeakerIcon muted={muted} />
@@ -262,10 +290,10 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       </div>
 
       {/* ★ 動画とフッターの“間”にシークバーを配置 */}
-      <div className="absolute inset-x-0 bottom-14 z-30">
-        <div className="w-full h-1 rounded-full bg-white/25 backdrop-blur-sm flex items-center">
+      <div className="absolute inset-x-0 bottom-12 z-30">
+        <div className="w-full h-8 flex items-center">
           <div
-            className="relative w-full h-1 bg-white/30 rounded-full touch-pan-x"
+            className="relative w-full h-full touch-pan-x select-none"
             onMouseDown={(e) => {
               const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
               handleSeekStart(e.clientX, rect)
@@ -291,15 +319,28 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
             }}
             onTouchEnd={handleSeekEnd}
           >
-            <div className="absolute inset-0 rounded-full bg-white/20" />
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-orange-500"
-              style={{ width: `${progress * 100}%` }}
-            />
-            <div
+            {/* プレビュー時間バッジ（ドラッグ中のみ、進捗位置で表示） */}
+            {isSeeking && previewTime != null && (
+              <div
+                className="absolute -top-2 px-2 py-1 rounded-full bg-black/70 text-white text-xs pointer-events-none -translate-x-1/2 whitespace-nowrap leading-none"
+                style={{ left: `${Math.min(Math.max(seekPercent * 100, 2), 98)}%` }}
+              >
+                {formatTime(previewTime)} / {formatTime(duration)}
+              </div>
+            )}
+            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-white/25 backdrop-blur-sm">
+              <div className="relative w-full h-1 bg-white/30 rounded-full">
+                <div className="absolute inset-0 rounded-full bg-white/20" />
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-orange-500"
+                  style={{ width: `${progress * 100}%` }}
+                />              
+            {/* <div
               className="absolute -top-1.5 w-4 h-4 rounded-full bg-white shadow-md border border-black/10"
               style={{ left: `calc(${progress * 100}% - 8px)` }}
-            />
+            /> */}
+              </div>
+            </div>
           </div>
         </div>
       </div>
