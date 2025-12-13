@@ -57,6 +57,13 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   const [seekPercent, setSeekPercent] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
 
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null)
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [previewThumb, setPreviewThumb] = useState<string | null>(null)
+  const [lastThumbAt, setLastThumbAt] = useState(0)
+  const seekContainerRef = useRef<HTMLDivElement | null>(null)
+  const [previewX, setPreviewX] = useState<number | null>(null)
+
   // 再生/一時停止トグル
   const handleTogglePlay = () => {
     const v = videoRef.current
@@ -81,6 +88,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       // プレビュー用に time だけ更新（確定はしない想定ならここで v.currentTime を動かさない選択肢もある）
       setPreviewTime(newTime)
       setSeekPercent(clamped)
+      updatePreviewThumbnail(newTime)
     } else {
       v.currentTime = newTime
       setCurrentTime(newTime)
@@ -92,19 +100,22 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   const handleSeekStart = (clientX: number, rect: DOMRect) => {
     setIsSeeking(true)
     const p = (clientX - rect.left) / rect.width
-    // まずは「確定シーク」としても良ければ forPreview=false でOK
+    updatePreviewPosition(clientX, rect)
     applySeek(p, true)
   }
 
   const handleSeekMove = (clientX: number, rect: DOMRect) => {
     if (!isSeeking) return
     const p = (clientX - rect.left) / rect.width
+    updatePreviewPosition(clientX, rect)
     applySeek(p, true)
   }
+
 
   const handleSeekEnd = () => {
     if (!isSeeking) return
     setIsSeeking(false)
+    setPreviewX(null)
 
     // previewTime が入っていれば、その時点に確定シーク
     if (previewTime != null && duration) {
@@ -123,6 +134,85 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
     const m = Math.floor(s / 60)
     const r = s % 60
     return `${m}:${r.toString().padStart(2, "0")}`
+  }
+
+  const updatePreviewPosition = (clientX: number, rect: DOMRect) => {
+    const thumbW = 96 // サムネ実幅（w-24）
+    const xCenter = clientX - rect.left
+    // 左端座標を計算してクランプ
+    let left = xCenter - thumbW / 2
+    if (left < 0) left = 0
+    if (left > rect.width - thumbW) left = rect.width - thumbW
+    setPreviewX(left)
+  }
+
+  const updatePreviewThumbnail = (time: number) => {
+    const src = video.playback_url
+    let pv = previewVideoRef.current
+    let cv = previewCanvasRef.current
+
+    if (!pv) {
+      pv = document.createElement("video")
+      pv.crossOrigin = "anonymous"
+      pv.preload = "auto"
+      pv.muted = true
+      pv.playsInline = true
+      pv.src = src
+      previewVideoRef.current = pv
+    }
+    if (!cv) {
+      cv = document.createElement("canvas")
+      previewCanvasRef.current = cv
+    }
+
+    const targetW = 90 // 小サムネ幅
+    const targetH = 160  // 9:16 高さ
+    cv.width = targetW
+    cv.height = targetH
+
+    const drawFrame = () => {
+      const ctx = cv!.getContext("2d")
+      if (!ctx) return
+      try {
+        // 動画のアスペクトを維持して中央トリミング
+        const vw = pv!.videoWidth || targetW
+        const vh = pv!.videoHeight || targetH
+        if (vw === 0 || vh === 0) return
+
+        const scale = Math.max(targetW / vw, targetH / vh)
+        const dw = vw * scale
+        const dh = vh * scale
+        const dx = (targetW - dw) / 2
+        const dy = (targetH - dh) / 2
+        ctx.clearRect(0, 0, targetW, targetH)
+        ctx.drawImage(pv!, dx, dy, dw, dh)
+        const url = cv!.toDataURL("image/jpeg", 0.7)
+        setPreviewThumb(url)
+      } catch {}
+    }
+
+    const onSeeked = () => {
+      pv!.removeEventListener("seeked", onSeeked)
+      drawFrame()
+    }
+
+    // 軽いスロットリング（60ms）
+    const now = performance.now()
+    if (now - lastThumbAt < 60) return
+    setLastThumbAt(now)
+
+    if (Number.isFinite(time)) {
+      // メタデータ読み込み後にシーク
+      if (pv!.readyState >= 1) {
+        pv!.addEventListener("seeked", onSeeked)
+        pv!.currentTime = Math.min(Math.max(time, 0), pv!.duration || time)
+      } else {
+        pv!.addEventListener("loadedmetadata", () => {
+          pv!.addEventListener("seeked", onSeeked)
+          pv!.currentTime = Math.min(Math.max(time, 0), pv!.duration || time)
+        }, { once: true })
+      }
+    }
   }
 
   // timeupdate / loadedmetadata で状態更新
@@ -293,6 +383,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       <div className="absolute inset-x-0 bottom-12 z-30">
         <div className="w-full h-8 flex items-center">
           <div
+            ref={seekContainerRef}
             className="relative w-full h-full touch-pan-x select-none"
             onMouseDown={(e) => {
               const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
@@ -319,11 +410,27 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
             }}
             onTouchEnd={handleSeekEnd}
           >
-            {/* プレビュー時間バッジ（ドラッグ中のみ、進捗位置で表示） */}
-            {isSeeking && previewTime != null && (
+            {isSeeking && previewTime != null && previewThumb && previewX != null && (
               <div
-                className="absolute -top-2 px-2 py-1 rounded-full bg-black/70 text-white text-xs pointer-events-none -translate-x-1/2 whitespace-nowrap leading-none"
-                style={{ left: `${Math.min(Math.max(seekPercent * 100, 2), 98)}%` }}
+                className="absolute -top-44 w-24 rounded-lg bg-black/60 backdrop-blur-sm border border-white/15 shadow-xl pointer-events-none overflow-hidden"
+                style={{ left: `${previewX}px` }}
+              >
+                <img
+                  src={previewThumb}
+                  alt="プレビュー"
+                  className="w-full h-40 object-cover"
+                  draggable={false}
+                />
+              </div>
+            )}
+
+            {isSeeking && previewTime != null && previewX != null && (
+              <div
+                className="absolute -top-2 px-2 py-1 rounded-full bg-black/70 text-white text-xs pointer-events-none whitespace-nowrap leading-none"
+                style={{
+                  left: `${previewX + 48}px`, // 96px / 2 = 48
+                  transform: "translateX(-50%)"
+                }}
               >
                 {formatTime(previewTime)} / {formatTime(duration)}
               </div>
@@ -335,10 +442,6 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
                   className="absolute inset-y-0 left-0 rounded-full bg-orange-500"
                   style={{ width: `${progress * 100}%` }}
                 />              
-            {/* <div
-              className="absolute -top-1.5 w-4 h-4 rounded-full bg-white shadow-md border border-black/10"
-              style={{ left: `calc(${progress * 100}% - 8px)` }}
-            /> */}
               </div>
             </div>
           </div>
