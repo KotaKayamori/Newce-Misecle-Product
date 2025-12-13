@@ -52,9 +52,17 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [duration, setDuration] = useState(0)
   const [currentTime, setCurrentTime] = useState(0)
+  const [previewTime, setPreviewTime] = useState<number | null>(null)
   const [isSeeking, setIsSeeking] = useState(false)
   const [seekPercent, setSeekPercent] = useState(0)
   const [isPlaying, setIsPlaying] = useState(true)
+
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null)
+  const previewCanvasRef = useRef<HTMLCanvasElement | null>(null)
+  const [previewThumb, setPreviewThumb] = useState<string | null>(null)
+  const [lastThumbAt, setLastThumbAt] = useState(0)
+  const seekContainerRef = useRef<HTMLDivElement | null>(null)
+  const [previewX, setPreviewX] = useState<number | null>(null)
 
   // 再生/一時停止トグル
   const handleTogglePlay = () => {
@@ -70,31 +78,143 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   }
 
   // シーク処理本体：0〜1 の割合から currentTime を決める
-  const applySeek = (percentage: number) => {
+  const applySeek = (percentage: number, forPreview = false) => {
     const v = videoRef.current
     if (!v || !duration) return
     const clamped = Math.min(Math.max(percentage, 0), 1)
     const newTime = duration * clamped
-    v.currentTime = newTime
-    setCurrentTime(newTime)
-    setSeekPercent(clamped)
+
+    if (forPreview) {
+      // プレビュー用に time だけ更新（確定はしない想定ならここで v.currentTime を動かさない選択肢もある）
+      setPreviewTime(newTime)
+      setSeekPercent(clamped)
+      updatePreviewThumbnail(newTime)
+    } else {
+      v.currentTime = newTime
+      setCurrentTime(newTime)
+      setSeekPercent(clamped)
+      setPreviewTime(null)
+    }
   }
 
-  // シーク開始/ドラッグ/終了用ハンドラ
   const handleSeekStart = (clientX: number, rect: DOMRect) => {
     setIsSeeking(true)
     const p = (clientX - rect.left) / rect.width
-    applySeek(p)
+    updatePreviewPosition(clientX, rect)
+    applySeek(p, true)
   }
 
   const handleSeekMove = (clientX: number, rect: DOMRect) => {
     if (!isSeeking) return
     const p = (clientX - rect.left) / rect.width
-    applySeek(p)
+    updatePreviewPosition(clientX, rect)
+    applySeek(p, true)
   }
 
+
   const handleSeekEnd = () => {
+    if (!isSeeking) return
     setIsSeeking(false)
+    setPreviewX(null)
+
+    // previewTime が入っていれば、その時点に確定シーク
+    if (previewTime != null && duration) {
+      const v = videoRef.current
+      if (v) {
+        v.currentTime = previewTime
+        setCurrentTime(previewTime)
+        setSeekPercent(previewTime / duration)
+      }
+    }
+    setPreviewTime(null)
+  }
+
+  const formatTime = (sec: number) => {
+    const s = Math.floor(sec)
+    const m = Math.floor(s / 60)
+    const r = s % 60
+    return `${m}:${r.toString().padStart(2, "0")}`
+  }
+
+  const updatePreviewPosition = (clientX: number, rect: DOMRect) => {
+    const thumbW = 96 // サムネ実幅（w-24）
+    const xCenter = clientX - rect.left
+    // 左端座標を計算してクランプ
+    let left = xCenter - thumbW / 2
+    if (left < 0) left = 0
+    if (left > rect.width - thumbW) left = rect.width - thumbW
+    setPreviewX(left)
+  }
+
+  const updatePreviewThumbnail = (time: number) => {
+    const src = video.playback_url
+    let pv = previewVideoRef.current
+    let cv = previewCanvasRef.current
+
+    if (!pv) {
+      pv = document.createElement("video")
+      pv.crossOrigin = "anonymous"
+      pv.preload = "auto"
+      pv.muted = true
+      pv.playsInline = true
+      pv.src = src
+      previewVideoRef.current = pv
+    }
+    if (!cv) {
+      cv = document.createElement("canvas")
+      previewCanvasRef.current = cv
+    }
+
+    const targetW = 90 // 小サムネ幅
+    const targetH = 160  // 9:16 高さ
+    cv.width = targetW
+    cv.height = targetH
+
+    const drawFrame = () => {
+      const ctx = cv!.getContext("2d")
+      if (!ctx) return
+      try {
+        // 動画のアスペクトを維持して中央トリミング
+        const vw = pv!.videoWidth || targetW
+        const vh = pv!.videoHeight || targetH
+        if (vw === 0 || vh === 0) return
+
+        const scale = Math.max(targetW / vw, targetH / vh)
+        const dw = vw * scale
+        const dh = vh * scale
+        const dx = (targetW - dw) / 2
+        const dy = (targetH - dh) / 2
+        ctx.clearRect(0, 0, targetW, targetH)
+        ctx.drawImage(pv!, dx, dy, dw, dh)
+        const url = cv!.toDataURL("image/jpeg", 0.7)
+        setPreviewThumb(url)
+      } catch (err) {
+        console.error("Error drawing video frame to canvas:", err);
+      }
+    }
+
+    const onSeeked = () => {
+      pv!.removeEventListener("seeked", onSeeked)
+      drawFrame()
+    }
+
+    // 軽いスロットリング（60ms）
+    const now = performance.now()
+    if (now - lastThumbAt < 60) return
+    setLastThumbAt(now)
+
+    if (Number.isFinite(time)) {
+      // メタデータ読み込み後にシーク
+      if (pv!.readyState >= 1) {
+        pv!.addEventListener("seeked", onSeeked)
+        pv!.currentTime = Math.min(Math.max(time, 0), pv!.duration || time)
+      } else {
+        pv!.addEventListener("loadedmetadata", () => {
+          pv!.addEventListener("seeked", onSeeked)
+          pv!.currentTime = Math.min(Math.max(time, 0), pv!.duration || time)
+        }, { once: true })
+      }
+    }
   }
 
   // timeupdate / loadedmetadata で状態更新
@@ -158,12 +278,12 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       <div className="absolute top-6 left-6 z-30">
         <Button
           variant="ghost"
-          size="sm"
+          size="icon"                     // アイコンボタンサイズ
           onClick={() => {
             try { videoRef.current?.pause() } catch {}
             onClose()
           }}
-          className="bg-black bg-opacity-50 hover:bg-opacity-70 text-white border-none"
+          className="h-10 w-10 bg-black/50 hover:bg-black/70 text-white border-none"
         >
           ＜
         </Button>
@@ -174,7 +294,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         <button
           type="button"
           onClick={onToggleMuted}
-          className="p-3 rounded-full bg-black/50 hover:bg-black/70 text-white transition"
+          className="h-10 w-10 flex items-center justify-center rounded-full bg-black/50 hover:bg-black/70 text-white transition"
           aria-label={muted ? "ミュート解除" : "ミュートにする"}
         >
           <SpeakerIcon muted={muted} />
@@ -262,10 +382,11 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       </div>
 
       {/* ★ 動画とフッターの“間”にシークバーを配置 */}
-      <div className="absolute inset-x-0 bottom-14 z-30">
-        <div className="w-full h-1 rounded-full bg-white/25 backdrop-blur-sm flex items-center">
+      <div className="absolute inset-x-0 bottom-12 z-30">
+        <div className="w-full h-8 flex items-center">
           <div
-            className="relative w-full h-1 bg-white/30 rounded-full touch-pan-x"
+            ref={seekContainerRef}
+            className="relative w-full h-full touch-pan-x select-none"
             onMouseDown={(e) => {
               const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
               handleSeekStart(e.clientX, rect)
@@ -291,15 +412,40 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
             }}
             onTouchEnd={handleSeekEnd}
           >
-            <div className="absolute inset-0 rounded-full bg-white/20" />
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-orange-500"
-              style={{ width: `${progress * 100}%` }}
-            />
-            <div
-              className="absolute -top-1.5 w-4 h-4 rounded-full bg-white shadow-md border border-black/10"
-              style={{ left: `calc(${progress * 100}% - 8px)` }}
-            />
+            {isSeeking && previewTime != null && previewThumb && previewX != null && (
+              <div
+                className="absolute -top-44 w-24 rounded-lg bg-black/60 backdrop-blur-sm border border-white/15 shadow-xl pointer-events-none overflow-hidden"
+                style={{ left: `${previewX}px` }}
+              >
+                <img
+                  src={previewThumb}
+                  alt="プレビュー"
+                  className="w-full h-40 object-cover"
+                  draggable={false}
+                />
+              </div>
+            )}
+
+            {isSeeking && previewTime != null && previewX != null && (
+              <div
+                className="absolute -top-2 px-2 py-1 rounded-full bg-black/70 text-white text-xs pointer-events-none whitespace-nowrap leading-none"
+                style={{
+                  left: `${previewX + 48}px`, // 96px / 2 = 48
+                  transform: "translateX(-50%)"
+                }}
+              >
+                {formatTime(previewTime)} / {formatTime(duration)}
+              </div>
+            )}
+            <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1 rounded-full bg-white/25 backdrop-blur-sm">
+              <div className="relative w-full h-1 bg-white/30 rounded-full">
+                <div className="absolute inset-0 rounded-full bg-white/20" />
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-orange-500"
+                  style={{ width: `${progress * 100}%` }}
+                />              
+              </div>
+            </div>
           </div>
         </div>
       </div>
