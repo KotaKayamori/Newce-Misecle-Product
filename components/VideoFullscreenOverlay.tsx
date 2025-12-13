@@ -188,7 +188,9 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         ctx.drawImage(pv!, dx, dy, dw, dh)
         const url = cv!.toDataURL("image/jpeg", 0.7)
         setPreviewThumb(url)
-      } catch {}
+      } catch (err) {
+        console.error("Error drawing video frame to canvas:", err);
+      }
     }
 
     const onSeeked = () => {
