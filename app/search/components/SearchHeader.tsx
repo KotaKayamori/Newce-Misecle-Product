@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Plus } from "lucide-react"
 import { Search } from "lucide-react"
 import { SearchHistory } from "./SearchHistory"
+import { useRouter } from "next/navigation"
 
 interface SearchHeaderProps {
   isSearchMode: boolean
@@ -40,6 +42,8 @@ export function SearchHeader({
       onSearchModeChange(false)
     }
   }
+
+  const router = useRouter()
 
   return (
     <div className="bg-white px-6 py-4">
@@ -98,28 +102,43 @@ export function SearchHeader({
                 閉じる
               </Button>
             </div>
-            <div className="flex items-center gap-3">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault()
+                onSearchSubmit()
+              }}
+              className="flex items-center gap-3"
+            >
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
+                  type="search"
+                  enterKeyHint="search"
+                  inputMode="search"
                   placeholder="検索ワードを入力"
                   className="h-12 pl-10 rounded-full border-none bg-gray-200 text-black placeholder:text-gray-400 focus:border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
                   autoFocus
                   value={searchTerm}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") onSearchSubmit()
-                  }}
                 />
               </div>
               <Button
+                type="button"
+                onClick={() => router.push("/upload")}
+                className="rounded-full w-12 h-12 bg-orange-600 hover:bg-orange-700 text-white flex items-center justify-center"
+                aria-label="コンテンツをアップロード"
+              >
+                <Plus className="w-5 h-5" />
+              </Button>
+            </form>
+              {/* <Button
                 onClick={onSearchSubmit}
                 className="bg-orange-600 hover:bg-orange-700 text-white"
                 disabled={!searchTerm.trim() || searchLoading}
               >
                 検索
-              </Button>
-            </div>
+              </Button> */}
+            
             {didSearch && <p className="text-sm text-gray-500">現在の検索結果を表示中です</p>}
 
             <div className="flex-1 overflow-y-auto">
