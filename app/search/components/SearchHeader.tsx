@@ -62,6 +62,14 @@ export function SearchHeader({
           </div>
         </div>
         <Button
+          type="button"
+          onClick={() => router.push("/upload")}
+          className="rounded-full w-8 h-8 bg-white border border-gray-300 text-gray-400 flex items-center justify-center hover:bg-white"
+          aria-label="コンテンツをアップロード"
+        >
+          <Plus className="w-6 h-6" />
+        </Button>
+        {/* <Button
           onClick={() => {
             if (searchTerm.trim()) onSearchSubmit()
             else onSearchModeChange(true)
@@ -70,7 +78,7 @@ export function SearchHeader({
           disabled={searchLoading}
         >
           検索
-        </Button>
+        </Button> */}
       </div>
 
       {/* 検索バー直下の人気キーワード */}
@@ -125,10 +133,10 @@ export function SearchHeader({
               <Button
                 type="button"
                 onClick={() => router.push("/upload")}
-                className="rounded-full w-12 h-12 bg-orange-600 hover:bg-orange-700 text-white flex items-center justify-center"
+                className="rounded-full w-8 h-8 bg-white border border-gray-300 text-gray-400 flex items-center justify-center hover:bg-white"
                 aria-label="コンテンツをアップロード"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-6 h-6" />
               </Button>
             </form>
               {/* <Button
