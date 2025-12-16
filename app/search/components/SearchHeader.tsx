@@ -7,6 +7,7 @@ import { Plus } from "lucide-react"
 import { Search } from "lucide-react"
 import { SearchHistory } from "./SearchHistory"
 import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase"
 
 interface SearchHeaderProps {
   isSearchMode: boolean
@@ -45,6 +46,21 @@ export function SearchHeader({
 
   const router = useRouter()
 
+  const handleUploadClick = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) {
+        router.push("/auth/login?redirect=/upload")
+        return
+      }
+      router.push("/upload")
+    } catch {
+      router.push("/auth/login?redirect=/upload")
+    }
+  }
+
   return (
     <div className="bg-white px-4 py-4">
       <div className="flex items-center gap-3 mb-3">
@@ -63,22 +79,12 @@ export function SearchHeader({
         </div>
         <Button
           type="button"
-          onClick={() => router.push("/upload")}
+          onClick={handleUploadClick}
           className="rounded-full w-8 h-8 bg-white border border-gray-300 text-gray-400 flex items-center justify-center hover:bg-white"
           aria-label="コンテンツをアップロード"
         >
           <Plus className="w-6 h-6" />
         </Button>
-        {/* <Button
-          onClick={() => {
-            if (searchTerm.trim()) onSearchSubmit()
-            else onSearchModeChange(true)
-          }}
-          className="bg-orange-600 hover:bg-orange-700 text-white"
-          disabled={searchLoading}
-        >
-          検索
-        </Button> */}
       </div>
 
       {/* 検索バー直下の人気キーワード */}
