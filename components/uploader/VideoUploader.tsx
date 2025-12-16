@@ -29,6 +29,10 @@ export default function VideoUploader() {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const { state, error, publicUrl, upload, reset } = useVideoUpload()
 
+  // 権限チェック用 state
+  const [permissionChecking, setPermissionChecking] = useState(true)
+  const [hasPermission, setHasPermission] = useState(false)
+
   const [mode, setMode] = useState<UploadMode>("")
   const [formatError, setFormatError] = useState("")
 
@@ -47,7 +51,42 @@ export default function VideoUploader() {
   const [albumId, setAlbumId] = useState<string | null>(null)
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
 
+  // マウント時に allowed_uploaders をチェック
+  useEffect(() => {
+    const checkPermission = async () => {
+      setPermissionChecking(true)
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) {
+          setHasPermission(false)
+          setPermissionChecking(false)
+          return
+        }
+        const { data, error } = await supabase
+          .from("allowed_uploaders")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle()
+        if (error) {
+          console.error("allowed_uploaders check error", error)
+          setHasPermission(false)
+        } else {
+          setHasPermission(!!data)
+        }
+      } catch (e) {
+        console.error("permission check error", e)
+        setHasPermission(false)
+      } finally {
+        setPermissionChecking(false)
+      }
+    }
+    checkPermission()
+  }, [])
+
   const pickFile = () => {
+    if (!hasPermission) return
     if (!mode) {
       setFormatError("形式を選択してください")
       return
@@ -98,6 +137,7 @@ export default function VideoUploader() {
   }
 
   const handleModeChange = (value: UploadMode) => {
+    if (!hasPermission) return
     setMode(value)
     setFormatError("")
     if (value === "video") {
@@ -149,7 +189,6 @@ export default function VideoUploader() {
       setFormatError("動画ファイルを選択してください")
       return
     }
-    // { changed code } カテゴリの必須チェックを複数対応に
     if (!categories.length) {
       setFormatError("カテゴリを1つ以上選択してください")
       return
@@ -163,7 +202,6 @@ export default function VideoUploader() {
       return
     }
 
-    // { changed code } APIへはラベルの配列（テキスト）で送る
     const categoryValues = categories.map((v) => String(v))
 
     const storePayload = stores.map((store) => ({
@@ -315,6 +353,7 @@ export default function VideoUploader() {
   }
 
   const handleSubmit = async () => {
+    if (!hasPermission) return
     if (!mode) {
       setFormatError("形式を選択してください")
       return
@@ -351,7 +390,6 @@ export default function VideoUploader() {
   const isUploading = isVideoMode ? state === "uploading" : photoState === "uploading"
   const isValid =
     isVideoMode
-      // { changed code } カテゴリ複数対応
       ? Boolean(title.trim() && categories.length > 0 && selectedFile)
       : isAlbumMode
         ? Boolean(title.trim() && photoFiles.length > 0)
@@ -365,341 +403,363 @@ export default function VideoUploader() {
         ? "写真をアップロードする"
         : "アップロードする"
 
+  // フォーム無効化フラグ
+  const formDisabled = !hasPermission || permissionChecking
+
   return (
     <div className="mx-auto w-full min-h-0 max-w-md">
       <Card className="border-0 shadow-none">
         <CardContent className="space-y-4 pt-6">
-          <input
-            ref={inputRef}
-            type="file"
-            accept={
-              mode === "album"
-                ? IMAGE_MIME_TYPES.join(",")
-                : mode === "video"
-                  ? "video/mp4,video/webm,video/quicktime"
-                  : ""
-            }
-            multiple={mode === "album"}
-            className="hidden"
-            onChange={(e) => {
-              if (mode === "album") handlePhotoFiles(e.target.files)
-              else handleVideoFiles(e.target.files)
-            }}
-          />
-
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              形式を選択 <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={mode}
-              onChange={(e) => handleModeChange(e.target.value as UploadMode)}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
-            >
-              <option value="">形式を選択してください</option>
-              <option value="video">動画</option>
-              <option value="album">アルバム</option>
-            </select>
-            {formatError && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
-                {formatError}
+          {/* 権限エラー表示 */}
+          {!permissionChecking && !hasPermission && (
+            <div className="rounded-md border-2 border-red-500 bg-red-50 px-4 py-3">
+              <p className="text-center text-lg font-bold text-red-600">
+                権限がないのでアップロードできません
               </p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              タイトル <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="タイトルを入力してください"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-              required
-            />
-          </div>
-
-          {/* { changed code } カテゴリUIを複数選択(チェックボックス)に */}
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              カテゴリ <span className="text-red-500">*</span>
-              <span className="ml-2 text-xs text-gray-500">(複数選択可)</span>
-            </label>
-
-            <div className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${isAlbumMode ? "opacity-60 pointer-events-none" : ""}`}>
-              {CATEGORY_OPTIONS.map((opt) => {
-                const checked = categories.includes(opt.value)
-                return (
-                  <label key={opt.value} className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      disabled={isAlbumMode}
-                      checked={checked}
-                      onChange={(e) => {
-                        setCategories((prev) => {
-                          if (e.target.checked) {
-                            return Array.from(new Set([...prev, opt.value]))
-                          } else {
-                            return prev.filter((v) => v !== opt.value)
-                          }
-                        })
-                      }}
-                    />
-                    <span className="text-sm text-gray-800">{opt.label}</span>
-                  </label>
-                )
-              })}
-            </div>
-
-            {isAlbumMode && (
-              <p className="text-xs text-gray-500">アルバムではカテゴリ選択は不要です</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">店舗情報 / 感想・レビュー（任意）</label>
-            <textarea
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="お店についての情報やレビュー（任意）"
-              className="w-full rounded-md border border-gray-300 px-3 py-2 h-24 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            />
-          </div>
-
-          {mode === "video" && (
-            <div className="space-y-3">
-              <div className="flex flex-col gap-1">
-                <span className="text-sm font-medium text-gray-700">紹介店舗（最大3件・任意）</span>
-                <span className="text-xs text-gray-500">店舗名か電話番号のみでも入力できます</span>
-              </div>
-              {stores.map((store, index) => (
-                <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  <input
-                    type="text"
-                    value={store.name}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setStores((prev) => {
-                        const next = [...prev]
-                        next[index] = { ...next[index], name: value }
-                        return next
-                      })
-                    }}
-                    placeholder={`店舗${index + 1}の名称（任意）`}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                  <input
-                    type="tel"
-                    value={store.tel}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      setStores((prev) => {
-                        const next = [...prev]
-                        next[index] = { ...next[index], tel: value }
-                        return next
-                      })
-                    }}
-                    placeholder={`店舗${index + 1}の電話番号（任意）`}
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  />
-                </div>
-              ))}
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-700">
-              {isAlbumMode ? "写真ファイル" : isVideoMode ? "動画ファイル" : "ファイル"}{" "}
-              <span className="text-red-500">*</span>
-            </label>
-            <div
-              className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
-                dragOver ? "border-orange-500 bg-orange-50" : "border-gray-300 hover:border-gray-400"
-              } ${isUploading ? "pointer-events-none opacity-75" : "cursor-pointer"}`}
-              onClick={pickFile}
-              onDragOver={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                if (!mode) return
-                setDragOver(true)
-              }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                setDragOver(false)
-                if (!mode) {
-                  setFormatError("形式を選択してください")
-                  return
-                }
-                if (mode === "album") handlePhotoFiles(e.dataTransfer.files)
-                else handleVideoFiles(e.dataTransfer.files)
-              }}
-            >
-              <div className="flex flex-col items-center gap-3">
-                {isUploading ? (
-                  <Loader2 className="h-6 w-6 animate-spin text-orange-600" />
-                ) : (
-                  <UploadIcon className="h-6 w-6 text-gray-600" />
-                )}
+          {permissionChecking && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+              <span className="text-sm text-gray-500">権限を確認中…</span>
+            </div>
+          )}
 
-                {isVideoMode && (
-                  <>
-                    <p className="text-sm text-gray-700">
-                      {selectedFile
-                        ? selectedFile.name
-                        : dragOver
-                          ? "ここにドロップしてください"
-                          : "クリックまたはドラッグ＆ドロップで動画を選択"}
-                    </p>
-                    <Button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        pickFile()
-                      }}
-                      disabled={isUploading}
-                      className="mt-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-6 rounded-full"
-                    >
-                      ファイルを選択
-                    </Button>
-                  </>
+          <fieldset disabled={formDisabled} className={formDisabled ? "opacity-50 pointer-events-none" : ""}>
+            <input
+              ref={inputRef}
+              type="file"
+              accept={
+                mode === "album"
+                  ? IMAGE_MIME_TYPES.join(",")
+                  : mode === "video"
+                    ? "video/mp4,video/webm,video/quicktime"
+                    : ""
+              }
+              multiple={mode === "album"}
+              className="hidden"
+              onChange={(e) => {
+                if (mode === "album") handlePhotoFiles(e.target.files)
+                else handleVideoFiles(e.target.files)
+              }}
+            />
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  形式を選択 <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={mode}
+                  onChange={(e) => handleModeChange(e.target.value as UploadMode)}
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                >
+                  <option value="">形式を選択してください</option>
+                  <option value="video">動画</option>
+                  <option value="album">アルバム</option>
+                </select>
+                {formatError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">
+                    {formatError}
+                  </p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  タイトル <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="タイトルを入力してください"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  カテゴリ <span className="text-red-500">*</span>
+                  <span className="ml-2 text-xs text-gray-500">(複数選択可)</span>
+                </label>
+
+                <div className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${isAlbumMode ? "opacity-60 pointer-events-none" : ""}`}>
+                  {CATEGORY_OPTIONS.map((opt) => {
+                    const checked = categories.includes(opt.value)
+                    return (
+                      <label key={opt.value} className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          disabled={isAlbumMode}
+                          checked={checked}
+                          onChange={(e) => {
+                            setCategories((prev) => {
+                              if (e.target.checked) {
+                                return Array.from(new Set([...prev, opt.value]))
+                              } else {
+                                return prev.filter((v) => v !== opt.value)
+                              }
+                            })
+                          }}
+                        />
+                        <span className="text-sm text-gray-800">{opt.label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
 
                 {isAlbumMode && (
-                  <div className="w-full space-y-3">
-                    <p className="text-sm text-gray-700 text-center">
-                      {photoFiles.length
-                        ? "追加で写真を選択するにはクリックまたはドロップしてください"
-                        : dragOver
-                          ? "ここにドロップしてください"
-                          : "クリックまたはドラッグ＆ドロップで写真を選択（複数可）"}
-                    </p>
-                    {photoFiles.length > 0 && (
-                      <ul className="space-y-2 text-left">
-                        {photoFiles.map((file, index) => (
-                          <li
-                            key={`${file.name}-${index}`}
-                            className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2"
-                          >
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden flex-shrink-0">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                {photoPreviews[index] ? (
-                                  <img src={photoPreviews[index]} alt={file.name} className="w-full h-full object-cover" />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Preview</div>
-                                )}
-                              </div>
-                              <span className="truncate text-sm font-medium text-gray-700 block">{index + 1}. {file.name}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={index === 0 || isUploading}
-                                onClick={(e) => { e.stopPropagation(); movePhotoFile(index, index - 1) }}
-                                className="inline-flex items-center rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-                                aria-label="上へ"
-                                title="上へ"
-                              >
-                                ↑
-                              </button>
-                              <button
-                                type="button"
-                                disabled={index === photoFiles.length - 1 || isUploading}
-                                onClick={(e) => { e.stopPropagation(); movePhotoFile(index, index + 1) }}
-                                className="inline-flex items-center rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-                                aria-label="下へ"
-                                title="下へ"
-                              >
-                                ↓
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  removePhotoFile(index)
-                                }}
-                                className="inline-flex items-center gap-1 rounded-md border border-transparent px-2 py-1 text-sm text-red-500 hover:bg-red-50"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                                削除
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  <p className="text-xs text-gray-500">アルバムではカテゴリ選択は不要です</p>
                 )}
-
-                {!mode && <p className="text-sm text-gray-600">まず形式を選択してください</p>}
               </div>
-            </div>
-            <p className="text-xs text-gray-500">
-              {isAlbumMode
-                ? "jpeg / png / webp（1枚10MB以下・複数可）"
-                : isVideoMode
-                  ? "mp4 / webm / mov（上限1GB）"
-                  : ""}
-            </p>
-            {isVideoMode && error && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
-            )}
-            {isAlbumMode && photoError && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{photoError}</p>
-            )}
-          </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!isValid || isUploading}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-12 rounded-full disabled:bg-gray-300 disabled:text-gray-500"
-            >
-              {uploadButtonLabel}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleResetForm}
-              disabled={isUploading}
-              className="px-6"
-            >
-              リセット
-            </Button>
-          </div>
-
-          {isVideoMode && publicUrl && (
-            <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
-              <p className="text-sm font-medium text-green-700">✓ 動画のアップロードが完了しました</p>
               <div className="space-y-2">
-                <p className="text-sm font-medium">タイトル: {title}</p>
-                <p className="text-sm">
-                  カテゴリ: {categories.map((v) => CATEGORY_OPTIONS.find((o) => o.value === v)?.label || v).join("、")}
-                </p>
-                <video src={publicUrl} controls className="w-full max-h-40 rounded" />
+                <label className="block text-sm font-medium text-gray-700">店舗情報 / 感想・レビュー（任意）</label>
+                <textarea
+                  value={caption}
+                  onChange={(e) => setCaption(e.target.value)}
+                  placeholder="お店についての情報やレビュー（任意）"
+                  className="w-full rounded-md border border-gray-300 px-3 py-2 h-24 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
               </div>
-            </div>
-          )}
 
-          {isAlbumMode && photoState === "success" && photoResult.length > 0 && (
-            <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
-              <p className="text-sm font-medium text-green-700">✓ 写真アルバムのアップロードが完了しました</p>
-              <ul className="space-y-1 text-sm text-gray-700">
-                {photoResult.map((path, index) => (
-                  <li key={`${path}-${index}`} className="truncate">
-                    {path}
-                  </li>
-                ))}
-              </ul>
+              {mode === "video" && (
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium text-gray-700">紹介店舗（最大3件・任意）</span>
+                    <span className="text-xs text-gray-500">店舗名か電話番号のみでも入力できます</span>
+                  </div>
+                  {stores.map((store, index) => (
+                    <div key={index} className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <input
+                        type="text"
+                        value={store.name}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setStores((prev) => {
+                            const next = [...prev]
+                            next[index] = { ...next[index], name: value }
+                            return next
+                          })
+                        }}
+                        placeholder={`店舗${index + 1}の名称（任意）`}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                      <input
+                        type="tel"
+                        value={store.tel}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setStores((prev) => {
+                            const next = [...prev]
+                            next[index] = { ...next[index], tel: value }
+                            return next
+                          })
+                        }}
+                        placeholder={`店舗${index + 1}の電話番号（任意）`}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  {isAlbumMode ? "写真ファイル" : isVideoMode ? "動画ファイル" : "ファイル"}{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                <div
+                  className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+                    dragOver ? "border-orange-500 bg-orange-50" : "border-gray-300 hover:border-gray-400"
+                  } ${isUploading ? "pointer-events-none opacity-75" : "cursor-pointer"}`}
+                  onClick={pickFile}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (!mode) return
+                    setDragOver(true)
+                  }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setDragOver(false)
+                    if (!mode) {
+                      setFormatError("形式を選択してください")
+                      return
+                    }
+                    if (mode === "album") handlePhotoFiles(e.dataTransfer.files)
+                    else handleVideoFiles(e.dataTransfer.files)
+                  }}
+                >
+                  <div className="flex flex-col items-center gap-3">
+                    {isUploading ? (
+                      <Loader2 className="h-6 w-6 animate-spin text-orange-600" />
+                    ) : (
+                      <UploadIcon className="h-6 w-6 text-gray-600" />
+                    )}
+
+                    {isVideoMode && (
+                      <>
+                        <p className="text-sm text-gray-700">
+                          {selectedFile
+                            ? selectedFile.name
+                            : dragOver
+                              ? "ここにドロップしてください"
+                              : "クリックまたはドラッグ＆ドロップで動画を選択"}
+                        </p>
+                        <Button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            pickFile()
+                          }}
+                          disabled={isUploading}
+                          className="mt-1 bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-6 rounded-full"
+                        >
+                          ファイルを選択
+                        </Button>
+                      </>
+                    )}
+
+                    {isAlbumMode && (
+                      <div className="w-full space-y-3">
+                        <p className="text-sm text-gray-700 text-center">
+                          {photoFiles.length
+                            ? "追加で写真を選択するにはクリックまたはドロップしてください"
+                            : dragOver
+                              ? "ここにドロップしてください"
+                              : "クリックまたはドラッグ＆ドロップで写真を選択（複数可）"}
+                        </p>
+                        {photoFiles.length > 0 && (
+                          <ul className="space-y-2 text-left">
+                            {photoFiles.map((file, index) => (
+                              <li
+                                key={`${file.name}-${index}`}
+                                className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2"
+                              >
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden flex-shrink-0">
+                                    {photoPreviews[index] ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img src={photoPreviews[index]} alt={file.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Preview</div>
+                                    )}
+                                  </div>
+                                  <span className="truncate text-sm font-medium text-gray-700 block">{index + 1}. {file.name}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={index === 0 || isUploading}
+                                    onClick={(e) => { e.stopPropagation(); movePhotoFile(index, index - 1) }}
+                                    className="inline-flex items-center rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                                    aria-label="上へ"
+                                    title="上へ"
+                                  >
+                                    ↑
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={index === photoFiles.length - 1 || isUploading}
+                                    onClick={(e) => { e.stopPropagation(); movePhotoFile(index, index + 1) }}
+                                    className="inline-flex items-center rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
+                                    aria-label="下へ"
+                                    title="下へ"
+                                  >
+                                    ↓
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      removePhotoFile(index)
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-md border border-transparent px-2 py-1 text-sm text-red-500 hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    削除
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+
+                    {!mode && <p className="text-sm text-gray-600">まず形式を選択してください</p>}
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500">
+                  {isAlbumMode
+                    ? "jpeg / png / webp（1枚10MB以下・複数可）"
+                    : isVideoMode
+                      ? "mp4 / webm / mov（上限1GB）"
+                      : ""}
+                </p>
+                {isVideoMode && error && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
+                )}
+                {isAlbumMode && photoError && (
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{photoError}</p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+                <Button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={!isValid || isUploading || !hasPermission}
+                  className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-12 rounded-full disabled:bg-gray-300 disabled:text-gray-500"
+                >
+                  {uploadButtonLabel}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetForm}
+                  disabled={isUploading}
+                  className="px-6"
+                >
+                  リセット
+                </Button>
+              </div>
+
+              {isVideoMode && publicUrl && (
+                <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
+                  <p className="text-sm font-medium text-green-700">✓ 動画のアップロードが完了しました</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">タイトル: {title}</p>
+                    <p className="text-sm">
+                      カテゴリ: {categories.map((v) => CATEGORY_OPTIONS.find((o) => o.value === v)?.label || v).join("、")}
+                    </p>
+                    <video src={publicUrl} controls className="w-full max-h-40 rounded" />
+                  </div>
+                </div>
+              )}
+
+              {isAlbumMode && photoState === "success" && photoResult.length > 0 && (
+                <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
+                  <p className="text-sm font-medium text-green-700">✓ 写真アルバムのアップロードが完了しました</p>
+                  <ul className="space-y-1 text-sm text-gray-700">
+                    {photoResult.map((path, index) => (
+                      <li key={`${path}-${index}`} className="truncate">
+                        {path}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
-          )}
+          </fieldset>
         </CardContent>
       </Card>
     </div>

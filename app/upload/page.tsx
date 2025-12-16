@@ -2,15 +2,28 @@
 
 import VideoUploader from "@/components/uploader/VideoUploader"
 import Navigation from "@/components/navigation"
+import { Button } from "@/components/ui/button"
+import { useRouter } from "next/navigation"
 
 export default function UploadPage() {
+  const router = useRouter()
+
   return (
     <div className="min-h-screen bg-white pb-20 px-6 pt-8">
-      <h1 className="text-xl font-semibold mb-4">動画アップロード</h1>
-  <p className="text-sm text-gray-600 mb-6">mp4 / webm / mov 推奨。上限 1GB（開発設定）。</p>
+      <div className="flex items-center gap-4 mb-4">
+        <Button
+          variant="ghost"
+          onClick={() => router.push("/search")}
+          className="text-black"
+          aria-label="検索に戻る"
+        >
+          ＜
+        </Button>
+        <h1 className="text-xl font-semibold">コンテンツをアップロード</h1>
+      </div>
+
       <VideoUploader />
       <Navigation />
     </div>
   )
 }
-
