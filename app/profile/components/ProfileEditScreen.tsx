@@ -5,6 +5,7 @@ import Navigation from "@/components/navigation"
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
+import { ChevronLeft } from "lucide-react"
 
 interface UserProfile {
   name?: string | null
@@ -12,6 +13,7 @@ interface UserProfile {
   avatar_url?: string | null
   gender?: string | null
   age?: string | null
+  profile?: string | null
   created_at?: string
 }
 
@@ -33,16 +35,20 @@ export function ProfileEditScreen({
   const { toast } = useToast()
   const [editedName, setEditedName] = useState("")
   const [editedUsername, setEditedUsername] = useState("")
+  const [editedProfile, setEditedProfile] = useState("")
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedProfileImage, setSelectedProfileImage] = useState<File | null>(null)
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null)
   const [isUploadingProfile, setIsUploadingProfile] = useState(false)
   const [profileUploadProgress, setProfileUploadProgress] = useState<number>(0)
 
+  const PROFILE_MAX_LENGTH = 150
+
   useEffect(() => {
     if (userProfile) {
       setEditedName(userProfile.name || "")
       setEditedUsername(userProfile.username || "")
+      setEditedProfile(userProfile.profile || "")
     }
   }, [userProfile])
 
@@ -139,12 +145,22 @@ export function ProfileEditScreen({
     const updates: any = {
       name: editedName.trim(),
       username: editedUsername.trim(),
+      profile: editedProfile.trim(),
     }
 
     if (!updates.name || !updates.username) {
       toast({
         title: "入力エラー",
         description: "名前とユーザーネームを入力してください",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (editedProfile.length > PROFILE_MAX_LENGTH) {
+      toast({
+        title: "入力エラー",
+        description: `自己紹介は${PROFILE_MAX_LENGTH}文字以内で入力してください`,
         variant: "destructive",
       })
       return
@@ -190,9 +206,9 @@ export function ProfileEditScreen({
   return (
     <div className="min-h-screen bg-white pb-20">
       <div className="px-6 py-4 flex items-center gap-4">
-        <Button variant="ghost" onClick={onClose} className="text-black">
-          ＜
-        </Button>
+        <button onClick={onClose} className="text-black">
+          <ChevronLeft className="w-6 h-6" />
+        </button>
         <h1 className="text-xl font-semibold flex-1 text-center">プロフィール</h1>
         <div className="w-10"></div>
       </div>
@@ -283,6 +299,30 @@ export function ProfileEditScreen({
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
               placeholder={userProfile?.username || "ユーザーネームを入力してください"}
             />
+          </div>
+
+          {/* Profile (自己紹介) */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="block text-sm font-medium text-gray-700">自己紹介</label>
+              <span className={`text-xs ${editedProfile.length > PROFILE_MAX_LENGTH ? 'text-red-500' : 'text-gray-500'}`}>
+                {editedProfile.length}/{PROFILE_MAX_LENGTH}
+              </span>
+            </div>
+            <textarea
+              value={editedProfile}
+              onChange={(e) => setEditedProfile(e.target.value)}
+              rows={4}
+              className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none ${
+                editedProfile.length > PROFILE_MAX_LENGTH ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder={userProfile?.profile || "自己紹介を入力してください"}
+            />
+            {editedProfile.length > PROFILE_MAX_LENGTH && (
+              <p className="text-xs text-red-500 mt-1">
+                文字数が上限を超えています
+              </p>
+            )}
           </div>
 
           {/* Gender and Age */}
