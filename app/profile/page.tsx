@@ -294,7 +294,7 @@ export default function ProfilePage() {
       />
       {/* Drawer */}
       <div className="fixed right-0 top-0 h-full w-80 bg-white z-50 overflow-y-auto shadow-xl">
-        <div className="p-4 border-b flex items-center justify-between">
+        <div className="p-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">メニュー</h2>
           <button onClick={() => setShowMenuDrawer(false)} className="p-2">
             <X className="w-6 h-6" />
@@ -303,7 +303,7 @@ export default function ProfilePage() {
         <div className="p-4 space-y-6">
           {menuItems.map((section, sectionIndex) => (
             <div key={sectionIndex}>
-              <h3 className="text-sm font-semibold text-gray-500 mb-2">{section.category}</h3>
+              <h3 className="text-sm font-bold text-black mb-2">{section.category}</h3>
               <div className="space-y-1">
                 {section.items.map((item, itemIndex) => {
                   const IconComponent = item.icon
@@ -521,11 +521,9 @@ export default function ProfilePage() {
       {showMenuDrawer && <MenuDrawer />}
 
       {/* Header - Instagram style */}
-      <div className="bg-white px-4 py-3 border-b sticky top-0 z-30">
+      <div className="bg-white px-4 py-3 sticky top-0 z-30">
         <div className="flex items-center justify-between">
-          <button onClick={() => router.back()} className="p-1">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
+          <div className="w-8"></div>
           <span className="text-base font-semibold">
             @{userProfile?.username || "username"}
           </span>
