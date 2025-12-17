@@ -571,6 +571,20 @@ export default function ProfilePage() {
           </p>
         </div>
 
+        {/* SNS Link */}
+        {userProfile?.sns_link && (
+          <div className="mb-4">
+            <a 
+              href={userProfile.sns_link.startsWith('http') ? userProfile.sns_link : `https://${userProfile.sns_link}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              {userProfile.sns_link}
+            </a>
+          </div>
+        )}
+
         {/* Edit Profile Button */}
         <Button
           onClick={() => setShowProfileEdit(true)}
