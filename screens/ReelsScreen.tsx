@@ -47,8 +47,9 @@ export default function ReelsScreen() {
   const [activeIndex, setActiveIndex] = useState(0)
   const [viewportH, setViewportH] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 0)
   const [videoUrlMap, setVideoUrlMap] = useState<Record<string, string>>({})
-  const [totalCount, setTotalCount] = useState<number | null>(null)
-  const itemIdsRef = useRef<Set<string>>(new Set())
+  // 全動画のIDプール（初回にIDだけ取得してシャッフル）
+  const [idPool, setIdPool] = useState<string[]>([])
+  const [idCursor, setIdCursor] = useState(0)
   // リール滞在中は共通のミュート状態を使う（動画ごとではなくグローバル）
   const [muted, setMuted] = useState(false)
 
@@ -79,38 +80,44 @@ export default function ReelsScreen() {
   const fetchPage = useCallback(async () => {
     if (!hasMore) return
     try {
-      // 総件数を一度だけ取得
-      if (totalCount === null) {
-        const { count, error: countErr } = await supabase.from("videos").select("id", { count: "exact", head: true })
-        if (countErr) throw countErr
-        setTotalCount(count ?? 0)
-        if (!count || count === 0) {
-          setHasMore(false)
-          setLoading(false)
-          return
+      let pool = idPool
+      // IDプールが空なら全IDを取得してシャッフル
+      if (pool.length === 0) {
+        const { data: ids, error: idErr } = await supabase.from("videos").select("id")
+        if (idErr) throw idErr
+        pool = ((ids as { id: string }[]) ?? []).map((r) => r.id)
+        // シャッフル
+        for (let i = pool.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1))
+          ;[pool[i], pool[j]] = [pool[j], pool[i]]
         }
+        setIdPool(pool)
+        setIdCursor(0)
       }
 
-      const total = totalCount ?? 0
-      // ランダムオフセットで取得（重複はクライアント側で除外）
-      const maxOffset = Math.max(total - PAGE_SIZE, 0)
-      const offset = maxOffset > 0 ? Math.floor(Math.random() * (maxOffset + 1)) : 0
+      const start = idCursor
+      const end = Math.min(idCursor + PAGE_SIZE, pool.length)
+      const slice = pool.slice(start, end)
+      if (slice.length === 0) {
+        setHasMore(false)
+        setLoading(false)
+        return
+      }
 
       const { data, error } = await supabase
         .from("videos")
         .select(
           "id, storage_path, title, caption, owner_id, created_at, video_likes(count), store_1_name, store_1_tel, store_1_tabelog, store_2_name, store_2_tel, store_2_tabelog, store_3_name, store_3_tel, store_3_tabelog",
         )
-        .order("created_at", { ascending: false })
-        .range(offset, offset + PAGE_SIZE - 1)
+        .in("id", slice)
 
       if (error) throw error
-      const rows = ((data as VideoRow[]) ?? []).filter((r) => !itemIdsRef.current.has(r.id))
-      rows.forEach((r) => itemIdsRef.current.add(r.id))
-      // ランダム性を強めるため取得チャンク内もシャッフル
-      rows.sort(() => Math.random() - 0.5)
+      const rows = (data as VideoRow[]) ?? []
+      // slice の順序で並べ替え（in句は順不同）
+      rows.sort((a, b) => slice.indexOf(a.id) - slice.indexOf(b.id))
       setItems((prev) => [...prev, ...rows])
-      setHasMore(itemIdsRef.current.size < (totalCount ?? Infinity))
+      setIdCursor(end)
+      setHasMore(end < pool.length)
 
       const ownerIds = Array.from(new Set(rows.map((r) => r.owner_id).filter(Boolean))) as string[]
       if (ownerIds.length) {
@@ -134,7 +141,7 @@ export default function ReelsScreen() {
     } finally {
       setLoading(false)
     }
-  }, [hasMore, totalCount])
+  }, [hasMore, idCursor, idPool])
 
   useEffect(() => {
     fetchPage()
