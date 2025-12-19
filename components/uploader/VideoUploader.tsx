@@ -21,7 +21,7 @@ const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MAX_VIDEO_BYTES = 1024 * 1024 * 1024
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const STORE_INPUT_COUNT = 3
-const createDefaultStores = () => Array.from({ length: STORE_INPUT_COUNT }, () => ({ name: "", tel: "" }))
+const createDefaultStores = () => Array.from({ length: STORE_INPUT_COUNT }, () => ({ name: "", tel: "", tabelog: "" }))
 
 type PhotoUploadState = "idle" | "uploading" | "success" | "error"
 
@@ -169,6 +169,7 @@ export default function VideoUploader() {
     const storePayload = stores.map((store) => ({
       name: store.name.trim(),
       tel: store.tel.trim(),
+      tabelog: store.tabelog.trim(),
     }))
 
     await upload(selectedFile, {
@@ -505,6 +506,20 @@ export default function VideoUploader() {
                     }}
                     placeholder={`店舗${index + 1}の電話番号（任意）`}
                     className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  />
+                  <input
+                    type="url"
+                    value={store.tabelog}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setStores((prev) => {
+                        const next = [...prev]
+                        next[index] = { ...next[index], tabelog: value }
+                        return next
+                      })
+                    }}
+                    placeholder={`店舗${index + 1}の食べログURL（任意）`}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 sm:col-span-2"
                   />
                 </div>
               ))}
