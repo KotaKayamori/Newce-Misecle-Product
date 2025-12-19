@@ -44,7 +44,12 @@ export function StoreDetailModal({
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4">
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            className="text-gray-800 hover:text-gray-900"
+          >
             ＜
           </Button>
           <h2 className="text-lg font-semibold">店舗詳細</h2>
