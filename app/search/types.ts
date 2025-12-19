@@ -28,6 +28,7 @@ export type AlbumItem = {
   coverUrl?: string | null
   createdAt?: string | null
   owner?: {
+    id: string
     username?: string | null
     displayName?: string | null
     avatarUrl?: string | null

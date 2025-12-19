@@ -78,6 +78,7 @@ export function LikedVideosSection({
             bottomMetaVariant="account"
             accountAvatarUrl={profile?.avatar_url ?? null}
             accountLabel={label}
+            accountUserId={video.owner_id}
             showTopBookmark
             isBookmarked={bookmarkedSet.has(video.id)}
             onToggleBookmark={() => onToggleBookmark(video)}

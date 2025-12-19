@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Heart, Bookmark, Send } from "lucide-react"
 
@@ -17,6 +18,7 @@ interface VideoFullscreenOverlayProps {
   video: FullscreenVideoData
   ownerHandle: string
   ownerAvatarUrl?: string | null
+  ownerUserId?: string | null
   liked: boolean
   likeCount?: number
   onToggleLike: () => void
@@ -31,11 +33,13 @@ interface VideoFullscreenOverlayProps {
 }
 
 export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProps) {
+  const router = useRouter()
   const {
     open,
     video,
     ownerHandle,
     ownerAvatarUrl,
+    ownerUserId,
     liked,
     likeCount = 0,
     onToggleLike,
@@ -306,7 +310,18 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         <div className="flex-1 flex flex-col justify-end p-4 pb-32">
           <div className="text-white z-30">
             <div className="mb-3">
-              <button className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (ownerUserId) {
+                    try { videoRef.current?.pause() } catch {}
+                    onClose()
+                    router.push(`/profile/${ownerUserId}`)
+                  }
+                }}
+                className={`flex items-center gap-3 transition-opacity ${ownerUserId ? "hover:opacity-80 cursor-pointer" : ""}`}
+                disabled={!ownerUserId}
+              >
                 <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden">
                   {ownerAvatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element

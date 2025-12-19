@@ -55,7 +55,7 @@ export function useAlbums(isActive: boolean) {
     setAlbumAssetsMap(() => {
       const next: Record<string, AssetItem[]> = {}
       entries.forEach(([id, assets]) => {
-        next[id] = assets
+        next[id] = Array.from(assets)
       })
       return next
     })
