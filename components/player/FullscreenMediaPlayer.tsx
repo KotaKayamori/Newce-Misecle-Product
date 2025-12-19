@@ -57,7 +57,7 @@ export default function FullscreenMediaPlayer(props: FullscreenMediaPlayerProps)
     const el = videoRef.current
     if (!el) return
 
-    if (active) {
+    if (active && post.videoUrl) {
       // attach src only when active
       if (!el.getAttribute("src")) {
         el.setAttribute("src", post.videoUrl)

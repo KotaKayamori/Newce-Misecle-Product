@@ -13,7 +13,6 @@ import { supabase } from "@/lib/supabase"
 
 type VideoRow = {
   id: string
-  playback_url: string
   storage_path?: string | null
   title?: string | null
   caption?: string | null
@@ -22,10 +21,13 @@ type VideoRow = {
   video_likes?: { count?: number }[]
   store_1_name?: string | null
   store_1_tel?: string | null
+  store_1_tabelog?: string | null
   store_2_name?: string | null
   store_2_tel?: string | null
+  store_2_tabelog?: string | null
   store_3_name?: string | null
   store_3_tel?: string | null
+  store_3_tabelog?: string | null
 }
 
 type OwnerProfile = {
@@ -40,11 +42,15 @@ const WINDOW = 2 // activeIndex ±2 を描画
 export default function ReelsScreen() {
   const [items, setItems] = useState<VideoRow[]>([])
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, OwnerProfile>>({})
-  const [cursor, setCursor] = useState<string | null>(null)
   const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(true)
   const [activeIndex, setActiveIndex] = useState(0)
   const [viewportH, setViewportH] = useState<number>(typeof window !== "undefined" ? window.innerHeight : 0)
+  const [videoUrlMap, setVideoUrlMap] = useState<Record<string, string>>({})
+  const [totalCount, setTotalCount] = useState<number | null>(null)
+  const itemIdsRef = useRef<Set<string>>(new Set())
+  // リール滞在中は共通のミュート状態を使う（動画ごとではなくグローバル）
+  const [muted, setMuted] = useState(false)
 
   const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -73,22 +79,38 @@ export default function ReelsScreen() {
   const fetchPage = useCallback(async () => {
     if (!hasMore) return
     try {
-      const query = supabase
+      // 総件数を一度だけ取得
+      if (totalCount === null) {
+        const { count, error: countErr } = await supabase.from("videos").select("id", { count: "exact", head: true })
+        if (countErr) throw countErr
+        setTotalCount(count ?? 0)
+        if (!count || count === 0) {
+          setHasMore(false)
+          setLoading(false)
+          return
+        }
+      }
+
+      const total = totalCount ?? 0
+      // ランダムオフセットで取得（重複はクライアント側で除外）
+      const maxOffset = Math.max(total - PAGE_SIZE, 0)
+      const offset = maxOffset > 0 ? Math.floor(Math.random() * (maxOffset + 1)) : 0
+
+      const { data, error } = await supabase
         .from("videos")
         .select(
-          "id, playback_url, storage_path, title, caption, owner_id, created_at, video_likes(count), store_1_name, store_1_tel, store_1_tabelog, store_2_name, store_2_tel, store_2_tabelog, store_3_name, store_3_tel, store_3_tabelog",
+          "id, storage_path, title, caption, owner_id, created_at, video_likes(count), store_1_name, store_1_tel, store_1_tabelog, store_2_name, store_2_tel, store_2_tabelog, store_3_name, store_3_tel, store_3_tabelog",
         )
         .order("created_at", { ascending: false })
-        .limit(PAGE_SIZE)
+        .range(offset, offset + PAGE_SIZE - 1)
 
-      if (cursor) query.lt("created_at", cursor)
-
-      const { data, error } = await query
       if (error) throw error
-      const rows = (data as VideoRow[]) ?? []
+      const rows = ((data as VideoRow[]) ?? []).filter((r) => !itemIdsRef.current.has(r.id))
+      rows.forEach((r) => itemIdsRef.current.add(r.id))
+      // ランダム性を強めるため取得チャンク内もシャッフル
+      rows.sort(() => Math.random() - 0.5)
       setItems((prev) => [...prev, ...rows])
-      setCursor(rows.length ? rows[rows.length - 1].created_at : cursor)
-      setHasMore(rows.length === PAGE_SIZE)
+      setHasMore(itemIdsRef.current.size < (totalCount ?? Infinity))
 
       const ownerIds = Array.from(new Set(rows.map((r) => r.owner_id).filter(Boolean))) as string[]
       if (ownerIds.length) {
@@ -112,11 +134,31 @@ export default function ReelsScreen() {
     } finally {
       setLoading(false)
     }
-  }, [cursor, hasMore])
+  }, [hasMore, totalCount])
 
   useEffect(() => {
     fetchPage()
   }, [fetchPage])
+
+  // 個別に playback_url を取得して map に保持
+  const ensureVideoUrl = useCallback(
+    async (id: string) => {
+      if (videoUrlMap[id]) return videoUrlMap[id]
+      const { data, error } = await supabase.from("videos").select("playback_url").eq("id", id).single()
+      if (!error && data?.playback_url) {
+        setVideoUrlMap((prev) => ({ ...prev, [id]: data.playback_url }))
+        return data.playback_url
+      }
+      return undefined
+    },
+    [videoUrlMap],
+  )
+
+  // active 変更時に必要なら playback_url を取得
+  useEffect(() => {
+    const current = items[activeIndex]
+    if (current) ensureVideoUrl(current.id)
+  }, [activeIndex, items, ensureVideoUrl])
 
   // Sentinel for pagination
   useEffect(() => {
@@ -185,8 +227,11 @@ export default function ReelsScreen() {
             post={post}
             index={globalIndex}
             active={globalIndex === activeIndex}
+            videoUrl={videoUrlMap[post.id]}
             bookmarked={bookmarkedVideoIds.has(post.id)}
             onToggleBookmark={() => toggleBookmark(post.id)}
+            muted={muted}
+            onToggleMuted={() => setMuted((m) => !m)}
             ownerProfile={post.owner_id ? ownerProfiles[post.owner_id] : undefined}
             registerObserver={registerActiveTarget}
             onOpenReserve={() =>
@@ -237,8 +282,11 @@ function ReelItem({
   post,
   index,
   active,
+  videoUrl,
   bookmarked,
   onToggleBookmark,
+  muted,
+  onToggleMuted,
   ownerProfile,
   registerObserver,
   onOpenReserve,
@@ -247,15 +295,17 @@ function ReelItem({
   post: VideoRow
   index: number
   active: boolean
+  videoUrl?: string
   bookmarked: boolean
   onToggleBookmark: () => void
+  muted: boolean
+  onToggleMuted: () => void
   ownerProfile?: OwnerProfile
   registerObserver: (el: HTMLElement, index: number) => void
   onOpenReserve: () => void
   onOpenStore: () => void
 }) {
   const { isLiked, likeCount, toggleLike } = useLike(post.id, post.video_likes?.[0]?.count ?? 0)
-  const [muted, setMuted] = useState(true)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
 
   const ownerHandle = useMemo(() => {
@@ -284,7 +334,7 @@ function ReelItem({
         active={active}
         post={{
           id: post.id,
-          videoUrl: active ? post.playback_url : "", // 非activeはsrcなし
+          videoUrl: active ? videoUrl || "" : "",
           posterUrl,
           title: post.title || post.caption || "動画",
           caption: normalizeOptionalText(post.caption) || undefined,
@@ -298,7 +348,8 @@ function ReelItem({
         onToggleBookmark={onToggleBookmark}
         onShare={async () => {
           try {
-            const shareData = { title: post.title || "動画", url: post.playback_url }
+            const url = videoUrl || ""
+            const shareData = { title: post.title || "動画", url }
             if (navigator.share) await navigator.share(shareData)
             else {
               await navigator.clipboard.writeText(shareData.url)
@@ -309,7 +360,7 @@ function ReelItem({
         onReserve={onOpenReserve}
         onMore={onOpenStore}
         muted={muted}
-        onToggleMuted={() => setMuted((m) => !m)}
+        onToggleMuted={onToggleMuted}
       />
     </div>
   )
