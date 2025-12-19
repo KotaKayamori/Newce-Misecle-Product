@@ -22,8 +22,8 @@ interface VideoFullscreenOverlayProps {
   onToggleBookmark: () => void
   onShare: () => Promise<void> | void
   onClose: () => void
-  onReserve: () => void
-  onMore: () => void
+  onReserve?: () => void
+  onMore?: () => void
   muted: boolean
   onToggleMuted: () => void
 }
@@ -78,4 +78,3 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
     </div>
   )
 }
-

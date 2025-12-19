@@ -144,21 +144,20 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
         </div>
       )}
       {/* Page indicator moved under image (inside relative container) */}
-      {/* Bottom single CTA: もっと見る… */}
-      <div className="absolute bottom-16 left-0 right-0 px-4">
-        <div className="flex">
-          <button
-            type="button"
-            onClick={() => {
-              if (onMore) onMore()
-              else setDetailOpen(true)
-            }}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
-          >
-            もっと見る…
-          </button>
+      {/* Bottom CTA (optional): もっと見る… */}
+      {onMore && (
+        <div className="absolute bottom-16 left-0 right-0 px-4">
+          <div className="flex">
+            <button
+              type="button"
+              onClick={onMore}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
+            >
+              もっと見る…
+            </button>
+          </div>
         </div>
-      </div>
+      )}
       {detailOpen && (
         <div className="fixed inset-0 z-[60] bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
