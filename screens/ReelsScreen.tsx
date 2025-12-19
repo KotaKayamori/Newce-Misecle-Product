@@ -76,7 +76,7 @@ export default function ReelsScreen() {
       const query = supabase
         .from("videos")
         .select(
-          "id, playback_url, storage_path, title, caption, owner_id, created_at, video_likes(count), store_1_name, store_1_tel, store_2_name, store_2_tel, store_3_name, store_3_tel",
+          "id, playback_url, storage_path, title, caption, owner_id, created_at, video_likes(count), store_1_name, store_1_tel, store_1_tabelog, store_2_name, store_2_tel, store_2_tabelog, store_3_name, store_3_tel, store_3_tabelog",
         )
         .order("created_at", { ascending: false })
         .limit(PAGE_SIZE)

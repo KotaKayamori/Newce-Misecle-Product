@@ -40,10 +40,13 @@ type SupabaseVideoRow = {
   video_likes?: { count?: number }[]
   store_1_name?: string | null
   store_1_tel?: string | null
+  store_1_tabelog?: string | null
   store_2_name?: string | null
   store_2_tel?: string | null
+  store_2_tabelog?: string | null
   store_3_name?: string | null
   store_3_tel?: string | null
+  store_3_tabelog?: string | null
 }
 
 const CATEGORY_SLUG_MAP: Record<string, string> = {
@@ -275,10 +278,13 @@ export default function SearchPage() {
       video_likes: [],
       store_1_name: video.store_1_name ?? null,
       store_1_tel: video.store_1_tel ?? null,
+      store_1_tabelog: video.store_1_tabelog ?? null,
       store_2_name: video.store_2_name ?? null,
       store_2_tel: video.store_2_tel ?? null,
+      store_2_tabelog: video.store_2_tabelog ?? null,
       store_3_name: video.store_3_name ?? null,
       store_3_tel: video.store_3_tel ?? null,
+      store_3_tabelog: video.store_3_tabelog ?? null,
     })
     setShowFullscreenVideo(true)
   }
