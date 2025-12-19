@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import { Heart, Bookmark, Send } from "lucide-react"
 import { ImageCarousel } from "./ImageCarousel"
 
@@ -47,7 +47,14 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
     onToggleBookmark,
     onShare,
   } = props
-  if (!open) return null
+  useEffect(() => {
+    if (!open) return
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    return () => {
+      document.body.style.overflow = prevOverflow
+    }
+  }, [open])
 
   const hasAssets = assets && assets.length > 0
   const [detailOpen, setDetailOpen] = useState(false)
@@ -69,8 +76,12 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
     onIndexChange(index + 1)
   }
 
+  const canShowMore = Boolean(onMore || description || title || ownerLabel)
+
+  if (!open) return null
+
   return (
-    <div className="fixed inset-0 z-50 bg-black">
+    <div className="fixed inset-0 z-50 bg-black overflow-hidden">
       <button
         onClick={onClose}
         className="absolute left-6 top-6 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-white"
@@ -80,11 +91,11 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
       </button>
 
       {loading ? (
-        <div className="flex h-full w-full items-center justify-center text-sm text-white/70">読み込み中...</div>
+        <div className="flex h-full w-full items-center justify-center text-sm text-white/70 overflow-hidden">読み込み中...</div>
       ) : !hasAssets ? (
-        <div className="flex h-full w-full items-center justify-center text-sm text-white/70">このアルバムには写真がありません。</div>
+        <div className="flex h-full w-full items-center justify-center text-sm text-white/70 overflow-hidden">このアルバムには写真がありません。</div>
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center pb-32 pt-12">
+        <div className="absolute inset-0 flex items-center justify-center pb-32 pt-12 overflow-hidden">
           <div className="relative flex items-center justify-center">
             <ImageCarousel
               images={assets.map((asset) => asset.url)}
@@ -126,8 +137,8 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
               </div>
             )}
           </div>
-          {/* Meta overlay (icon + title) - place next to back button to avoid overlap */}
-          <div className="absolute top-6 left-16 z-50 flex items-center gap-3 text-white">
+          {/* Meta overlay (icon + title) */}
+          <div className="absolute top-6 left-16 z-50 flex items-center gap-3 text-white pointer-events-none">
             <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden">
               {ownerAvatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -144,21 +155,23 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
         </div>
       )}
       {/* Page indicator moved under image (inside relative container) */}
-      {/* Bottom single CTA: もっと見る… */}
-      <div className="absolute bottom-16 left-0 right-0 px-4">
-        <div className="flex">
-          <button
-            type="button"
-            onClick={() => {
-              if (onMore) onMore()
-              else setDetailOpen(true)
-            }}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
-          >
-            もっと見る…
-          </button>
+      {/* Bottom CTA (optional): もっと見る… */}
+      {canShowMore && (
+        <div className="absolute bottom-16 left-0 right-0 px-4">
+          <div className="flex">
+            <button
+              type="button"
+              onClick={() => {
+                if (onMore) onMore()
+                else setDetailOpen(true)
+              }}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors"
+            >
+              もっと見る…
+            </button>
+          </div>
         </div>
-      </div>
+      )}
       {detailOpen && (
         <div className="fixed inset-0 z-[60] bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">

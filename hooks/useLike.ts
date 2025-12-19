@@ -1,84 +1,83 @@
 "use client"
 
-import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useCallback, useEffect, useState } from "react"
+import { supabase } from "@/lib/supabase"
 
-export function useLike(videoId: string) {
+/**
+ * 楽観的更新付きいいねhook（videos / video_likes 前提）
+ */
+export function useLike(videoId: string, initialCount = 0) {
   const [isLiked, setIsLiked] = useState(false)
-  const [likeCount, setLikeCount] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [likeCount, setLikeCount] = useState(initialCount)
+  const [pending, setPending] = useState(false)
 
-  // いいね状態を取得
   const fetchLikeStatus = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const accessToken = session?.access_token
+      const { data: userData } = await supabase.auth.getUser()
+      const userId = userData?.user?.id
 
-      const headers: Record<string, string> = {}
-      if (accessToken) {
-        headers.Authorization = `Bearer ${accessToken}`
+      const { count } = await supabase
+        .from("video_likes")
+        .select("*", { count: "exact", head: true })
+        .eq("video_id", videoId)
+      setLikeCount(count ?? 0)
+
+      if (!userId) {
+        setIsLiked(false)
+        return
       }
 
-      const response = await fetch(`/api/videos/${videoId}/likes`, {
-        headers
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setIsLiked(data.isLiked)
-        setLikeCount(data.count)
-      }
-    } catch (error) {
-      console.error('Failed to fetch like status:', error)
+      const { data, error } = await supabase
+        .from("video_likes")
+        .select("id")
+        .eq("video_id", videoId)
+        .eq("user_id", userId)
+        .limit(1)
+      if (error) throw error
+      setIsLiked((data?.length || 0) > 0)
+    } catch (e) {
+      console.warn("fetchLikeStatus error", e)
     }
   }, [videoId])
 
-  // いいねをトグル
   const toggleLike = useCallback(async () => {
-    if (loading) return
-
-    setLoading(true)
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const accessToken = session?.access_token
-
-      if (!accessToken) {
-        throw new Error('ログインが必要です')
-      }
-
-      // 楽観的更新
-      const wasLiked = isLiked
-      setIsLiked(!wasLiked)
-      setLikeCount(prev => wasLiked ? prev - 1 : prev + 1)
-
-      const response = await fetch(`/api/videos/${videoId}/likes`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
-      })
-
-      if (!response.ok) {
-        // エラー時はロールバック
-        setIsLiked(wasLiked)
-        setLikeCount(prev => wasLiked ? prev + 1 : prev - 1)
-        throw new Error('いいねの更新に失敗しました')
-      }
-
-      const data = await response.json()
-      setIsLiked(data.liked)
-
-      // 正確な数を再取得
-      await fetchLikeStatus()
-
-    } catch (error) {
-      console.error('Failed to toggle like:', error)
-      throw error
-    } finally {
-      setLoading(false)
+    if (pending) return
+    setPending(true)
+    const { data: userData } = await supabase.auth.getUser()
+    const userId = userData?.user?.id
+    if (!userId) {
+      setPending(false)
+      return { needLogin: true }
     }
-  }, [videoId, isLiked, loading, fetchLikeStatus])
+
+    const wasLiked = isLiked
+    const prevCount = likeCount
+    const nextLiked = !wasLiked
+    setIsLiked(nextLiked)
+    setLikeCount((prev) => Math.max(0, prev + (nextLiked ? 1 : -1)))
+
+    try {
+      if (nextLiked) {
+        const { error } = await supabase.from("video_likes").upsert({ video_id: videoId, user_id: userId })
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from("video_likes")
+          .delete()
+          .eq("video_id", videoId)
+          .eq("user_id", userId)
+        if (error) throw error
+      }
+    } catch (e) {
+      console.warn("toggleLike error", e)
+      setIsLiked(wasLiked)
+      setLikeCount(prevCount)
+      return { error: true }
+    } finally {
+      setPending(false)
+    }
+    return { needLogin: false }
+  }, [pending, isLiked, videoId, likeCount])
 
   useEffect(() => {
     fetchLikeStatus()
@@ -87,8 +86,8 @@ export function useLike(videoId: string) {
   return {
     isLiked,
     likeCount,
-    loading,
+    pending,
     toggleLike,
-    refetch: fetchLikeStatus
+    refetch: fetchLikeStatus,
   }
 }

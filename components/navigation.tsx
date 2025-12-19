@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Search, Calendar, Heart, User /* , Play */ } from "lucide-react" // TODO: 未使用 Play アイコン
+import { Search, Calendar, Heart, User, Play } from "lucide-react"
 
 export default function Navigation() {
   const pathname = usePathname()
@@ -10,7 +10,7 @@ export default function Navigation() {
   const navItems = [
     { label: "探す", icon: Search, href: "/search" },
     { label: "予約履歴", icon: Calendar, href: "/reservations" },
-    // { label: "動画", icon: Play, href: "/reels" }, // 一時停止中: Reels をフッターから非表示
+    { label: "動画", icon: Play, href: "/reels" },
     { label: "お気に入り", icon: Heart, href: "/favorites" },
     { label: "マイページ", icon: User, href: "/profile" },
   ]
