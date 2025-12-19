@@ -186,13 +186,6 @@ export default function SearchPage() {
   const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
 
 
-  useEffect(() => {
-    document.body.classList.add("scrollbar-hide")
-    return () => {
-      document.body.classList.remove("scrollbar-hide")
-    }
-  }, [])
-
   async function toggleVideoLike(videoId: string) {
     if (likeMutationRef.current.has(videoId)) return
     const wasLiked = likedVideoIds.has(videoId)
