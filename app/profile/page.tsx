@@ -7,6 +7,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { useFollow } from "@/hooks/useFollow"
 import { useToast } from "@/hooks/use-toast"
 import { useProfileModals } from "./hooks/useProfileModals"
 import { GenderAgeScreen } from "./components/GenderAgeScreen"
@@ -28,6 +29,7 @@ import { PasswordSuccessScreen } from "./components/PasswordSuccessScreen"
 import { UploadScreen } from "./components/UploadScreen"
 import { MyVideosScreen } from "./components/MyVideosScreen"
 import { NotificationPermissionScreen } from "./components/NotificationPermissionScreen"
+import { supabase } from "@/lib/supabase"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -72,6 +74,15 @@ export default function ProfilePage() {
     setShowMyVideosModal,
   } = modals
 
+  // フォロー機能（自分自身のフォロワー/フォロー数を取得）
+  const { 
+    followersCount, 
+    followingCount 
+  } = useFollow(user?.id ?? null)
+
+  // 投稿数
+  const [postsCount, setPostsCount] = useState(0)
+
   const [showEmailSuccess, setShowEmailSuccess] = useState(false)
   const [emailSuccessMessage, setEmailSuccessMessage] = useState("")
   const [emailSuccessType, setEmailSuccessType] = useState<"contact" | "bug">("contact")
@@ -85,6 +96,37 @@ export default function ProfilePage() {
       router.push("/register")
     }
   }, [error, router])
+
+  // 投稿数を取得（動画 + アルバム）
+  useEffect(() => {
+    const loadPostsCount = async () => {
+      if (!user?.id) return
+
+      try {
+        // 動画数を取得
+        const { count: videosCount, error: videosError } = await supabase
+          .from("videos")
+          .select("*", { count: "exact", head: true })
+          .eq("owner_id", user.id)
+
+        if (videosError) throw videosError
+
+        // アルバム数を取得
+        const { count: albumsCount, error: albumsError } = await supabase
+          .from("photo_albums")
+          .select("*", { count: "exact", head: true })
+          .eq("owner_id", user.id)
+
+        if (albumsError) throw albumsError
+
+        setPostsCount((videosCount || 0) + (albumsCount || 0))
+      } catch (err) {
+        console.error("Failed to load posts count:", err)
+      }
+    }
+
+    loadPostsCount()
+  }, [user?.id])
 
   const visitHistory = [
     {
@@ -549,16 +591,16 @@ export default function ProfilePage() {
             {/* <h2 className="text-xl font-bold mb-2">{userProfile?.name || "ユーザー"}</h2> */}
             <div className="flex gap-6">
               <div className="text-center">
-                <div className="font-bold text-lg">0</div>
+                <div className="font-bold text-lg">{postsCount}</div>
                 <div className="text-xs text-gray-500">投稿</div>
               </div>
               <div className="text-center">
-                <div className="font-bold text-lg">0</div>
+                <div className="font-bold text-lg">{followersCount}</div>
                 <div className="text-xs text-gray-500">フォロワー</div>
               </div>
               <div className="text-center">
-                <div className="font-bold text-lg">0</div>
-                <div className="text-xs text-gray-500">フォロー</div>
+                <div className="font-bold text-lg">{followingCount}</div>
+                <div className="text-xs text-gray-500">フォロー中</div>
               </div>
             </div>
           </div>

@@ -8,12 +8,8 @@ import { useRouter, useParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { fetchUserProfile, UserProfile } from "@/lib/api/profile"
 import { supabase } from "@/lib/supabase"
-import VideoCard from "@/components/VideoCard"
-import AlbumCard from "@/components/AlbumCard"
-import VideoFullscreenOverlay, { FullscreenVideoData } from "@/components/VideoFullscreenOverlay"
+import { useFollow } from "@/hooks/useFollow"
 import AlbumViewerOverlay, { AlbumAsset } from "@/components/AlbumViewerOverlay"
-import { useBookmark } from "@/hooks/useBookmark"
-import { useLike } from "@/hooks/useLike"
 
 // 動画の型定義
 interface UserVideo {
@@ -87,6 +83,15 @@ export default function UserProfilePage() {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"video" | "album">("video")
   
+  // フォロー機能
+  const { 
+    isFollowing, 
+    loading: followLoading, 
+    followersCount, 
+    followingCount, 
+    toggleFollow 
+  } = useFollow(userId)
+
   // 動画関連
   const [videos, setVideos] = useState<UserVideo[]>([])
   const [videosLoading, setVideosLoading] = useState(true)
@@ -95,21 +100,12 @@ export default function UserProfilePage() {
   const [albums, setAlbums] = useState<UserAlbum[]>([])
   const [albumsLoading, setAlbumsLoading] = useState(true)
   
-  // フルスクリーンオーバーレイ関連
-  const [selectedVideo, setSelectedVideo] = useState<UserVideo | null>(null)
-  const [fsOpen, setFsOpen] = useState(false)
-  const [fsMuted, setFsMuted] = useState(true)
-  
   // アルバムビューア関連
   const [selectedAlbum, setSelectedAlbum] = useState<UserAlbum | null>(null)
   const [albumAssets, setAlbumAssets] = useState<AlbumAsset[]>([])
   const [albumViewerOpen, setAlbumViewerOpen] = useState(false)
   const [albumAssetIndex, setAlbumAssetIndex] = useState(0)
   const [albumAssetsLoading, setAlbumAssetsLoading] = useState(false)
-
-  // いいね・ブックマーク
-  // const { liked, toggleLike } = useLike(selectedVideo?.id ?? null)
-  // const { bookmarked, toggleBookmark } = useBookmark(selectedVideo?.id ?? null, "video")
 
   // 自分のプロフィールページの場合は /profile にリダイレクト
   useEffect(() => {
@@ -196,10 +192,20 @@ export default function UserProfilePage() {
     loadAlbums()
   }, [userId])
 
+  // フォローボタンクリック
+  const handleFollowClick = async () => {
+    if (!user) {
+      // 未ログインの場合はログインページへ
+      router.push("/auth/login")
+      return
+    }
+    await toggleFollow()
+  }
+
   // 動画クリック時
   const handleVideoClick = (video: UserVideo) => {
-    setSelectedVideo(video)
-    setFsOpen(true)
+    // 動画詳細ページまたはリールページに遷移
+    router.push(`/reels?v=${video.id}`)
   }
 
   // アルバムクリック時
@@ -233,18 +239,6 @@ export default function UserProfilePage() {
       setAlbumAssets([])
     } finally {
       setAlbumAssetsLoading(false)
-    }
-  }
-
-  // シェア処理
-  const handleShare = async () => {
-    if (!selectedVideo) return
-    const url = `${window.location.origin}/reels?v=${selectedVideo.id}`
-    if (navigator.share) {
-      await navigator.share({ title: selectedVideo.title || "動画", url })
-    } else {
-      await navigator.clipboard.writeText(url)
-      alert("リンクをコピーしました")
     }
   }
 
@@ -288,33 +282,6 @@ export default function UserProfilePage() {
 
   return (
     <div className="min-h-screen bg-white pb-20">
-      {/* Video Fullscreen Overlay */}
-      {/* {selectedVideo && (
-        <VideoFullscreenOverlay
-          open={fsOpen}
-          video={{
-            id: selectedVideo.id,
-            playback_url: selectedVideo.playback_url,
-            poster_url: derivePosterUrl(selectedVideo.playback_url, selectedVideo.storage_path),
-            title: selectedVideo.title,
-            caption: selectedVideo.caption,
-          }}
-          ownerHandle={`@${userProfile.username || "user"}`}
-          ownerAvatarUrl={userProfile.avatar_url}
-          ownerUserId={userId}
-          liked={liked}
-          onToggleLike={toggleLike}
-          bookmarked={bookmarked}
-          onToggleBookmark={toggleBookmark}
-          onShare={handleShare}
-          onClose={() => setFsOpen(false)}
-          onReserve={() => {}}
-          onMore={() => {}}
-          muted={fsMuted}
-          onToggleMuted={() => setFsMuted((m) => !m)}
-        />
-      )} */}
-
       {/* Album Viewer Overlay */}
       {selectedAlbum && (
         <AlbumViewerOverlay
@@ -360,12 +327,12 @@ export default function UserProfilePage() {
                 <div className="text-xs text-gray-500">投稿</div>
               </div>
               <div className="text-center">
-                <div className="font-bold text-lg">0</div>
+                <div className="font-bold text-lg">{followersCount}</div>
                 <div className="text-xs text-gray-500">フォロワー</div>
               </div>
               <div className="text-center">
-                <div className="font-bold text-lg">0</div>
-                <div className="text-xs text-gray-500">フォロー</div>
+                <div className="font-bold text-lg">{followingCount}</div>
+                <div className="text-xs text-gray-500">フォロー中</div>
               </div>
             </div>
           </div>
@@ -392,11 +359,18 @@ export default function UserProfilePage() {
           </div>
         )}
 
+        {/* フォローボタン */}
         <Button
-          variant="default"
-          className="w-full bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 rounded-lg"
+          onClick={handleFollowClick}
+          disabled={followLoading}
+          variant={isFollowing ? "outline" : "default"}
+          className={`w-full font-medium py-2 rounded-lg ${
+            isFollowing 
+              ? "border-gray-300 text-gray-800 hover:bg-gray-100" 
+              : "bg-orange-600 hover:bg-orange-700 text-white"
+          }`}
         >
-          フォローする
+          {followLoading ? "読み込み中..." : isFollowing ? "フォロー中" : "フォローする"}
         </Button>
       </div>
 
@@ -426,8 +400,8 @@ export default function UserProfilePage() {
         </div>
       </div>
 
-      {/* Content Area */}
-      <div className="p-4">
+      {/* Content Area - 3カラムグリッド、サムネイルのみ */}
+      <div>
         {activeTab === "video" ? (
           videosLoading ? (
             <div className="py-8 text-center text-gray-500">読み込み中…</div>
@@ -437,16 +411,23 @@ export default function UserProfilePage() {
               <p className="text-gray-500">まだ動画がありません</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-[1px]">
               {videos.map((video) => (
-                <VideoCard
+                <button
                   key={video.id}
-                  posterUrl={derivePosterUrl(video.playback_url, video.storage_path) || "/placeholder.jpg"}
-                  title={video.title || video.caption || "無題の動画"}
-                  bottomMetaVariant="date"
-                  dateLabel={new Date(video.created_at).toLocaleDateString("ja-JP")}
-                  onClickCard={() => handleVideoClick(video)}
-                />
+                  onClick={() => handleVideoClick(video)}
+                  className="aspect-square relative overflow-hidden bg-gray-100 hover:opacity-80 transition-opacity"
+                >
+                  <img
+                    src={derivePosterUrl(video.playback_url, video.storage_path) || "/placeholder.jpg"}
+                    alt={video.title || "動画"}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* 再生アイコン */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Play className="w-8 h-8 text-white drop-shadow-lg" fill="white" />
+                  </div>
+                </button>
               ))}
             </div>
           )
@@ -459,16 +440,23 @@ export default function UserProfilePage() {
               <p className="text-gray-500">まだアルバムがありません</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-[1px]">
               {albums.map((album) => (
-                <AlbumCard
+                <button
                   key={album.id}
-                  coverUrl={deriveAlbumCoverUrl(album.cover_path)}
-                  title={album.title || "無題のアルバム"}
-                  bottomMetaVariant="date"
-                  dateLabel={new Date(album.created_at).toLocaleDateString("ja-JP")}
-                  onClickCard={() => handleAlbumClick(album)}
-                />
+                  onClick={() => handleAlbumClick(album)}
+                  className="aspect-square relative overflow-hidden bg-gray-100 hover:opacity-80 transition-opacity"
+                >
+                  <img
+                    src={deriveAlbumCoverUrl(album.cover_path) || "/placeholder.jpg"}
+                    alt={album.title || "アルバム"}
+                    className="w-full h-full object-cover"
+                  />
+                  {/* 複数枚アイコン */}
+                  <div className="absolute top-2 right-2">
+                    <Image className="w-5 h-5 text-white drop-shadow-lg" />
+                  </div>
+                </button>
               ))}
             </div>
           )
