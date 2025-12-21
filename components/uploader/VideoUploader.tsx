@@ -21,7 +21,7 @@ const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
 const MAX_VIDEO_BYTES = 1024 * 1024 * 1024
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const STORE_INPUT_COUNT = 3
-const createDefaultStores = () => Array.from({ length: STORE_INPUT_COUNT }, () => ({ name: "", tel: "" }))
+const createDefaultStores = () => Array.from({ length: STORE_INPUT_COUNT }, () => ({ name: "", tel: "", tabelog: "" }))
 
 type PhotoUploadState = "idle" | "uploading" | "success" | "error"
 
@@ -207,6 +207,7 @@ export default function VideoUploader() {
     const storePayload = stores.map((store) => ({
       name: store.name.trim(),
       tel: store.tel.trim(),
+      tabelog: store.tabelog.trim(),
     }))
 
     await upload(selectedFile, {
@@ -427,25 +428,25 @@ export default function VideoUploader() {
           )}
 
           <fieldset disabled={formDisabled} className={formDisabled ? "opacity-50 pointer-events-none" : ""}>
-            <input
-              ref={inputRef}
-              type="file"
-              accept={
-                mode === "album"
-                  ? IMAGE_MIME_TYPES.join(",")
-                  : mode === "video"
-                    ? "video/mp4,video/webm,video/quicktime"
-                    : ""
-              }
-              multiple={mode === "album"}
-              className="hidden"
-              onChange={(e) => {
-                if (mode === "album") handlePhotoFiles(e.target.files)
-                else handleVideoFiles(e.target.files)
-              }}
-            />
-
             <div className="space-y-4">
+              <input
+                ref={inputRef}
+                type="file"
+                accept={
+                  mode === "album"
+                    ? IMAGE_MIME_TYPES.join(",")
+                    : mode === "video"
+                      ? "video/mp4,video/webm,video/quicktime"
+                      : ""
+                }
+                multiple={mode === "album"}
+                className="hidden"
+                onChange={(e) => {
+                  if (mode === "album") handlePhotoFiles(e.target.files)
+                  else handleVideoFiles(e.target.files)
+                }}
+              />
+
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   形式を選択 <span className="text-red-500">*</span>
@@ -481,6 +482,7 @@ export default function VideoUploader() {
                 />
               </div>
 
+              {/* { changed code } カテゴリUIを複数選択(チェックボックス)に */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   カテゴリ <span className="text-red-500">*</span>
@@ -563,6 +565,20 @@ export default function VideoUploader() {
                         }}
                         placeholder={`店舗${index + 1}の電話番号（任意）`}
                         className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      />
+                      <input
+                        type="url"
+                        value={store.tabelog}
+                        onChange={(e) => {
+                          const value = e.target.value
+                          setStores((prev) => {
+                            const next = [...prev]
+                            next[index] = { ...next[index], tabelog: value }
+                            return next
+                          })
+                        }}
+                        placeholder={`店舗${index + 1}の食べログURL（任意）`}
+                        className="w-full rounded-md border border-gray-300 px-3 py-2 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500 sm:col-span-2"
                       />
                     </div>
                   ))}
@@ -698,67 +714,68 @@ export default function VideoUploader() {
                     {!mode && <p className="text-sm text-gray-600">まず形式を選択してください</p>}
                   </div>
                 </div>
-                <p className="text-xs text-gray-500">
-                  {isAlbumMode
-                    ? "jpeg / png / webp（1枚10MB以下・複数可）"
-                    : isVideoMode
-                      ? "mp4 / webm / mov（上限1GB）"
-                      : ""}
-                </p>
-                {isVideoMode && error && (
-                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
-                )}
-                {isAlbumMode && photoError && (
-                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{photoError}</p>
-                )}
               </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
-                <Button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={!isValid || isUploading || !hasPermission}
-                  className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-12 rounded-full disabled:bg-gray-300 disabled:text-gray-500"
-                >
-                  {uploadButtonLabel}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleResetForm}
-                  disabled={isUploading}
-                  className="px-6"
-                >
-                  リセット
-                </Button>
-              </div>
-
-              {isVideoMode && publicUrl && (
-                <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
-                  <p className="text-sm font-medium text-green-700">✓ 動画のアップロードが完了しました</p>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">タイトル: {title}</p>
-                    <p className="text-sm">
-                      カテゴリ: {categories.map((v) => CATEGORY_OPTIONS.find((o) => o.value === v)?.label || v).join("、")}
-                    </p>
-                    <video src={publicUrl} controls className="w-full max-h-40 rounded" />
-                  </div>
-                </div>
-              )}
-
-              {isAlbumMode && photoState === "success" && photoResult.length > 0 && (
-                <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
-                  <p className="text-sm font-medium text-green-700">✓ 写真アルバムのアップロードが完了しました</p>
-                  <ul className="space-y-1 text-sm text-gray-700">
-                    {photoResult.map((path, index) => (
-                      <li key={`${path}-${index}`} className="truncate">
-                        {path}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
+
+            <p className="text-xs text-gray-500">
+              {isAlbumMode
+                ? "jpeg / png / webp（1枚10MB以下・複数可）"
+                : isVideoMode
+                  ? "mp4 / webm / mov（上限1GB）"
+                  : ""}
+            </p>
+            {isVideoMode && error && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{error}</p>
+            )}
+            {isAlbumMode && photoError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2">{photoError}</p>
+            )}
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">
+              <Button
+                type="button"
+                onClick={handleSubmit}
+                disabled={!isValid || isUploading}
+                className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-12 rounded-full disabled:bg-gray-300 disabled:text-gray-500"
+              >
+                {uploadButtonLabel}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResetForm}
+                disabled={isUploading}
+                className="px-6"
+              >
+                リセット
+              </Button>
+            </div>
+
+            {isVideoMode && publicUrl && (
+              <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
+                <p className="text-sm font-medium text-green-700">✓ 動画のアップロードが完了しました</p>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">タイトル: {title}</p>
+                  <p className="text-sm">
+                    カテゴリ: {categories.map((v) => CATEGORY_OPTIONS.find((o) => o.value === v)?.label || v).join("、")}
+                  </p>
+                  <video src={publicUrl} controls className="w-full max-h-40 rounded" />
+                </div>
+              </div>
+            )}
+
+            {isAlbumMode && photoState === "success" && photoResult.length > 0 && (
+              <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
+                <p className="text-sm font-medium text-green-700">✓ 写真アルバムのアップロードが完了しました</p>
+                <ul className="space-y-1 text-sm text-gray-700">
+                  {photoResult.map((path, index) => (
+                    <li key={`${path}-${index}`} className="truncate">
+                      {path}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </fieldset>
         </CardContent>
       </Card>

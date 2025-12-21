@@ -27,8 +27,9 @@ export function mapVideoToRestaurant(video: BasicVideo | null | undefined) {
     .map((index) => {
       const name = normalizeOptionalText((video as any)[`store_${index}_name`])
       const tel = normalizeOptionalText((video as any)[`store_${index}_tel`])
-      if (!name && !tel) return null
-      return { name: name ?? "店舗情報", tel: tel ?? null }
+      const tabelog = normalizeOptionalText((video as any)[`store_${index}_tabelog`])
+      if (!name && !tel && !tabelog) return null
+      return { name: name ?? "店舗情報", tel: tel ?? null, tabelog: tabelog ?? null }
     })
     .filter(Boolean) as { name: string; tel: string | null }[]
 
