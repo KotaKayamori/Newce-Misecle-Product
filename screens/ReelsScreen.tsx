@@ -6,7 +6,7 @@ import { ReservationModal } from "@/app/search/components/modals/ReservationModa
 import { StoreDetailModal } from "@/app/search/components/modals/StoreDetailModal"
 import type { RestaurantInfo } from "@/app/search/types"
 import { openReservationForVideo, openStoreDetailForVideo, normalizeOptionalText } from "@/lib/video-actions"
-import FullscreenMediaPlayer from "@/components/player/FullscreenMediaPlayer"
+import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import { useBookmark } from "@/hooks/useBookmark"
 import { useLike } from "@/hooks/useLike"
 import { supabase } from "@/lib/supabase"
@@ -241,6 +241,7 @@ export default function ReelsScreen() {
             onToggleMuted={() => setMuted((m) => !m)}
             ownerProfile={post.owner_id ? ownerProfiles[post.owner_id] : undefined}
             registerObserver={registerActiveTarget}
+            onCloseReel={() => window.history.back()}
             onOpenReserve={() =>
               openReservationForVideo({ setSelectedRestaurant, setShowReservationModal }, post, { keepFullscreen: true })
             }
@@ -296,6 +297,7 @@ function ReelItem({
   onToggleMuted,
   ownerProfile,
   registerObserver,
+  onCloseReel,
   onOpenReserve,
   onOpenStore,
 }: {
@@ -309,6 +311,7 @@ function ReelItem({
   onToggleMuted: () => void
   ownerProfile?: OwnerProfile
   registerObserver: (el: HTMLElement, index: number) => void
+  onCloseReel: () => void
   onOpenReserve: () => void
   onOpenStore: () => void
 }) {
@@ -322,8 +325,8 @@ function ReelItem({
   }, [ownerProfile, post.owner_id])
   const ownerAvatarUrl = ownerProfile?.avatar_url ?? null
   const posterUrl = useMemo(
-    () => derivePosterUrl(post.playback_url, post.storage_path) || undefined,
-    [post.playback_url, post.storage_path],
+    () => derivePosterUrl(videoUrl, post.storage_path) || undefined,
+    [videoUrl, post.storage_path],
   )
 
   useEffect(() => {
@@ -336,22 +339,22 @@ function ReelItem({
       className="relative h-screen w-screen snap-start"
       style={{ scrollSnapStop: "always" as any }}
     >
-      <FullscreenMediaPlayer
-        open
-        active={active}
-        post={{
+      <VideoFullscreenOverlay
+        open={active}
+        variant="reels"
+        video={{
           id: post.id,
-          videoUrl: active ? videoUrl || "" : "",
-          posterUrl,
-          title: post.title || post.caption || "動画",
-          caption: normalizeOptionalText(post.caption) || undefined,
+          playback_url: active ? videoUrl || "" : "",
+          poster_url: posterUrl,
+          title: post.title ?? undefined,
+          caption: normalizeOptionalText(post.caption) ?? undefined,
         }}
         ownerHandle={ownerHandle}
         ownerAvatarUrl={ownerAvatarUrl}
         liked={isLiked}
         likeCount={likeCount}
-        bookmarked={bookmarked}
         onToggleLike={toggleLike}
+        bookmarked={bookmarked}
         onToggleBookmark={onToggleBookmark}
         onShare={async () => {
           try {
@@ -364,6 +367,7 @@ function ReelItem({
             }
           } catch {}
         }}
+        onClose={onCloseReel}
         onReserve={onOpenReserve}
         onMore={onOpenStore}
         muted={muted}
