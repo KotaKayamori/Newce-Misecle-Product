@@ -29,6 +29,10 @@ export default function VideoUploader() {
   const inputRef = useRef<HTMLInputElement | null>(null)
   const { state, error, publicUrl, upload, reset } = useVideoUpload()
 
+  // 権限チェック用 state
+  const [permissionChecking, setPermissionChecking] = useState(true)
+  const [hasPermission, setHasPermission] = useState(false)
+
   const [mode, setMode] = useState<UploadMode>("")
   const [formatError, setFormatError] = useState("")
 
@@ -47,7 +51,42 @@ export default function VideoUploader() {
   const [albumId, setAlbumId] = useState<string | null>(null)
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
 
+  // マウント時に allowed_uploaders をチェック
+  useEffect(() => {
+    const checkPermission = async () => {
+      setPermissionChecking(true)
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        if (!user) {
+          setHasPermission(false)
+          setPermissionChecking(false)
+          return
+        }
+        const { data, error } = await supabase
+          .from("allowed_uploaders")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle()
+        if (error) {
+          console.error("allowed_uploaders check error", error)
+          setHasPermission(false)
+        } else {
+          setHasPermission(!!data)
+        }
+      } catch (e) {
+        console.error("permission check error", e)
+        setHasPermission(false)
+      } finally {
+        setPermissionChecking(false)
+      }
+    }
+    checkPermission()
+  }, [])
+
   const pickFile = () => {
+    if (!hasPermission) return
     if (!mode) {
       setFormatError("形式を選択してください")
       return
@@ -98,6 +137,7 @@ export default function VideoUploader() {
   }
 
   const handleModeChange = (value: UploadMode) => {
+    if (!hasPermission) return
     setMode(value)
     setFormatError("")
     if (value === "video") {
@@ -316,6 +356,7 @@ export default function VideoUploader() {
   }
 
   const handleSubmit = async () => {
+    if (!hasPermission) return
     if (!mode) {
       setFormatError("形式を選択してください")
       return
@@ -366,10 +407,31 @@ export default function VideoUploader() {
         ? "写真をアップロードする"
         : "アップロードする"
 
+  // フォーム無効化フラグ
+  const formDisabled = !hasPermission || permissionChecking
+
   return (
     <div className="mx-auto w-full min-h-0 max-w-md">
       <Card className="border-0 shadow-none">
         <CardContent className="space-y-4 pt-6">
+          {/* 権限エラー表示 */}
+          {!permissionChecking && !hasPermission && (
+            <div className="rounded-md border-2 border-red-500 bg-red-50 px-4 py-3">
+              <p className="text-center text-lg font-bold text-red-600">
+                権限がないのでアップロードできません
+              </p>
+            </div>
+          )}
+
+          {permissionChecking && (
+            <div className="flex items-center justify-center gap-2 py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-gray-500" />
+              <span className="text-sm text-gray-500">権限を確認中…</span>
+            </div>
+          )}
+
+          <fieldset disabled={formDisabled} className={formDisabled ? "opacity-50 pointer-events-none" : ""}>
+            <div className="space-y-4">
           <input
             ref={inputRef}
             type="file"
@@ -715,6 +777,8 @@ export default function VideoUploader() {
               </ul>
             </div>
           )}
+            </div>
+          </fieldset>
         </CardContent>
       </Card>
     </div>
