@@ -385,7 +385,7 @@ export default function SearchPage() {
 
   const handleRefreshVideos = () => {
     if (isLatestCategory || isGuidebookCategory) return
-    const categorySlug = selectedCategory === "今日のおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
     refreshVideos(categorySlug, 10)
   }
 
@@ -405,7 +405,7 @@ export default function SearchPage() {
 
   useEffect(() => {
     if (selectedCategory === "最新動画" || selectedCategory === "ガイドブック") return
-    const categorySlug = selectedCategory === "今日のおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
     fetchVideos(categorySlug, 10)
   }, [selectedCategory, fetchVideos])
 
@@ -507,7 +507,7 @@ export default function SearchPage() {
     : (selectedOwnerProfile?.display_name || "ユーザー");
 
   return (
-   <div className="min-h-screen bg-white pb-20 overflow-y-auto scrollbar-hide">
+   <div className="min-h-screen bg-white pb-20 scrollbar-hide">
       <SearchControls
         isSearchMode={isSearchMode}
         didSearch={search.didSearch}
@@ -679,27 +679,3 @@ export default function SearchPage() {
    </div>
   )
 }
-
-// function SpeakerIcon({ muted }: { muted: boolean }) {
-//   return (
-//     <svg
-//       width="24"
-//       height="24"
-//       viewBox="0 0 24 24"
-//       fill="none"
-//       stroke="currentColor"
-//       strokeWidth="1.8"
-//       strokeLinecap="round"
-//       strokeLinejoin="round"
-//     >
-//       <path d="M4.5 9.5v5h3.2L12 20V4l-4.3 5.5H4.5z" fill="currentColor" stroke="currentColor" />
-//       {!muted && (
-//         <>
-//           <path d="M15.2 9.2a3.3 3.3 0 010 5.6" />
-//           <path d="M17.4 7a5.6 5.6 0 010 10" />
-//         </>
-//       )}
-//       {muted && <line x1="16.2" y1="8" x2="21" y2="16" />}
-//     </svg>
-//   )
-// }

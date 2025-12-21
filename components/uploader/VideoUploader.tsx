@@ -10,10 +10,10 @@ import { supabase } from "@/lib/supabase"
 type UploadMode = "" | "video" | "album"
 
 const CATEGORY_OPTIONS: { value: VideoCategory; label: string }[] = [
-  { value: "today_recommended", label: "今日のおすすめ" },
-  { value: "popular_now", label: "今人気のお店" },
+  { value: "today_recommended", label: "あなたにおすすめ" },
+  { value: "popular_now", label: "人気急上昇中のお店" },
   { value: "sns_popular", label: "SNSで人気のお店" },
-  { value: "gen_z_popular", label: "Z世代に人気のお店" },
+  { value: "gen_z_popular", label: "若年層に人気のお店" },
   { value: "date_recommended", label: "デートでおすすめのお店" },
 ]
 
@@ -35,7 +35,7 @@ export default function VideoUploader() {
   const [dragOver, setDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [title, setTitle] = useState("")
-  // { changed code } 単一→複数選択に変更
+
   const [categories, setCategories] = useState<VideoCategory[]>([])
   const [caption, setCaption] = useState("")
   const [stores, setStores] = useState(createDefaultStores)
