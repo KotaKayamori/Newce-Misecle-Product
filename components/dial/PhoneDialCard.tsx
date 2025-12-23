@@ -2,7 +2,7 @@
 
 interface PhoneDialCardProps {
   open: boolean
-  stores?: { name: string; tel: string | null }[]
+  stores?: { name: string; tel: string | null; tabelog?: string | null }[]
   onClose: () => void
 }
 
@@ -19,6 +19,7 @@ export function PhoneDialCard({ open, stores, onClose }: PhoneDialCardProps) {
       name,
       displayTel: store.tel ?? "",
       sanitizedTel,
+      tabelog: store.tabelog,
     }
   })
 
@@ -46,8 +47,8 @@ export function PhoneDialCard({ open, stores, onClose }: PhoneDialCardProps) {
         ) : (
           <div className="space-y-3">
             {storeEntries.map((store, idx) => (
-              <div key={store.key} className="rounded-2xl bg-white/95 px-4 py-3 text-left">
-                <p className="text-sm font-semibold text-gray-800 mb-2">{store.name}</p>
+              <div key={store.key} className="rounded-2xl bg-white/95 px-4 py-3 text-left space-y-2">
+                <p className="text-sm font-semibold text-gray-800">{store.name}</p>
                 {store.sanitizedTel ? (
                   <button
                     type="button"
@@ -64,6 +65,16 @@ export function PhoneDialCard({ open, stores, onClose }: PhoneDialCardProps) {
                   >
                     電話番号が見つかりません
                   </button>
+                )}
+                {store.tabelog && (
+                  <a
+                    href={store.tabelog}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block text-center w-full rounded-2xl bg-[#f5b400] py-2 text-sm font-semibold text-white shadow transition hover:bg-[#e0a200]"
+                  >
+                    食べログで見る
+                  </a>
                 )}
               </div>
             ))}

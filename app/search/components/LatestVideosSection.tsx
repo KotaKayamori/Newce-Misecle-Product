@@ -44,6 +44,7 @@ export function LatestVideosSection({
       onRefresh={handleRefresh}
       onVideoSelect={onVideoSelect}
       onToggleFavorite={onToggleFavorite}
+      /* CategoryVideosSection 内で thumbnailOnly を付けた VideoCard を使用 */
     />
   )
 }

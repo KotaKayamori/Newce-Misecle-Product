@@ -99,9 +99,12 @@ export async function POST(req: NextRequest) {
     }
 
     // 6) 署名URLの発行（ユーザー権限で評価。SRKは使わない）
-    const { data: signed, error: signErr } = await supabase.storage
-      .from("videos")
-      .createSignedUploadUrl(key)
+    // 6) cacheControl を content-type で出し分け（秒指定のみを返す仕様）
+    //    - ポスター/サムネ: 1年
+    //    - 動画: 1日（CDN での過剰保持を避けつつヒットを狙う）
+    const cacheControl = contentType?.toLowerCase() === "image/webp" ? "31536000" : "86400"
+
+    const { data: signed, error: signErr } = await supabase.storage.from("videos").createSignedUploadUrl(key)
 
     if (signErr) {
       // ここで 403 が来る場合 → Storage RLS を確認：
@@ -113,7 +116,7 @@ export async function POST(req: NextRequest) {
       bucket: "videos",
       path: signed.path,
       token: signed.token,
-      cacheControl: "31536000, immutable",
+      cacheControl,
     })
   } catch (e: any) {
     // 予期せぬ例外のみ 500
