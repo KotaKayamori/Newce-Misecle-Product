@@ -17,7 +17,7 @@ export function StoreDetailModal({ open, restaurant, onClose, onReserve }: Store
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-hide">
         <div className="flex items-center justify-between p-4">
-          <button onClick={onClose} className="text-lg">
+          <button onClick={onClose} className="text-lg text-gray-800 hover:text-gray-900">
             ＜
           </button>
           <h2 className="text-lg font-semibold">店舗詳細</h2>

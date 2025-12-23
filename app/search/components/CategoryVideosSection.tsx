@@ -68,6 +68,7 @@ export function CategoryVideosSection({
                 posterUrl={derivePosterUrl(video.public_url) || "/placeholder.jpg"}
                 title={video.title}
                 onClickCard={() => onVideoSelect(video)}
+                thumbnailOnly
                 showTopBookmark
                 isBookmarked={bookmarkedVideoIds.has(video.id)}
                 onToggleBookmark={(e) => onToggleFavorite(video.id, e)}

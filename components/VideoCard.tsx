@@ -13,6 +13,8 @@ interface VideoCardProps {
   onClickCard?: () => void
   cardAriaLabel?: string
   cardTitleAttribute?: string
+  // サムネのみ表示したい場合（一覧の軽量化用）
+  thumbnailOnly?: boolean
 
   // Top-right bookmark circle button
   showTopBookmark?: boolean
@@ -40,6 +42,7 @@ export default function VideoCard(props: VideoCardProps) {
     onClickCard,
     cardAriaLabel,
     cardTitleAttribute,
+    thumbnailOnly = false,
     showTopBookmark = false,
     isBookmarked = false,
     onToggleBookmark,
@@ -70,20 +73,33 @@ export default function VideoCard(props: VideoCardProps) {
     >
       <CardContent className="p-0">
         <div className="aspect-[9/16] relative">
-          {/* Use poster as thumbnail; do not autoplay */}
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            poster={posterUrl}
-            className="w-full h-full object-cover rounded-t-lg cursor-pointer"
-            playsInline
-            preload="metadata"
-            controls={false}
-            onClick={(e) => {
-              e.stopPropagation()
-              onClickCard?.()
-            }}
-          />
+          {/* サムネのみ表示（一覧の軽量化） */}
+          {thumbnailOnly ? (
+            <img
+              src={posterUrl}
+              alt={title || "video"}
+              loading="lazy"
+              className="w-full h-full object-cover rounded-t-lg cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation()
+                onClickCard?.()
+              }}
+            />
+          ) : (
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              poster={posterUrl}
+              className="w-full h-full object-cover rounded-t-lg cursor-pointer"
+              playsInline
+              preload="metadata"
+              controls={false}
+              onClick={(e) => {
+                e.stopPropagation()
+                onClickCard?.()
+              }}
+            />
+          )}
 
           {showTopBookmark && (
             <div className="absolute top-2 right-2 z-10">

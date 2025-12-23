@@ -82,6 +82,7 @@ export function SearchResultsSection({
                 posterUrl={derivePosterUrl(video.playback_url, video.storage_path) || "/placeholder.jpg"}
                 title={video.title || video.caption || "動画"}
                 onClickCard={() => onSelectVideo(video)}
+                thumbnailOnly
                 showTopBookmark
                 isBookmarked={isBookmarked}
                 onToggleBookmark={(e) => onToggleFavorite(video.id, e)}

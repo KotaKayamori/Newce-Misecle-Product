@@ -14,10 +14,13 @@ export type SupabaseVideoRow = {
   video_likes?: { count?: number }[]
   store_1_name?: string | null
   store_1_tel?: string | null
+  store_1_tabelog?: string | null
   store_2_name?: string | null
   store_2_tel?: string | null
+  store_2_tabelog?: string | null
   store_3_name?: string | null
   store_3_tel?: string | null
+  store_3_tabelog?: string | null
 }
 
 // アルバムアイテムの型
@@ -66,7 +69,7 @@ export type RestaurantInfo = {
   caption?: string
   ownerLabel?: string | null
   ownerAvatarUrl?: string | null
-  stores?: { name: string; tel: string | null }[]
+  stores?: { name: string; tel: string | null; tabelog?: string | null }[]
 }
 
 // オーナープロフィールの型

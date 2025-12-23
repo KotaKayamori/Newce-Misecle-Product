@@ -30,6 +30,7 @@ interface VideoFullscreenOverlayProps {
   onMore: () => void
   muted: boolean
   onToggleMuted: () => void
+  variant?: "overlay" | "reels"
 }
 
 export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProps) {
@@ -51,6 +52,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
     onMore,
     muted,
     onToggleMuted,
+    variant = "overlay",
   } = props
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -251,8 +253,10 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
 
   if (!open) return null
 
+  const isReels = variant === "reels"
+
   return (
-    <div className="fixed inset-0 z-40 bg-black">
+    <div className={isReels ? "absolute inset-0 z-40 bg-black touch-pan-y" : "fixed inset-0 z-40 bg-black"}>
       <video
         ref={videoRef}
         src={video.playback_url}
@@ -265,18 +269,21 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         {...{ "webkit-playsinline": "true" }}
         preload="auto"
         controls={false}
+        onClick={isReels ? handleTogglePlay : undefined}
       />
 
       {/* クリック判定用の透明レイヤ（video 全体をカバー） */}
-      <button
-        type="button"
-        className="absolute inset-0 z-20 cursor-pointer"
-        onClick={(e) => {
-          e.stopPropagation()
-          handleTogglePlay()
-        }}
-        aria-label="再生/一時停止"
-      />
+      {!isReels && (
+        <button
+          type="button"
+          className="absolute inset-0 z-20 cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleTogglePlay()
+          }}
+          aria-label="再生/一時停止"
+        />
+      )}
 
       {/* Back button */}
       <div className="absolute top-6 left-6 z-30">
@@ -508,5 +515,4 @@ function SpeakerIcon({ muted }: { muted: boolean }) {
     </svg>
   )
 }
-
 
