@@ -227,9 +227,9 @@ export default function FavoritesPage() {
           ownerHandle={fsOwnerHandle}
           ownerAvatarUrl={fsOwnerAvatar ?? null}
           ownerUserId={fsOwnerUserId ?? null}
-          liked={likedSet.has(fsVideo.id)}
-          likeCount={getLikeCount(fsVideo.id)}
-          onToggleLike={() => handleToggleLikeInFeed(fsVideo.id)}
+          // liked={likedSet.has(fsVideo.id)}
+          // likeCount={getLikeCount(fsVideo.id)}
+          // onToggleLike={() => handleToggleLikeInFeed(fsVideo.id)}
           bookmarked={bookmarkedSet.has(fsVideo.id)}
           onToggleBookmark={() => toggleBookmarkForVideo({ id: fsVideo.id } as any)}
           onShare={async () => { try { if ((navigator as any).share) { await (navigator as any).share({ url: fsVideo.playback_url }) } else { await navigator.clipboard.writeText(fsVideo.playback_url); alert("リンクをコピーしました") } } catch {} }}

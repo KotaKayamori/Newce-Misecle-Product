@@ -9,6 +9,9 @@ import { useAuth } from "@/components/auth-provider"
 import { fetchUserProfile, UserProfile } from "@/lib/api/profile"
 import { supabase } from "@/lib/supabase"
 import { useFollow } from "@/hooks/useFollow"
+import { useLike } from "@/hooks/useLike"
+import { useBookmark } from "@/hooks/useBookmark"
+import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import AlbumViewerOverlay, { AlbumAsset } from "@/components/AlbumViewerOverlay"
 
 // 動画の型定義
@@ -92,9 +95,20 @@ export default function UserProfilePage() {
     toggleFollow 
   } = useFollow(userId)
 
+  // ブックマーク機能
+  const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
+
   // 動画関連
   const [videos, setVideos] = useState<UserVideo[]>([])
   const [videosLoading, setVideosLoading] = useState(true)
+
+  // 動画フルスクリーン関連
+  const [fsOpen, setFsOpen] = useState(false)
+  const [fsVideo, setFsVideo] = useState<{ id: string; playback_url: string; poster_url?: string | null; title?: string | null; caption?: string | null } | null>(null)
+  const [fsOwnerHandle, setFsOwnerHandle] = useState<string>("")
+  const [fsOwnerAvatar, setFsOwnerAvatar] = useState<string | null>(null)
+  const [fsOwnerUserId, setFsOwnerUserId] = useState<string | null>(null)
+  const [fsMuted, setFsMuted] = useState(false)
   
   // アルバム関連
   const [albums, setAlbums] = useState<UserAlbum[]>([])
@@ -204,8 +218,22 @@ export default function UserProfilePage() {
 
   // 動画クリック時
   const handleVideoClick = (video: UserVideo) => {
-    // 動画詳細ページまたはリールページに遷移
-    router.push(`/reels?v=${video.id}`)
+    const handle = userProfile?.username 
+      ? `@${userProfile.username}` 
+      : "ユーザー"
+    
+    setFsVideo({
+      id: video.id,
+      playback_url: video.playback_url,
+      poster_url: derivePosterUrl(video.playback_url, video.storage_path),
+      title: video.title,
+      caption: video.caption,
+    })
+    setFsOwnerHandle(handle)
+    setFsOwnerAvatar(userProfile?.avatar_url ?? null)
+    setFsOwnerUserId(video.owner_id)
+    setFsMuted(false)
+    setFsOpen(true)
   }
 
   // アルバムクリック時
@@ -220,7 +248,7 @@ export default function UserProfilePage() {
         .from("photo_assets")
         .select("id, storage_path, display_order, width, height")
         .eq("album_id", album.id)
-        .order("display_order", { ascending: true })
+        // .order("display_order", { ascending: true })
       
       if (error) throw error
       
@@ -282,6 +310,23 @@ export default function UserProfilePage() {
 
   return (
     <div className="min-h-screen bg-white pb-20">
+      {/* Video Fullscreen Overlay */}
+      {fsOpen && fsVideo && (
+        <VideoFullscreenOverlay
+          open={fsOpen}
+          video={fsVideo}
+          ownerHandle={fsOwnerHandle}
+          ownerAvatarUrl={fsOwnerAvatar}
+          ownerUserId={fsOwnerUserId}
+          muted={fsMuted}
+          bookmarked={bookmarkedVideoIds.has(fsVideo.id)}
+          onShare={async () => { try { if ((navigator as any).share) { await (navigator as any).share({ url: fsVideo.playback_url }) } else { await navigator.clipboard.writeText(fsVideo.playback_url); alert("リンクをコピーしました") } } catch {} }}
+          onClose={() => setFsOpen(false)}
+          onToggleMuted={() => setFsMuted((m) => !m)}
+          onToggleBookmark={() => toggleBookmark(fsVideo.id)}
+        />
+      )}
+
       {/* Album Viewer Overlay */}
       {selectedAlbum && (
         <AlbumViewerOverlay

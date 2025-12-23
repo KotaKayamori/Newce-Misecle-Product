@@ -19,10 +19,13 @@ export interface VideoData {
   }
   store_1_name?: string | null
   store_1_tel?: string | null
+  store_1_tabelog?: string | null
   store_2_name?: string | null
   store_2_tel?: string | null
+  store_2_tabelog?: string | null
   store_3_name?: string | null
   store_3_tel?: string | null
+  store_3_tabelog?: string | null
 }
 
 export function useRandomVideos() {

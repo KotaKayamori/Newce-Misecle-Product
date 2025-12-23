@@ -219,6 +219,7 @@ export default function SearchPage() {
       likeMutationRef.current.delete(videoId)
     }
   }
+  
   function openReservationForVideo(video: SupabaseVideoRow | null, options?: { keepFullscreen?: boolean }) {
     openReserveShared({ setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo }, video as any, options)
   }
@@ -348,14 +349,6 @@ export default function SearchPage() {
       return () => cancelAnimationFrame(id)
     }
   }, [showFullscreenVideo, selectedVideo, fullscreenMuted])
-
-  // Video URLs array
-
-  // filterOptions は FilterModal.tsx に移動
-
-  const EMPTY_INFLUENCER_COMMENT_MESSAGE = "感想は追加されていません"
-
-  // Filter functions moved to useFilters hook
 
   const toggleFavorite = async (id: string | number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation()
@@ -636,9 +629,9 @@ export default function SearchPage() {
           ownerHandle={selectedOwnerHandle}
           ownerAvatarUrl={selectedOwnerProfile?.avatar_url}
           ownerUserId={selectedVideo.owner_id}
-          liked={likedVideoIds.has(selectedVideo.id)}
-          likeCount={videoLikeCounts[selectedVideo.id] ?? 0}
-          onToggleLike={() => toggleVideoLike(selectedVideo.id)}
+          // liked={likedVideoIds.has(selectedVideo.id)}
+          // likeCount={videoLikeCounts[selectedVideo.id] ?? 0}
+          // onToggleLike={() => toggleVideoLike(selectedVideo.id)}
           bookmarked={bookmarkedVideoIds.has(selectedVideo.id)}
           onToggleBookmark={() => toggleFavorite(selectedVideo.id)}
           onShare={async () => {

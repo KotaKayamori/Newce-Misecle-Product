@@ -312,10 +312,6 @@ export default function MyVideosPanel() {
           }}
           ownerHandle={profile?.username ? `@${profile.username}` : profile?.display_name || "あなた"}
           ownerAvatarUrl={profile?.avatar_url ?? null}
-          ownerHandle={profile?.username ? `@${profile.username}` : profile?.display_name || "あなた"}
-          liked={false}
-          likeCount={0}
-          onToggleLike={() => {}}
           bookmarked={false}
           onToggleBookmark={() => {}}
           onShare={async () => {
