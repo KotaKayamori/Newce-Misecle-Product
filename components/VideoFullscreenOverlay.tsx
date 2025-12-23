@@ -1,8 +1,10 @@
 "use client"
 
 import { useRef, useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Heart, Bookmark, Send } from "lucide-react"
+import { useLike } from "@/hooks/useLike"
 
 export interface FullscreenVideoData {
   id: string
@@ -17,29 +19,32 @@ interface VideoFullscreenOverlayProps {
   video: FullscreenVideoData
   ownerHandle: string
   ownerAvatarUrl?: string | null
-  liked: boolean
-  likeCount?: number
-  onToggleLike: () => void
+  ownerUserId?: string | null
+  // liked: boolean
+  // likeCount?: number
+  // onToggleLike: () => void
   bookmarked: boolean
   onToggleBookmark: () => void
   onShare: () => Promise<void> | void
   onClose: () => void
-  onReserve: () => void
-  onMore: () => void
+  onReserve?: () => void
+  onMore?: () => void
   muted: boolean
   onToggleMuted: () => void
   variant?: "overlay" | "reels"
 }
 
 export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProps) {
+  const router = useRouter()
   const {
     open,
     video,
     ownerHandle,
     ownerAvatarUrl,
-    liked,
-    likeCount = 0,
-    onToggleLike,
+    ownerUserId,
+    // liked,
+    // likeCount = 0,
+    // onToggleLike,
     bookmarked,
     onToggleBookmark,
     onShare,
@@ -50,6 +55,9 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
     onToggleMuted,
     variant = "overlay",
   } = props
+
+  // いいね機能を内部で管理
+  const { isLiked, likeCount, toggleLike } = useLike(video.id, 0)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [duration, setDuration] = useState(0)
@@ -313,7 +321,18 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         <div className="flex-1 flex flex-col justify-end p-4 pb-32">
           <div className="text-white z-30">
             <div className="mb-3">
-              <button className="flex items-center gap-3 hover:opacity-80 transition-opacity">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (ownerUserId) {
+                    try { videoRef.current?.pause() } catch {}
+                    onClose()
+                    router.push(`/profile/${ownerUserId}`)
+                  }
+                }}
+                className={`flex items-center gap-3 transition-opacity ${ownerUserId ? "hover:opacity-80 cursor-pointer" : ""}`}
+                disabled={!ownerUserId}
+              >
                 <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden">
                   {ownerAvatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -337,10 +356,10 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         {/* Right actions */}
         <div className="w-16 flex flex-col items-center justify-end pb-40 gap-6">
           <div className="flex flex-col items-center z-30">
-            <button className="w-12 h-12 flex items-center justify-center" onClick={onToggleLike} aria-label={liked ? "いいね解除" : "いいね"}>
+            <button className="w-12 h-12 flex items-center justify-center" onClick={toggleLike} aria-label={isLiked ? "いいね解除" : "いいね"}>
               <Heart
-                className={`w-8 h-8 ${liked ? "fill-red-500 text-transparent" : "text-white"}`}
-                style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 3px rgba(0,0,0,0.35))", ...(liked ? { stroke: 'none' } : {}) }}
+                className={`w-8 h-8 ${isLiked ? "fill-red-500 text-transparent" : "text-white"}`}
+                style={{ filter: "drop-shadow(0 0 1px rgba(0,0,0,0.6)) drop-shadow(0 1px 3px rgba(0,0,0,0.35))", ...(isLiked ? { stroke: 'none' } : {}) }}
               />
             </button>
             {/* <span
@@ -376,20 +395,26 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         </div>
       </div>
 
-      {/* Bottom CTA */}
-      <div className="absolute bottom-20 left-0 right-0 px-4 z-30">
-        <div className="flex gap-2">
-          <button type="button" onClick={onReserve} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
-            今すぐ予約する
-          </button>
-          <button type="button" onClick={onMore} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
-            もっと見る…
-          </button>
+      {/* Bottom CTA - onReserve または onMore が渡されている場合のみ表示 */}
+      {(onReserve || onMore) && (
+        <div className="absolute bottom-20 left-0 right-0 px-4 z-30">
+          <div className="flex gap-2">
+            {onReserve && (
+              <button type="button" onClick={onReserve} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
+                今すぐ予約する
+              </button>
+            )}
+            {onMore && (
+              <button type="button" onClick={onMore} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
+                もっと見る…
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ★ 動画とフッターの“間”にシークバーを配置 */}
-      <div className="absolute inset-x-0 bottom-12 z-30">
+      <div className="absolute inset-x-0 bottom-11 z-50">
         <div className="w-full h-8 flex items-center">
           <div
             ref={seekContainerRef}

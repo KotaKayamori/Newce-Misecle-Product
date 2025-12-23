@@ -2,6 +2,7 @@
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Bookmark, User } from "lucide-react"
+import { useRouter } from "next/navigation"
 import React from "react"
 
 type BottomMetaVariant = "account" | "date" | "none"
@@ -24,6 +25,7 @@ interface VideoCardProps {
   bottomMetaVariant?: BottomMetaVariant
   accountAvatarUrl?: string | null
   accountLabel?: string | null
+  accountUserId?: string | null
   dateLabel?: string | null
   showSmallBookmark?: boolean
   footer?: React.ReactNode
@@ -33,6 +35,7 @@ interface VideoCardProps {
 }
 
 export default function VideoCard(props: VideoCardProps) {
+  const router = useRouter()
   const {
     posterUrl,
     title,
@@ -46,6 +49,7 @@ export default function VideoCard(props: VideoCardProps) {
     bottomMetaVariant = "account",
     accountAvatarUrl,
     accountLabel,
+    accountUserId,
     dateLabel,
     showSmallBookmark = false,
     footer,
@@ -53,6 +57,13 @@ export default function VideoCard(props: VideoCardProps) {
     videoRef,
     onBottomClick,
   } = props
+
+  const handleAccountClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (accountUserId) {
+      router.push(`/profile/${accountUserId}`)
+    }
+  }
 
   return (
     <Card
@@ -132,7 +143,11 @@ export default function VideoCard(props: VideoCardProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {bottomMetaVariant === "account" ? (
-                  <>
+                  <button
+                    onClick={handleAccountClick}
+                    className={`flex items-center gap-2 ${accountUserId ? "hover:opacity-70 transition-opacity" : ""}`}
+                    disabled={!accountUserId}
+                  >
                     <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                       {accountAvatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -142,7 +157,7 @@ export default function VideoCard(props: VideoCardProps) {
                       )}
                     </div>
                     <span className="text-xs text-gray-600">{accountLabel || "@user"}</span>
-                  </>
+                  </button>
                 ) : (
                   <span className="text-xs text-gray-600">{dateLabel}</span>
                 )}
@@ -167,4 +182,3 @@ export default function VideoCard(props: VideoCardProps) {
     </Card>
   )
 }
-

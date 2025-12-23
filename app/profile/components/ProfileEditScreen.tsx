@@ -14,6 +14,7 @@ interface UserProfile {
   gender?: string | null
   age?: string | null
   profile?: string | null
+  sns_link?: string | null
   created_at?: string
 }
 
@@ -36,6 +37,7 @@ export function ProfileEditScreen({
   const [editedName, setEditedName] = useState("")
   const [editedUsername, setEditedUsername] = useState("")
   const [editedProfile, setEditedProfile] = useState("")
+  const [editedSnsLink, setEditedSnsLink] = useState("")
   const [isUpdating, setIsUpdating] = useState(false)
   const [selectedProfileImage, setSelectedProfileImage] = useState<File | null>(null)
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null)
@@ -49,6 +51,7 @@ export function ProfileEditScreen({
       setEditedName(userProfile.name || "")
       setEditedUsername(userProfile.username || "")
       setEditedProfile(userProfile.profile || "")
+      setEditedSnsLink(userProfile.sns_link || "")
     }
   }, [userProfile])
 
@@ -146,6 +149,7 @@ export function ProfileEditScreen({
       name: editedName.trim(),
       username: editedUsername.trim(),
       profile: editedProfile.trim(),
+      sns_link: editedSnsLink.trim(),
     }
 
     if (!updates.name || !updates.username) {
@@ -323,6 +327,18 @@ export function ProfileEditScreen({
                 文字数が上限を超えています
               </p>
             )}
+          </div>
+
+          {/* SNS Link */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">SNS</label>
+            <input
+              type="text"
+              value={editedSnsLink}
+              onChange={(e) => setEditedSnsLink(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+              placeholder={userProfile?.sns_link || "https://"}
+            />
           </div>
 
           {/* Gender and Age */}

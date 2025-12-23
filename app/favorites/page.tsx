@@ -54,6 +54,7 @@ export default function FavoritesPage() {
   const [fsVideo, setFsVideo] = useState<{ id: string; playback_url: string; poster_url?: string | null; title?: string | null; caption?: string | null } | null>(null)
   const [fsOwnerHandle, setFsOwnerHandle] = useState<string>("")
   const [fsOwnerAvatar, setFsOwnerAvatar] = useState<string | null | undefined>(null)
+  const [fsOwnerUserId, setFsOwnerUserId] = useState<string | null | undefined>(null)
   const [fsMuted, setFsMuted] = useState(false)
 
   const [albumFsOpen, setAlbumFsOpen] = useState(false)
@@ -71,6 +72,7 @@ export default function FavoritesPage() {
     setFsVideo({ id: v.id, playback_url: v.playback_url || FALLBACK_VIDEO_URL, poster_url: derivePosterUrl(v.playback_url as any, (v as any).storage_path), title: v.title ?? null, caption: v.caption ?? null })
     setFsOwnerHandle(handle)
     setFsOwnerAvatar(prof?.avatar_url ?? null)
+    setFsOwnerUserId(v.owner_id)
     setFsMuted(false)
     setFsOpen(true)
   }
@@ -81,6 +83,7 @@ export default function FavoritesPage() {
     setFsVideo({ id: video.id, playback_url: video.playback_url || FALLBACK_VIDEO_URL, poster_url: derivePosterUrl(video.playback_url as any, (video as any).storage_path), title: video.title ?? null, caption: video.caption ?? null })
     setFsOwnerHandle(handle)
     setFsOwnerAvatar(prof?.avatar_url ?? null)
+    setFsOwnerUserId(video.owner_id)
     setFsMuted(false)
     setFsOpen(true)
   }
@@ -216,8 +219,6 @@ export default function FavoritesPage() {
         </Tabs>
       </div>
 
-      {/* Reel feed modals disabled (replaced by VideoFullscreenOverlay) */}
-
       {/* Unified fullscreen overlay */}
       {fsOpen && fsVideo && (
         <VideoFullscreenOverlay
@@ -225,9 +226,10 @@ export default function FavoritesPage() {
           video={fsVideo}
           ownerHandle={fsOwnerHandle}
           ownerAvatarUrl={fsOwnerAvatar ?? null}
-          liked={likedSet.has(fsVideo.id)}
-          likeCount={getLikeCount(fsVideo.id)}
-          onToggleLike={() => handleToggleLikeInFeed(fsVideo.id)}
+          ownerUserId={fsOwnerUserId ?? null}
+          // liked={likedSet.has(fsVideo.id)}
+          // likeCount={getLikeCount(fsVideo.id)}
+          // onToggleLike={() => handleToggleLikeInFeed(fsVideo.id)}
           bookmarked={bookmarkedSet.has(fsVideo.id)}
           onToggleBookmark={() => toggleBookmarkForVideo({ id: fsVideo.id } as any)}
           onShare={async () => { try { if ((navigator as any).share) { await (navigator as any).share({ url: fsVideo.playback_url }) } else { await navigator.clipboard.writeText(fsVideo.playback_url); alert("リンクをコピーしました") } } catch {} }}

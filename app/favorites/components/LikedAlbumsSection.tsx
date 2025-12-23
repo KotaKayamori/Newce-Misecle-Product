@@ -84,6 +84,7 @@ export function LikedAlbumsSection({
             bottomMetaVariant="account"
             accountAvatarUrl={profile?.avatar_url ?? null}
             accountLabel={label}
+            accountUserId={album.owner_id}
           />
         )
       })}

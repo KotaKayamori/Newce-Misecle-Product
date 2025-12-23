@@ -5,6 +5,7 @@ export interface UserProfile {
   name: string
   username: string
   profile?: string | null
+  sns_link?: string | null
   gender: '男性' | '女性' | 'その他'
   age: '10代' | '20代' | '30代' | '40代' | '50代以上'
   avatar_url?: string | null
