@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useMemo, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Heart, Bookmark, Send } from "lucide-react"
 import { ImageCarousel } from "./ImageCarousel"
 
@@ -17,6 +18,7 @@ interface AlbumViewerOverlayProps {
   title?: string | null
   ownerAvatarUrl?: string | null
   ownerLabel?: string | null
+  ownerUserId?: string | null
   onMore?: () => void
   description?: string | null
   liked?: boolean
@@ -38,6 +40,7 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
     title,
     ownerAvatarUrl,
     ownerLabel,
+    ownerUserId,
     onMore,
     description,
     liked,
@@ -47,6 +50,7 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
     onToggleBookmark,
     onShare,
   } = props
+  const router = useRouter()
   if (!open) return null
 
   const hasAssets = assets && assets.length > 0
@@ -73,7 +77,7 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
     <div className="fixed inset-0 z-50 bg-white">
       {/* 上部固定バー：閉じる + owner アイコン + ownerLabel/title */}
       <div className="absolute top-0 left-0 right-0 z-50 bg-white/95 border-gray-200">
-        <div className="flex items-center gap-3 px-3 py-2">
+        <div className="flex items-center gap-3 px-3 py-4">
           {/* 閉じるボタン */}
           <button
             onClick={onClose}
@@ -84,7 +88,17 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
           </button>
 
           {/* owner アイコン + テキスト */}
-          <div className="flex items-center gap-2 min-w-0">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (ownerUserId) {
+                onClose()
+                router.push(`/profile/${ownerUserId}`)
+              }
+            }}
+            className={`flex items-center gap-2 min-w-0 ${ownerUserId ? "hover:opacity-70 transition-opacity cursor-pointer" : ""}`}
+            disabled={!ownerUserId}
+          >
             <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-gray-600 font-semibold overflow-hidden border border-gray-300">
               {ownerAvatarUrl ? (
                 <img src={ownerAvatarUrl} alt={ownerLabel ?? "user"} className="w-full h-full object-cover" />
@@ -92,7 +106,7 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
                 (ownerLabel?.replace(/^@/, "").charAt(0).toUpperCase() || "U")
               )}
             </div>
-            <div className="flex flex-col min-w-0">
+            <div className="flex flex-col min-w-0 text-left">
               {ownerLabel && (
                 <span className="text-black font-semibold text-sm leading-none truncate">
                   {ownerLabel}
@@ -104,7 +118,7 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
                 </span>
               )}
             </div>
-          </div>
+          </button>
         </div>
       </div>
 

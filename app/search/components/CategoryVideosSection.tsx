@@ -75,6 +75,7 @@ export function CategoryVideosSection({
                 bottomMetaVariant="account"
                 accountAvatarUrl={user?.avatar_url ?? null}
                 accountLabel={accountLabel}
+                accountUserId={video.owner_id}
               />
             )
           })}

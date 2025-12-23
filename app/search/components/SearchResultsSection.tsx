@@ -89,6 +89,7 @@ export function SearchResultsSection({
                 bottomMetaVariant="account"
                 accountAvatarUrl={ownerProfile?.avatar_url}
                 accountLabel={ownerHandle}
+                accountUserId={video.owner_id}
               />
             )
           })}

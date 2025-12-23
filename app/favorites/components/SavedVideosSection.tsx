@@ -93,6 +93,7 @@ export function SavedVideosSection({
             bottomMetaVariant="account"
             accountAvatarUrl={profile?.avatar_url ?? null}
             accountLabel={label}
+            accountUserId={video.owner_id}
             onClickCard={() => onVideoClick(video)}
           />
         )

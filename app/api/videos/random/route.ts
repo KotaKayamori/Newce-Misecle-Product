@@ -63,6 +63,7 @@ export async function GET(request: NextRequest) {
       username?: string | null;
       display_name?: string | null;
       name?: string | null;
+      profile?: string | null;
       avatar_url?: string | null;
     }
 

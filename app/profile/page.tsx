@@ -1,12 +1,13 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Settings, Store, Bell, Shield, HelpCircle, Upload, Play, Star } from "lucide-react"
+import { Settings, Store, Bell, Shield, HelpCircle, Upload, Play, Star, ChevronLeft, Menu, X } from "lucide-react"
 import Navigation from "@/components/navigation"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { useFollow } from "@/hooks/useFollow"
 import { useToast } from "@/hooks/use-toast"
 import { useProfileModals } from "./hooks/useProfileModals"
 import { GenderAgeScreen } from "./components/GenderAgeScreen"
@@ -28,6 +29,7 @@ import { PasswordSuccessScreen } from "./components/PasswordSuccessScreen"
 import { UploadScreen } from "./components/UploadScreen"
 import { MyVideosScreen } from "./components/MyVideosScreen"
 import { NotificationPermissionScreen } from "./components/NotificationPermissionScreen"
+import { supabase } from "@/lib/supabase"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -72,17 +74,59 @@ export default function ProfilePage() {
     setShowMyVideosModal,
   } = modals
 
+  // フォロー機能（自分自身のフォロワー/フォロー数を取得）
+  const { 
+    followersCount, 
+    followingCount 
+  } = useFollow(user?.id ?? null)
+
+  // 投稿数
+  const [postsCount, setPostsCount] = useState(0)
+
   const [showEmailSuccess, setShowEmailSuccess] = useState(false)
   const [emailSuccessMessage, setEmailSuccessMessage] = useState("")
   const [emailSuccessType, setEmailSuccessType] = useState<"contact" | "bug">("contact")
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false)
   const [isSavingGenderAge, setIsSavingGenderAge] = useState(false)
+  const [showMenuDrawer, setShowMenuDrawer] = useState(false)
+  const [activeTab, setActiveTab] = useState<"video" | "album">("video")
 
   useEffect(() => {
     if (error === "PROFILE_NOT_FOUND") {
       router.push("/register")
     }
   }, [error, router])
+
+  // 投稿数を取得（動画 + アルバム）
+  useEffect(() => {
+    const loadPostsCount = async () => {
+      if (!user?.id) return
+
+      try {
+        // 動画数を取得
+        const { count: videosCount, error: videosError } = await supabase
+          .from("videos")
+          .select("*", { count: "exact", head: true })
+          .eq("owner_id", user.id)
+
+        if (videosError) throw videosError
+
+        // アルバム数を取得
+        const { count: albumsCount, error: albumsError } = await supabase
+          .from("photo_albums")
+          .select("*", { count: "exact", head: true })
+          .eq("owner_id", user.id)
+
+        if (albumsError) throw albumsError
+
+        setPostsCount((videosCount || 0) + (albumsCount || 0))
+      } catch (err) {
+        console.error("Failed to load posts count:", err)
+      }
+    }
+
+    loadPostsCount()
+  }, [user?.id])
 
   const visitHistory = [
     {
@@ -223,6 +267,7 @@ export default function ProfilePage() {
   }
 
   const handleLogout = () => {
+    setShowMenuDrawer(false)
     setShowLogoutConfirmation(true)
   }
 
@@ -249,50 +294,91 @@ export default function ProfilePage() {
     {
       category: "アカウント",
       items: [
-        { icon: Upload, label: "コンテンツをアップロード", onClick: () => setShowUploadModal(true) },
-        { icon: Play, label: "自分の動画", onClick: () => setShowMyVideosModal(true) },
-        { icon: Settings, label: "パスワード設定", onClick: () => setShowAccountSettings(true) },
+        { icon: Upload, label: "コンテンツをアップロード", onClick: () => { setShowMenuDrawer(false); setShowUploadModal(true) } },
+        { icon: Play, label: "自分の動画", onClick: () => { setShowMenuDrawer(false); setShowMyVideosModal(true) } },
+        { icon: Settings, label: "パスワード設定", onClick: () => { setShowMenuDrawer(false); setShowAccountSettings(true) } },
         { icon: Shield, label: "ログアウト", onClick: () => handleLogout() },
       ],
     },
     {
       category: "店舗",
       items: [
-        { icon: Store, label: "これまで来店した店舗", onClick: () => setShowVisitedStores(true) },
+        { icon: Store, label: "これまで来店した店舗", onClick: () => { setShowMenuDrawer(false); setShowVisitedStores(true) } },
       ],
     },
     {
       category: "通知とプライバシー",
       items: [
-        { icon: Bell, label: "位置情報の設定", onClick: () => setShowLocationSettings(true) },
-        { icon: Bell, label: "プッシュ通知設定", onClick: () => setShowNotificationPermission(true) },
-        { icon: Shield, label: "ミュートにしている店舗", onClick: () => setShowMutedStoresSettings(true) },
+        { icon: Bell, label: "位置情報の設定", onClick: () => { setShowMenuDrawer(false); setShowLocationSettings(true) } },
+        { icon: Bell, label: "プッシュ通知設定", onClick: () => { setShowMenuDrawer(false); setShowNotificationPermission(true) } },
+        { icon: Shield, label: "ミュートにしている店舗", onClick: () => { setShowMenuDrawer(false); setShowMutedStoresSettings(true) } },
       ],
     },
     {
       category: "サポート",
       items: [
-        { icon: HelpCircle, label: "お問い合わせ", onClick: () => setShowContactForm(true) },
-        { icon: HelpCircle, label: "よくある質問", onClick: () => setShowFAQ(true) },
-        { icon: HelpCircle, label: "アプリの不具合や、改善要望を報告", onClick: () => setShowBugReportForm(true) },
+        { icon: HelpCircle, label: "お問い合わせ", onClick: () => { setShowMenuDrawer(false); setShowContactForm(true) } },
+        { icon: HelpCircle, label: "よくある質問", onClick: () => { setShowMenuDrawer(false); setShowFAQ(true) } },
+        { icon: HelpCircle, label: "アプリの不具合や、改善要望を報告", onClick: () => { setShowMenuDrawer(false); setShowBugReportForm(true) } },
         { icon: HelpCircle, label: "サービスサイトはこちら", onClick: () => window.open("https://service.newce.co.jp", "_blank") },
         { icon: HelpCircle, label: "店舗様はこちら", onClick: () => window.open("https://ad.newce.co.jp", "_blank") },
       ],
     },
-    // 運営機能セクションは削除済み
   ]
+
+  // Menu Drawer Component
+  const MenuDrawer = () => (
+    <>
+      {/* Overlay */}
+      <div 
+        className="fixed inset-0 bg-black/50 z-40"
+        onClick={() => setShowMenuDrawer(false)}
+      />
+      {/* Drawer */}
+      <div className="fixed right-0 top-0 h-full w-80 bg-white z-50 overflow-y-auto shadow-xl">
+        <div className="p-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">メニュー</h2>
+          <button onClick={() => setShowMenuDrawer(false)} className="p-2">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="p-4 space-y-6">
+          {menuItems.map((section, sectionIndex) => (
+            <div key={sectionIndex}>
+              <h3 className="text-sm font-bold text-black mb-2">{section.category}</h3>
+              <div className="space-y-1">
+                {section.items.map((item, itemIndex) => {
+                  const IconComponent = item.icon
+                  return (
+                    <button
+                      key={itemIndex}
+                      onClick={item.onClick}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-gray-100 rounded-lg transition-colors text-left"
+                    >
+                      <IconComponent className="w-5 h-5 text-gray-600" />
+                      <span className="text-gray-800 text-sm">{item.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )
 
   if (!user) {
     return (
       <div className="min-h-screen bg-white pb-20">
         {/* Header */}
-        <div className="bg-white px-6 py-4">
+        <div className="bg-white px-4 py-3 border-b">
           <div className="relative flex items-center justify-center">
-            <h1 className="text-xl font-semibold">マイページ</h1>
+            <h1 className="text-lg font-semibold">マイページ</h1>
           </div>
         </div>
 
-        {/* Login Required (お気に入りページと同様の見た目) */}
+        {/* Login Required */}
         <div className="px-6 py-12">
           <div className="text-center">
             <h1 className="text-xl font-semibold text-gray-900 mb-2">ログインが必要です</h1>
@@ -306,7 +392,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Footer */}
         <Navigation />
       </div>
     )
@@ -387,8 +472,6 @@ export default function ProfilePage() {
       />
     )
   }
-
-
 
   if (showReviews) {
     return <ReviewsScreen onClose={() => setShowReviews(false)} visitHistory={visitHistory} />
@@ -476,62 +559,121 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-white pb-20">
-      <div className="bg-white px-6 py-4">
-        <div className="relative flex items-center justify-center">
-          <h1 className="text-xl font-semibold">マイページ</h1>
+      {/* Menu Drawer */}
+      {showMenuDrawer && <MenuDrawer />}
+
+      {/* Header - Instagram style */}
+      <div className="bg-white px-4 py-3 sticky top-0 z-30">
+        <div className="flex items-center justify-between">
+          <div className="w-8"></div>
+          <span className="text-base font-semibold">
+            @{userProfile?.username || "username"}
+          </span>
+          <button onClick={() => setShowMenuDrawer(true)} className="p-1">
+            <Menu className="w-6 h-6" />
+          </button>
         </div>
       </div>
 
-      <div className="px-6 py-4 space-y-4 bg-white">
-        <div className="p-8">
-          <div className="flex flex-col items-center justify-center gap-4">
-            <div className="flex items-center justify-center gap-4">
-              <img
-                src={userProfile?.avatar_url || "/images/misecle-mascot.png"}
-                alt="Profile Icon"
-                className="w-24 h-24 rounded-full object-cover"
-              />
-              <div>
-                <h3 className="font-semibold text-xl">{userProfile?.username || "ユーザー"}</h3>
-                <p className="text-gray-600 text-sm">{userProfile?.name || ""}</p>
+      {/* Profile Section */}
+      <div className="px-6 py-4">
+        {/* Profile Info Row */}
+        <div className="flex items-center gap-6 mb-4">
+          {/* Avatar */}
+          <img
+            src={userProfile?.avatar_url || "/images/misecle-mascot.png"}
+            alt="Profile"
+            className="w-20 h-20 rounded-full object-cover border-2 border-gray-100"
+          />
+          
+          {/* Stats */}
+          <div className="flex-1">
+            {/* <h2 className="text-xl font-bold mb-2">{userProfile?.name || "ユーザー"}</h2> */}
+            <div className="flex gap-6">
+              <div className="text-center">
+                <div className="font-bold text-lg">{postsCount}</div>
+                <div className="text-xs text-gray-500">投稿</div>
+              </div>
+              <div className="text-center">
+                <div className="font-bold text-lg">{followersCount}</div>
+                <div className="text-xs text-gray-500">フォロワー</div>
+              </div>
+              <div className="text-center">
+                <div className="font-bold text-lg">{followingCount}</div>
+                <div className="text-xs text-gray-500">フォロー中</div>
               </div>
             </div>
-            <Button
-              onClick={() => setShowProfileEdit(true)}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-12 rounded-full w-full max-w-xs"
-            >
-              プロフィールを編集する
-            </Button>
           </div>
         </div>
 
-        <div className="space-y-6">
-          {menuItems.map((section, sectionIndex) => (
-            <div key={sectionIndex}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-3 px-2">{section.category}</h3>
-              <div className="bg-white rounded-lg overflow-hidden">
-                {section.items.map((item, itemIndex) => {
-                  const IconComponent = item.icon
-                  return (
-                    <div key={itemIndex}>
-                      <button
-                        onClick={item.onClick}
-                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-3">
-                          <IconComponent className="w-5 h-5 text-gray-600" />
-                          <span className="text-gray-800">{item.label}</span>
-                        </div>
-                        <span className="text-black">＞</span>
-                      </button>
-                      {itemIndex < section.items.length - 1 && <div className="border-b border-gray-200 mx-4"></div>}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+        {/* Bio Section */}
+        <div className="mb-4">
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+            {userProfile?.profile}
+          </p>
         </div>
+
+        {/* SNS Link */}
+        {userProfile?.sns_link && (
+          <div className="mb-4">
+            <a 
+              href={userProfile.sns_link.startsWith('http') ? userProfile.sns_link : `https://${userProfile.sns_link}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              {userProfile.sns_link}
+            </a>
+          </div>
+        )}
+
+        {/* Edit Profile Button */}
+        <Button
+          onClick={() => setShowProfileEdit(true)}
+          variant="outline"
+          className="w-full border-gray-300 text-gray-800 font-medium py-2 rounded-lg"
+        >
+          プロフィールを編集
+        </Button>
+      </div>
+
+      {/* Tab Navigation */}
+      <div className="border-b">
+        <div className="flex">
+          <button
+            onClick={() => setActiveTab("video")}
+            className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
+              activeTab === "video"
+                ? "text-gray-900 border-b-2 border-gray-900"
+                : "text-gray-400"
+            }`}
+          >
+            動画
+          </button>
+          <button
+            onClick={() => setActiveTab("album")}
+            className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
+              activeTab === "album"
+                ? "text-gray-900 border-b-2 border-gray-900"
+                : "text-gray-400"
+            }`}
+          >
+            アルバム
+          </button>
+        </div>
+      </div>
+
+      {/* Content Area */}
+      <div className="px-6 py-12">
+        {activeTab === "video" ? (
+          <div className="text-center text-gray-500">
+            まだ動画がありません
+          </div>
+        ) : (
+          <div className="text-center text-gray-500">
+            まだアルバムがありません
+          </div>
+        )}
       </div>
 
       <Navigation />

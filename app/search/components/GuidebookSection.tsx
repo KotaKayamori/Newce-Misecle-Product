@@ -70,6 +70,7 @@ export function GuidebookSection({
               bottomMetaVariant="account"
               accountAvatarUrl={album.owner?.avatarUrl ?? null}
               accountLabel={album.owner?.username ? `@${album.owner.username}` : album.owner?.displayName || "ユーザー"}
+              accountUserId={album.owner?.id ?? null}
             />
           ))}
         </div>
