@@ -1,5 +1,3 @@
-// TODO: components/modals/ReservationModal.tsx に統合
-
 "use client"
 
 import { useState } from "react"

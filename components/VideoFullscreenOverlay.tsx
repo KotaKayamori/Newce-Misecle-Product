@@ -20,11 +20,11 @@ interface VideoFullscreenOverlayProps {
   ownerHandle: string
   ownerAvatarUrl?: string | null
   ownerUserId?: string | null
-  // liked: boolean
-  // likeCount?: number
-  // onToggleLike: () => void
-  bookmarked: boolean
-  onToggleBookmark: () => void
+  liked?: boolean
+  likeCount?: number
+  onToggleLike?: () => void
+  bookmarked?: boolean
+  onToggleBookmark?: () => void
   onShare: () => Promise<void> | void
   onClose: () => void
   onReserve?: () => void

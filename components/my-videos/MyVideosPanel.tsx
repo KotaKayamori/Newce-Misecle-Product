@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import AlbumCard from "@/components/AlbumCard"
 import AlbumViewerOverlay from "@/components/AlbumViewerOverlay"
-import { derivePosterUrl } from "@/app/search/utils"
+import { derivePosterUrl, deriveAlbumCoverUrl } from "@/lib/media"
 import type { AssetItem } from "@/app/search/types"
 
 type Item = {
@@ -194,14 +194,6 @@ export default function MyVideosPanel() {
     } finally {
       setAlbumLoading(false)
     }
-  }
-
-  function deriveAlbumCoverUrl(coverPath?: string | null): string | null {
-    if (!coverPath) return null
-    const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "")
-    if (!base) return null
-    const objectPath = coverPath.replace(/^\/+/, "")
-    return `${base}/storage/v1/object/public/photos/${objectPath}`
   }
 
   return (

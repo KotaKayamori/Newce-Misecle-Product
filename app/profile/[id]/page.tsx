@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, Play, Image } from "lucide-react"
 import Navigation from "@/components/navigation"
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { fetchUserProfile, UserProfile } from "@/lib/api/profile"
@@ -13,67 +13,12 @@ import { useLike } from "@/hooks/useLike"
 import { useBookmark } from "@/hooks/useBookmark"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import AlbumViewerOverlay, { AlbumAsset } from "@/components/AlbumViewerOverlay"
-
-// 動画の型定義
-interface UserVideo {
-  id: string
-  owner_id: string
-  playback_url: string
-  storage_path: string
-  title: string | null
-  caption: string | null
-  created_at: string
-}
-
-// アルバムの型定義
-interface UserAlbum {
-  id: string
-  owner_id: string
-  title: string | null
-  description: string | null
-  caption: string | null
-  cover_path: string | null
-  created_at: string
-}
-
-// ポスター URL を導出
-function derivePosterUrl(playbackUrl?: string | null, storagePath?: string | null): string | null {
-  const VIDEO_EXT_REGEX = /\.(mp4|mov|m4v|webm|ogg)$/i
-  if (storagePath) {
-    const posterPath = storagePath.replace(/\.[^.]+$/, ".webp")
-    if (posterPath && posterPath !== storagePath) {
-      const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "")
-      if (base) {
-        const objectPath = posterPath.replace(/^\/+/, "")
-        return `${base}/storage/v1/object/public/videos/${objectPath}`
-      }
-    }
-  }
-  if (!playbackUrl) return null
-  try {
-    const url = new URL(playbackUrl)
-    if (!VIDEO_EXT_REGEX.test(url.pathname)) return null
-    url.pathname = url.pathname.replace(VIDEO_EXT_REGEX, ".webp")
-    url.search = ""
-    url.hash = ""
-    return url.toString()
-  } catch {
-    const base = playbackUrl?.split?.("?")[0]
-    if (base && VIDEO_EXT_REGEX.test(base)) {
-      return base.replace(VIDEO_EXT_REGEX, ".webp")
-    }
-    return null
-  }
-}
-
-// アルバムカバー URL を導出
-function deriveAlbumCoverUrl(coverPath?: string | null): string | null {
-  if (!coverPath) return null
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "")
-  if (!base) return null
-  const objectPath = coverPath.replace(/^\/+/, "")
-  return `${base}/storage/v1/object/public/photos/${objectPath}`
-}
+import type { UserVideo, UserAlbum } from "../types"
+import type { RestaurantInfo, ReservationFormData } from "@/lib/types"
+import { derivePosterUrl, deriveAlbumCoverUrl } from "@/lib/media"
+import { openReservationForVideo as openReserveShared, openStoreDetailForVideo as openStoreShared } from "@/lib/video-actions"
+import { ReservationModal } from "@/components/modals/ReservationModal"
+import { StoreDetailModal } from "@/components/modals/StoreDetailModal"
 
 export default function UserProfilePage() {
   const router = useRouter()
@@ -120,6 +65,19 @@ export default function UserProfilePage() {
   const [albumViewerOpen, setAlbumViewerOpen] = useState(false)
   const [albumAssetIndex, setAlbumAssetIndex] = useState(0)
   const [albumAssetsLoading, setAlbumAssetsLoading] = useState(false)
+  
+  const [showReservationModal, setShowReservationModal] = useState(false)
+  const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantInfo | null>(null)
+
+  const [reservationData, setReservationData] = useState<ReservationFormData>({
+    name: "",
+    people: 2,
+    date: "",
+    time: "18:00",
+    seatType: "指定なし",
+    message: "",
+  })
 
   // 自分のプロフィールページの場合は /profile にリダイレクト
   useEffect(() => {
@@ -189,11 +147,12 @@ export default function UserProfilePage() {
       try {
         const { data, error } = await supabase
           .from("photo_albums")
-          .select("id, owner_id, title, description, caption, cover_path, created_at")
+          .select("id, owner_id, title, caption, cover_path, created_at")
           .eq("owner_id", userId)
           .order("created_at", { ascending: false })
         
         if (error) throw error
+        
         setAlbums(data || [])
       } catch (err: any) {
         console.error("Failed to fetch user albums:", err)
@@ -244,22 +203,18 @@ export default function UserProfilePage() {
     setAlbumAssetIndex(0)
     
     try {
-      const { data, error } = await supabase
-        .from("photo_assets")
-        .select("id, storage_path, display_order, width, height")
-        .eq("album_id", album.id)
-        // .order("display_order", { ascending: true })
-      
-      if (error) throw error
-      
-      const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "")
-      const assets: AlbumAsset[] = (data || []).map((asset: any) => ({
-        id: asset.id,
-        url: base ? `${base}/storage/v1/object/public/photos/${asset.storage_path}` : "",
-        order: asset.display_order,
-        width: asset.width,
-        height: asset.height,
-      }))
+      const res = await fetch(`/api/guidebook/albums/${album.id}/assets`, { cache: "no-store" })
+      if (!res.ok) throw new Error("アルバムの取得に失敗しました")
+      const json = await res.json()
+      const assets: AlbumAsset[] = Array.isArray(json?.items)
+        ? json.items.map((asset: any) => ({
+            id: asset.id,
+            url: asset.url,
+            order: asset.order,
+            width: asset.width,
+            height: asset.height,
+          }))
+        : []
       
       setAlbumAssets(assets)
     } catch (err: any) {
@@ -324,10 +279,20 @@ export default function UserProfilePage() {
           onClose={() => setFsOpen(false)}
           onToggleMuted={() => setFsMuted((m) => !m)}
           onToggleBookmark={() => toggleBookmark(fsVideo.id)}
+          onReserve={() => { openReserveShared({ setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo: setFsOpen as any }, { id: fsVideo.id, title: fsVideo.title as any } as any, { keepFullscreen: true }) }}
+          onMore={() => {
+            const videoForModal = {
+              id: fsVideo.id,
+              title: fsVideo.title as any,
+              caption: fsVideo.caption as any,
+              owner_label: fsOwnerHandle || null,
+              owner_avatar_url: fsOwnerAvatar || null,
+            }
+            openStoreShared({ setSelectedRestaurant, setShowStoreDetailModal }, videoForModal as any, { keepFullscreen: true })
+          }}
         />
       )}
 
-      {/* Album Viewer Overlay */}
       {selectedAlbum && (
         <AlbumViewerOverlay
           open={albumViewerOpen}
@@ -335,13 +300,47 @@ export default function UserProfilePage() {
           index={albumAssetIndex}
           loading={albumAssetsLoading}
           onClose={() => setAlbumViewerOpen(false)}
-          onIndexChange={setAlbumAssetIndex}
+          onIndexChange={(next) => {
+            const clamped = Math.max(0, Math.min(next, albumAssets.length - 1))
+            setAlbumAssetIndex(clamped)
+          }}
           title={selectedAlbum.title}
           ownerAvatarUrl={userProfile.avatar_url}
           ownerLabel={`@${userProfile.username || "user"}`}
           ownerUserId={userId}
+          description={selectedAlbum.caption}
+          onShare={async () => {
+            const url = albumAssets[albumAssetIndex]?.url
+            if (!url) return
+            try {
+              if (navigator.share) await navigator.share({ url })
+              else {
+                await navigator.clipboard.writeText(url)
+                alert("リンクをコピーしました")
+              }
+            } catch {}
+          }}
         />
       )}
+
+      <ReservationModal
+        open={showReservationModal}
+        restaurant={selectedRestaurant}
+        data={reservationData}
+        onChange={(values) => setReservationData((prev) => ({ ...prev, ...values }))}
+        onClose={() => setShowReservationModal(false)}
+        onSubmit={() => {
+          alert("予約リクエストを送信しました！")
+          setShowReservationModal(false)
+        }}
+      />
+
+      <StoreDetailModal
+        open={showStoreDetailModal}
+        restaurant={selectedRestaurant}
+        onClose={() => setShowStoreDetailModal(false)}
+        onReserve={() => setShowReservationModal(true)}
+      />
 
       {/* Header */}
       <div className="bg-white px-4 py-3 sticky top-0 z-30">
@@ -368,7 +367,7 @@ export default function UserProfilePage() {
           <div className="flex-1">
             <div className="flex gap-6">
               <div className="text-center">
-                <div className="font-bold text-lg">{videos.length}</div>
+                <div className="font-bold text-lg">{videos.length + albums.length}</div>
                 <div className="text-xs text-gray-500">投稿</div>
               </div>
               <div className="text-center">

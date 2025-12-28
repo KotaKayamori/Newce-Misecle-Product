@@ -51,10 +51,7 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
     onShare,
   } = props
   const router = useRouter()
-  if (!open) return null
-
   const hasAssets = assets && assets.length > 0
-  const [detailOpen, setDetailOpen] = useState(false)
   const [likedInternal, setLikedInternal] = useState(Boolean(liked))
   const [likeCountInternal, setLikeCountInternal] = useState<number>(likeCount ?? 0)
   const [bookmarkedInternal, setBookmarkedInternal] = useState(Boolean(bookmarked))
@@ -62,6 +59,8 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
   const totalAssets = assets?.length ?? 0
   const canPrev = index > 0
   const canNext = index < totalAssets - 1
+
+  if (!open) return null
 
   const handlePrev = () => {
     if (!canPrev) return
