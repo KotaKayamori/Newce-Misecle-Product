@@ -6,17 +6,14 @@ import { LikedVideosSection } from "./components/LikedVideosSection"
 import { SavedVideosSection } from "./components/SavedVideosSection"
 import { LikedAlbumsSection } from "./components/LikedAlbumsSection"
 import { SavedAlbumsSection } from "./components/SavedAlbumsSection"
-import { ReservationModal } from "./components/ReservationModal"
+import { ReservationModal } from "@/components/modals/ReservationModal"
 import { StoreDetailModal } from "./components/StoreDetailModal"
-// 画像サムネイル生成にSearchと同じ関数を利用
-// derivePosterUrl は Search ページ内で定義されているため、同等の処理をここにも定義
 import Navigation from "@/components/navigation"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { FALLBACK_VIDEO_URL } from "@/lib/media"
+import { FALLBACK_VIDEO_URL, derivePosterUrl } from "@/lib/media"
 import { openReservationForVideo as openReserveShared, openStoreDetailForVideo as openStoreShared } from "@/lib/video-actions"
-import { derivePosterUrl } from "./utils"
-import type { AlbumRow, FavoriteVideo, ReservationFormData, SelectedRestaurant } from "@/app/favorites/types"
+import type { AlbumRow, FavoriteVideo, ReservationFormData, RestaurantInfo } from "@/lib/types"
 import { useFavoriteVideos } from "./hooks/useFavoriteVideos"
 import { useFavoriteAlbums } from "./hooks/useFavoriteAlbums"
 
@@ -110,7 +107,7 @@ export default function FavoritesPage() {
 
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<SelectedRestaurant | null>(null)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantInfo | null>(null)
   // const [showUserProfile, setShowUserProfile] = useState(false) // TODO: 未使用
   // const [selectedUser, setSelectedUser] = useState(null) // TODO: 未使用
   const [reservationData, setReservationData] = useState<ReservationFormData>({

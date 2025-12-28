@@ -3,7 +3,7 @@
 import { Play } from "lucide-react"
 import VideoCard from "@/components/VideoCard"
 import { FALLBACK_VIDEO_URL } from "@/lib/media"
-import { derivePosterUrl } from "@/app/favorites/utils"
+import { derivePosterUrl } from "@/lib/media"
 import type { BookmarkedVideo, FavoriteVideo, OwnerProfile } from "@/app/favorites/types"
 
 interface SavedVideosSectionProps {

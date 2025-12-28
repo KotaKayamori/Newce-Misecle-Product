@@ -384,15 +384,15 @@ export default function SearchPage() {
 
   const handleRefreshAlbums = albums.refreshAlbums
 
-  const handleOpenUserProfile = (user: { id: string; name: string; avatar?: string | null; isFollowing: boolean }) => {
-    setSelectedUser({
-      id: user.id,
-      name: user.name ?? "ゲスト",
-      avatar: user.avatar,
-      isFollowing: user.isFollowing,
-    })
-    setShowUserProfile(true)
-  }
+  // const handleOpenUserProfile = (user: { id: string; name: string; avatar?: string | null; isFollowing: boolean }) => {
+  //   setSelectedUser({
+  //     id: user.id,
+  //     name: user.name ?? "ゲスト",
+  //     avatar: user.avatar,
+  //     isFollowing: user.isFollowing,
+  //   })
+  //   setShowUserProfile(true)
+  // }
 
   // FilterButton は FilterModal.tsx に移動
 
