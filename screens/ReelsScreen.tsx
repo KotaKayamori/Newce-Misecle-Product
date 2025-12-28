@@ -39,22 +39,7 @@ type OwnerProfile = {
 const PAGE_SIZE = 15
 const WINDOW = 2 // activeIndex ±2 を描画
 
-type ReelsScreenProps = {
-  categorySlug?: string
-  startVideoId?: string | null
-}
-
-const moveStartIdToFront = (pool: string[], startVideoId?: string | null) => {
-  if (!startVideoId) return pool
-  const idx = pool.indexOf(startVideoId)
-  if (idx <= 0) return pool
-  const next = pool.slice()
-  next.splice(idx, 1)
-  next.unshift(startVideoId)
-  return next
-}
-
-export default function ReelsScreen({ categorySlug, startVideoId }: ReelsScreenProps) {
+export default function ReelsScreen() {
   const [items, setItems] = useState<VideoRow[]>([])
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, OwnerProfile>>({})
   const [hasMore, setHasMore] = useState(true)
@@ -66,7 +51,7 @@ export default function ReelsScreen({ categorySlug, startVideoId }: ReelsScreenP
   const [idPool, setIdPool] = useState<string[]>([])
   const [idCursor, setIdCursor] = useState(0)
   // リール滞在中は共通のミュート状態を使う（動画ごとではなくグローバル）
-  const [muted, setMuted] = useState(true)
+  const [muted, setMuted] = useState(false)
 
   const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
   const listRef = useRef<HTMLDivElement | null>(null)
@@ -98,11 +83,7 @@ export default function ReelsScreen({ categorySlug, startVideoId }: ReelsScreenP
       let pool = idPool
       // IDプールが空なら全IDを取得してシャッフル
       if (pool.length === 0) {
-        let idQuery = supabase.from("videos").select("id")
-        if (categorySlug) {
-          idQuery = idQuery.contains("categories", [categorySlug])
-        }
-        const { data: ids, error: idErr } = await idQuery
+        const { data: ids, error: idErr } = await supabase.from("videos").select("id")
         if (idErr) throw idErr
         pool = ((ids as { id: string }[]) ?? []).map((r) => r.id)
         // シャッフル
@@ -110,10 +91,8 @@ export default function ReelsScreen({ categorySlug, startVideoId }: ReelsScreenP
           const j = Math.floor(Math.random() * (i + 1))
           ;[pool[i], pool[j]] = [pool[j], pool[i]]
         }
-        pool = moveStartIdToFront(pool, startVideoId)
         setIdPool(pool)
         setIdCursor(0)
-        setActiveIndex(0)
       }
 
       const start = idCursor

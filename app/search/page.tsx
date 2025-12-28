@@ -27,7 +27,6 @@ import {
 import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
-import ReelsScreen from "@/screens/ReelsScreen"
 import type { RestaurantInfo } from "./types"
 
 type SupabaseVideoRow = {
@@ -167,7 +166,6 @@ export default function SearchPage() {
 
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<SupabaseVideoRow | null>(null)
-  const [showReelsFromSearch, setShowReelsFromSearch] = useState(false)
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, { username?: string | null; display_name?: string | null; avatar_url?: string | null }>>({})
   const [fullscreenMuted, setFullscreenMuted] = useState(false)
@@ -177,26 +175,12 @@ export default function SearchPage() {
     body: { top: string; position: string; overflow: string; width: string }
   } | null>(null)
 
-  const openSingleFullscreen = (video: SupabaseVideoRow) => {
-    setSelectedVideo({
-      ...video,
-      caption: normalizeOptionalText(video.caption) ?? null,
-    })
-    setShowReelsFromSearch(false)
-    setShowFullscreenVideo(true)
-  }
-
   const selectSupabaseVideo = (video: SupabaseVideoRow) => {
-    if (isGuidebookCategory) {
-      openSingleFullscreen(video)
-      return
-    }
     setSelectedVideo({
       ...video,
       caption: normalizeOptionalText(video.caption) ?? null,
     })
-    setShowFullscreenVideo(false)
-    setShowReelsFromSearch(true)
+    setShowFullscreenVideo(true)
   }
 
   // Fullscreen overlay interactions (like/favorite)
@@ -302,7 +286,7 @@ export default function SearchPage() {
       store_3_tel: video.store_3_tel ?? null,
       store_3_tabelog: video.store_3_tabelog ?? null,
     })
-    setShowReelsFromSearch(true)
+    setShowFullscreenVideo(true)
   }
 
   async function handleSearchSubmit() {
@@ -480,8 +464,7 @@ export default function SearchPage() {
     if (typeof document === "undefined") return
     const bodyStyle = document.body.style
 
-    const shouldLock = showFullscreenVideo || showReelsFromSearch
-    if (shouldLock) {
+    if (showFullscreenVideo) {
       fullscreenScrollLockRef.current = {
         scrollY: window.scrollY,
         body: {
@@ -516,7 +499,7 @@ export default function SearchPage() {
         fullscreenScrollLockRef.current = null
       }
     }
-  }, [showFullscreenVideo, showReelsFromSearch])
+  }, [showFullscreenVideo])
 
   const selectedOwnerProfile = selectedVideo?.owner_id ? ownerProfiles[selectedVideo.owner_id] : undefined
   const selectedOwnerHandle = selectedOwnerProfile?.username
@@ -637,27 +620,6 @@ export default function SearchPage() {
               onToggleBookmark={albums.toggleAlbumBookmark}
             />
           </div>
-        </div>
-      )}
-
-      {showReelsFromSearch && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <button
-            type="button"
-            onClick={() => setShowReelsFromSearch(false)}
-            className="absolute top-6 left-6 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 focus:outline-none"
-            aria-label="閉じる"
-          >
-            ＜
-          </button>
-          <ReelsScreen
-            categorySlug={
-              selectedCategory === "最新動画" || selectedCategory === "ガイドブック"
-                ? undefined
-                : resolveCategorySlug(selectedCategory)
-            }
-            startVideoId={selectedVideo?.id ?? null}
-          />
         </div>
       )}
 
