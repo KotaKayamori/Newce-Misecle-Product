@@ -89,3 +89,89 @@
     contain-intrinsic-size: auto 100svh;
   }
 }
+
+:root {
+  --footer-h: 56px;
+  --ui-gap: 16px;
+  --ui-right-gap: 80px;
+}
+
+.reel-stage {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100svh;
+  height: 100dvh;
+  height: var(--stage-h, 100dvh);
+  background: #000;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: pan-y;
+}
+
+.reel-video {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.reel-video__el {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.reel-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.reel-ui .btn,
+.reel-ui .cta {
+  pointer-events: auto;
+}
+
+.reel-top {
+  position: absolute;
+  top: calc(var(--ui-gap) + env(safe-area-inset-top));
+  left: 16px;
+}
+
+.reel-right {
+  position: absolute;
+  right: 16px;
+  bottom: calc(
+    var(--ui-gap) +
+    env(safe-area-inset-bottom) +
+    var(--footer-h) +
+    var(--ui-right-gap)
+  );
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reel-bottom {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: calc(
+    var(--ui-gap) +
+    env(safe-area-inset-bottom) +
+    var(--footer-h)
+  );
+  display: flex;
+  gap: 8px;
+}
+
+.app-footer {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: #fff;
+  z-index: 9999;
+}

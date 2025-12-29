@@ -174,7 +174,7 @@ export default function SearchPage() {
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
   const fullscreenScrollLockRef = useRef<{
     scrollY: number
-    body: { top: string; position: string; overflow: string; width: string }
+    body: { top: string; position: string; overflow: string; width: string; left: string; right: string }
   } | null>(null)
 
   const openSingleFullscreen = (video: SupabaseVideoRow) => {
@@ -489,11 +489,15 @@ export default function SearchPage() {
           position: bodyStyle.position,
           overflow: bodyStyle.overflow,
           width: bodyStyle.width,
+          left: bodyStyle.left,
+          right: bodyStyle.right,
         },
       }
       bodyStyle.top = `-${window.scrollY}px`
       bodyStyle.position = "fixed"
       bodyStyle.overflow = "hidden"
+      bodyStyle.left = "0"
+      bodyStyle.right = "0"
       bodyStyle.width = "100%"
     } else if (fullscreenScrollLockRef.current) {
       const previous = fullscreenScrollLockRef.current
@@ -501,6 +505,8 @@ export default function SearchPage() {
       bodyStyle.position = previous.body.position
       bodyStyle.overflow = previous.body.overflow
       bodyStyle.width = previous.body.width
+      bodyStyle.left = previous.body.left
+      bodyStyle.right = previous.body.right
       window.scrollTo({ top: previous.scrollY })
       fullscreenScrollLockRef.current = null
     }
@@ -512,6 +518,8 @@ export default function SearchPage() {
         bodyStyle.position = previous.body.position
         bodyStyle.overflow = previous.body.overflow
         bodyStyle.width = previous.body.width
+        bodyStyle.left = previous.body.left
+        bodyStyle.right = previous.body.right
         window.scrollTo({ top: previous.scrollY })
         fullscreenScrollLockRef.current = null
       }

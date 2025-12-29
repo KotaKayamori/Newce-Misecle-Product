@@ -2,24 +2,10 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useRef } from "react"
 import { Search, Calendar, Heart, User } from "lucide-react"
 
 export default function Navigation() {
   const pathname = usePathname()
-  const navRef = useRef<HTMLElement | null>(null)
-
-  useEffect(() => {
-    const updateNavHeight = () => {
-      const height = navRef.current?.offsetHeight
-      if (height) {
-        document.documentElement.style.setProperty("--app-nav-height", `${height}px`)
-      }
-    }
-    updateNavHeight()
-    window.addEventListener("resize", updateNavHeight)
-    return () => window.removeEventListener("resize", updateNavHeight)
-  }, [])
 
   const navItems = [
     { label: "探す", icon: Search, href: "/search" },
@@ -29,7 +15,7 @@ export default function Navigation() {
   ]
 
   return (
-    <nav ref={navRef} className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[70]">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[70]">
       <div className="flex">
         {navItems.map((item) => {
           const IconComponent = item.icon
