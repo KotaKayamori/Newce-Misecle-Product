@@ -86,23 +86,10 @@ export default function ReelsScreen({ categorySlug, startVideoId }: ReelsScreenP
   })
 
   useEffect(() => {
-    const updateViewport = () => {
-      const height = window.visualViewport?.height ?? window.innerHeight
-      setViewportH(height)
-      document.documentElement.style.setProperty("--reel-vh", `${height * 0.01}px`)
-    }
-
-    window.addEventListener("resize", updateViewport)
-    window.addEventListener("orientationchange", updateViewport)
-    window.visualViewport?.addEventListener("resize", updateViewport)
-    window.visualViewport?.addEventListener("scroll", updateViewport)
-    updateViewport()
-    return () => {
-      window.removeEventListener("resize", updateViewport)
-      window.removeEventListener("orientationchange", updateViewport)
-      window.visualViewport?.removeEventListener("resize", updateViewport)
-      window.visualViewport?.removeEventListener("scroll", updateViewport)
-    }
+    const onResize = () => setViewportH(window.innerHeight)
+    window.addEventListener("resize", onResize)
+    onResize()
+    return () => window.removeEventListener("resize", onResize)
   }, [])
 
   const fetchPage = useCallback(async () => {
@@ -258,11 +245,7 @@ export default function ReelsScreen({ categorySlug, startVideoId }: ReelsScreenP
   }
 
   return (
-    <div
-      ref={listRef}
-      className="h-[100dvh] w-screen bg-black text-white overflow-y-auto snap-y snap-mandatory overscroll-contain"
-      style={{ height: "calc(var(--reel-vh, 1vh) * 100)" }}
-    >
+    <div ref={listRef} className="h-screen w-screen bg-black text-white overflow-y-auto snap-y snap-mandatory overscroll-contain">
       <div style={{ height: topSpacer }} />
       {items.slice(renderRange.start, renderRange.end + 1).map((post, idx) => {
         const globalIndex = renderRange.start + idx
