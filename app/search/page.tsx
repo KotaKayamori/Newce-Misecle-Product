@@ -649,7 +649,7 @@ export default function SearchPage() {
       )}
 
       {showReelsFromSearch && (
-        <div className="fixed inset-0 z-50 bg-black">
+        <div className="fixed left-0 right-0 top-0 w-screen h-[var(--vvh)] translate-y-[var(--vvt)] z-50 bg-black [--footer-h:57px]">
           <ReelsScreen
             categorySlug={
               selectedCategory === "最新動画" || selectedCategory === "ガイドブック"

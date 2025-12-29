@@ -3,9 +3,11 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { Search, Calendar, Heart, User } from "lucide-react"
+import { useVisualViewportVars } from "@/hooks/useVisualViewportVars"
 
 export default function Navigation() {
   const pathname = usePathname()
+  useVisualViewportVars()
 
   const navItems = [
     { label: "探す", icon: Search, href: "/search" },
@@ -15,7 +17,7 @@ export default function Navigation() {
   ]
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-[70]">
+    <nav className="fixed left-0 right-0 bottom-[calc(env(safe-area-inset-bottom)+var(--vvb))] bg-white border-t border-gray-200 z-[70] pb-[env(safe-area-inset-bottom)]">
       <div className="flex">
         {navItems.map((item) => {
           const IconComponent = item.icon
