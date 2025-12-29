@@ -52,6 +52,11 @@ export default function FullscreenMediaPlayer(props: FullscreenMediaPlayerProps)
   } = props
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const topOffset = "calc(1.5rem + env(safe-area-inset-top))"
+  const navHeight = "var(--app-nav-height, 56px)"
+  const bottomSafe = `calc(env(safe-area-inset-bottom) + ${navHeight})`
+  const contentBottomPad = `calc(${bottomSafe} + 4rem)`
+  const ctaBottom = `calc(${bottomSafe} + 0.75rem)`
 
   useEffect(() => {
     const el = videoRef.current
@@ -96,7 +101,7 @@ export default function FullscreenMediaPlayer(props: FullscreenMediaPlayerProps)
 
       {/* Back button */}
       {onClose && (
-        <div className="absolute top-6 left-6 z-10">
+        <div className="absolute z-10" style={{ top: topOffset, left: "1.5rem" }}>
           <Button
             variant="ghost"
             size="sm"
@@ -114,7 +119,7 @@ export default function FullscreenMediaPlayer(props: FullscreenMediaPlayerProps)
       )}
 
       {/* Speaker toggle */}
-      <div className="absolute top-6 right-6 z-10">
+      <div className="absolute z-10" style={{ top: topOffset, right: "1.5rem" }}>
         <button
           type="button"
           onClick={onToggleMuted}
@@ -127,7 +132,7 @@ export default function FullscreenMediaPlayer(props: FullscreenMediaPlayerProps)
 
       <div className="absolute inset-0 flex">
         {/* Left content */}
-        <div className="flex-1 flex flex-col justify-end p-4 pb-32">
+        <div className="flex-1 flex flex-col justify-end p-4" style={{ paddingBottom: contentBottomPad }}>
           <div className="text-white">
             <div className="mb-3">
               <button className="flex items-center gap-3 hover:opacity-80 transition-opacity">
@@ -154,7 +159,8 @@ export default function FullscreenMediaPlayer(props: FullscreenMediaPlayerProps)
 
         {/* Right actions */}
         <MediaActions
-          className="w-16 justify-center pb-32"
+          className="w-16 justify-center"
+          style={{ paddingBottom: contentBottomPad }}
           liked={liked}
           likeCount={likeCount}
           bookmarked={bookmarked}
@@ -167,7 +173,7 @@ export default function FullscreenMediaPlayer(props: FullscreenMediaPlayerProps)
 
       {/* Bottom CTA */}
       {(onReserve || onMore) && (
-        <div className="absolute bottom-16 left-0 right-0 px-4">
+        <div className="absolute left-0 right-0 px-4" style={{ bottom: ctaBottom }}>
           <div className="flex gap-2">
             {onReserve && (
               <button

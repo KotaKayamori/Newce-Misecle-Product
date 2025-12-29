@@ -642,14 +642,6 @@ export default function SearchPage() {
 
       {showReelsFromSearch && (
         <div className="fixed inset-0 z-50 bg-black">
-          <button
-            type="button"
-            onClick={() => setShowReelsFromSearch(false)}
-            className="absolute top-6 left-6 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 focus:outline-none"
-            aria-label="閉じる"
-          >
-            ＜
-          </button>
           <ReelsScreen
             categorySlug={
               selectedCategory === "最新動画" || selectedCategory === "ガイドブック"
@@ -657,6 +649,7 @@ export default function SearchPage() {
                 : resolveCategorySlug(selectedCategory)
             }
             startVideoId={selectedVideo?.id ?? null}
+            onClose={() => setShowReelsFromSearch(false)}
           />
         </div>
       )}

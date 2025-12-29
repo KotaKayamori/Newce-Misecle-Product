@@ -42,6 +42,7 @@ const WINDOW = 2 // activeIndex ±2 を描画
 type ReelsScreenProps = {
   categorySlug?: string
   startVideoId?: string | null
+  onClose?: () => void
 }
 
 const moveStartIdToFront = (pool: string[], startVideoId?: string | null) => {
@@ -54,7 +55,7 @@ const moveStartIdToFront = (pool: string[], startVideoId?: string | null) => {
   return next
 }
 
-export default function ReelsScreen({ categorySlug, startVideoId }: ReelsScreenProps) {
+export default function ReelsScreen({ categorySlug, startVideoId, onClose }: ReelsScreenProps) {
   const [items, setItems] = useState<VideoRow[]>([])
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, OwnerProfile>>({})
   const [hasMore, setHasMore] = useState(true)
@@ -262,7 +263,7 @@ export default function ReelsScreen({ categorySlug, startVideoId }: ReelsScreenP
             onToggleMuted={() => setMuted((m) => !m)}
             ownerProfile={post.owner_id ? ownerProfiles[post.owner_id] : undefined}
             registerObserver={registerActiveTarget}
-            onCloseReel={() => window.history.back()}
+            onCloseReel={() => (onClose ? onClose() : window.history.back())}
             onOpenReserve={() =>
               openReservationForVideo({ setSelectedRestaurant, setShowReservationModal }, post, { keepFullscreen: true })
             }
