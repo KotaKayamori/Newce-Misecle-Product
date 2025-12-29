@@ -277,46 +277,48 @@ export default function ReelsScreen({ categorySlug, startVideoId, onClose }: Ree
   }
 
   return (
-    <div
-      ref={listRef}
-      className="fixed left-0 right-0 top-0 w-screen h-[var(--vvh)] translate-y-[var(--vvt)] bg-black text-white overflow-y-auto snap-y snap-mandatory overscroll-contain [--footer-h:57px]"
-    >
-      <div style={{ height: topSpacer }} />
-      {items.slice(renderRange.start, renderRange.end + 1).map((post, idx) => {
-        const globalIndex = renderRange.start + idx
-        return (
-          <ReelItem
-            key={post.id}
-            post={post}
-            index={globalIndex}
-            active={globalIndex === activeIndex}
-            videoUrl={videoUrlMap[post.id]}
-            bookmarked={bookmarkedVideoIds.has(post.id)}
-            onToggleBookmark={() => toggleBookmark(post.id)}
-            muted={muted}
-            onToggleMuted={() => setMuted((m) => !m)}
-            ownerProfile={post.owner_id ? ownerProfiles[post.owner_id] : undefined}
-            registerObserver={registerActiveTarget}
-            onCloseReel={() => (onClose ? onClose() : window.history.back())}
-            onOpenReserve={() =>
-              openReservationForVideo({ setSelectedRestaurant, setShowReservationModal }, post, { keepFullscreen: true })
-            }
-            onOpenStore={() => {
-              const ownerProfile = post.owner_id ? ownerProfiles[post.owner_id] : undefined
-              const enriched = {
-                ...post,
-                owner_label: ownerProfile?.username ? `@${ownerProfile.username}` : ownerProfile?.display_name ?? null,
-                owner_avatar_url: ownerProfile?.avatar_url ?? null,
+    <>
+      <div
+        ref={listRef}
+        className="fixed left-0 right-0 top-0 w-screen h-[var(--vvh)] translate-y-[var(--vvt)] bg-black text-white overflow-y-auto snap-y snap-mandatory overscroll-contain [--footer-h:57px]"
+      >
+        <div style={{ height: topSpacer }} />
+        {items.slice(renderRange.start, renderRange.end + 1).map((post, idx) => {
+          const globalIndex = renderRange.start + idx
+          return (
+            <ReelItem
+              key={post.id}
+              post={post}
+              index={globalIndex}
+              active={globalIndex === activeIndex}
+              videoUrl={videoUrlMap[post.id]}
+              bookmarked={bookmarkedVideoIds.has(post.id)}
+              onToggleBookmark={() => toggleBookmark(post.id)}
+              muted={muted}
+              onToggleMuted={() => setMuted((m) => !m)}
+              ownerProfile={post.owner_id ? ownerProfiles[post.owner_id] : undefined}
+              registerObserver={registerActiveTarget}
+              onCloseReel={() => (onClose ? onClose() : window.history.back())}
+              onOpenReserve={() =>
+                openReservationForVideo({ setSelectedRestaurant, setShowReservationModal }, post, { keepFullscreen: true })
               }
-              openStoreDetailForVideo({ setSelectedRestaurant, setShowStoreDetailModal }, enriched as any, {
-                keepFullscreen: true,
-              })
-            }}
-          />
-        )
-      })}
-      <div style={{ height: bottomSpacer }} />
-      <div ref={sentinelRef} className="h-1" />
+              onOpenStore={() => {
+                const ownerProfile = post.owner_id ? ownerProfiles[post.owner_id] : undefined
+                const enriched = {
+                  ...post,
+                  owner_label: ownerProfile?.username ? `@${ownerProfile.username}` : ownerProfile?.display_name ?? null,
+                  owner_avatar_url: ownerProfile?.avatar_url ?? null,
+                }
+                openStoreDetailForVideo({ setSelectedRestaurant, setShowStoreDetailModal }, enriched as any, {
+                  keepFullscreen: true,
+                })
+              }}
+            />
+          )
+        })}
+        <div style={{ height: bottomSpacer }} />
+        <div ref={sentinelRef} className="h-1" />
+      </div>
 
       <ReservationModal
         open={showReservationModal}
@@ -338,7 +340,7 @@ export default function ReelsScreen({ categorySlug, startVideoId, onClose }: Ree
           setShowReservationModal(true)
         }}
       />
-    </div>
+    </>
   )
 }
 

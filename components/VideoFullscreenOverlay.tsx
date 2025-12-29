@@ -270,21 +270,18 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         {...{ "webkit-playsinline": "true" }}
         preload="auto"
         controls={false}
-        onClick={isReels ? handleTogglePlay : undefined}
       />
 
       {/* クリック判定用の透明レイヤ（video 全体をカバー） */}
-      {!isReels && (
-        <button
-          type="button"
-          className="absolute inset-0 z-20 cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation()
-            handleTogglePlay()
-          }}
-          aria-label="再生/一時停止"
-        />
-      )}
+      <button
+        type="button"
+        className="absolute inset-0 z-20 cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation()
+          handleTogglePlay()
+        }}
+        aria-label="再生/一時停止"
+      />
 
       {/* Back button */}
       <div className="absolute left-6 top-[calc(env(safe-area-inset-top)+var(--vvt)+16px)] z-30">
