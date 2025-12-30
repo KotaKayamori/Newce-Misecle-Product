@@ -52,25 +52,49 @@ export function SearchHeader({
     setAccountError(null)
     // Supabaseで部分一致検索
     supabase
-      .from("user_profiles")
-      .select("id, username, name, avatar_url")
-      .or(`username.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`)
-      .limit(10)
-      .then(({ data, error }) => {
-        if (error) {
+      .from("allowed_uploaders")
+      .select("user_id")
+      .then(({ data: allowed, error: allowedError }) => {
+        if (allowedError) {
+          console.error(allowedError)
           setAccountError("アカウント候補の取得に失敗しました")
           setAccountSuggestions([])
-        } else {
-          setAccountSuggestions(
-            (data || []).map((u: any) => ({
-              id: u.id,
-              username: u.username || "",
-              display_name: u.name || u.username || "名無し",
-              avatar_url: u.avatar_url || undefined,
-            }))
-          )
+          setAccountLoading(false)
+          return
         }
-        setAccountLoading(false)
+        // 除外したいID
+        const excludeId = "e47816e8-9b90-4498-9ac9-59ff61e80eef"
+        // 除外IDを除いたリストを作成
+        const allowedIds = (allowed || [])
+          .map((row: any) => row.user_id)
+          .filter((id: string) => id !== excludeId)
+        if (allowedIds.length === 0) {
+          setAccountSuggestions([])
+          setAccountLoading(false)
+          return
+        }
+        supabase
+          .from("user_profiles")
+          .select("id, username, name, avatar_url")
+          .in("id", allowedIds)
+          .or(`username.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`)
+          .limit(10)
+          .then(({ data, error }) => {
+            if (error) {
+              setAccountError("アカウント候補の取得に失敗しました")
+              setAccountSuggestions([])
+            } else {
+              setAccountSuggestions(
+                (data || []).map((u: any) => ({
+                  id: u.id,
+                  username: u.username || "",
+                  display_name: u.name || u.username || "名無し",
+                  avatar_url: u.avatar_url || undefined,
+                }))
+              )
+            }
+            setAccountLoading(false)
+          })
       })
   }, [searchTerm])
 
@@ -112,16 +136,6 @@ export function SearchHeader({
         : [],
     [searchTerm]
   )
-  // const accountSuggestions = useMemo(
-  //   () =>
-  //     searchTerm
-  //       ? [
-  //           { username: "gourmet_taro", display: "グルメ太郎" },
-  //           { username: "cafe_hopping_girl", display: "カフェ巡り女子" },
-  //         ]
-  //       : [],
-  //   [searchTerm]
-  // )
 
   return (
     <div className="bg-white px-4 py-4">
