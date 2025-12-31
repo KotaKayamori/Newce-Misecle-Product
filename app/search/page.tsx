@@ -174,7 +174,7 @@ export default function SearchPage() {
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
   const fullscreenScrollLockRef = useRef<{
     scrollY: number
-    body: { top: string; position: string; overflow: string; width: string }
+    body: { top: string; position: string; overflow: string; width: string; left: string; right: string }
   } | null>(null)
 
   const openSingleFullscreen = (video: SupabaseVideoRow) => {
@@ -489,11 +489,15 @@ export default function SearchPage() {
           position: bodyStyle.position,
           overflow: bodyStyle.overflow,
           width: bodyStyle.width,
+          left: bodyStyle.left,
+          right: bodyStyle.right,
         },
       }
       bodyStyle.top = `-${window.scrollY}px`
       bodyStyle.position = "fixed"
       bodyStyle.overflow = "hidden"
+      bodyStyle.left = "0"
+      bodyStyle.right = "0"
       bodyStyle.width = "100%"
     } else if (fullscreenScrollLockRef.current) {
       const previous = fullscreenScrollLockRef.current
@@ -501,6 +505,8 @@ export default function SearchPage() {
       bodyStyle.position = previous.body.position
       bodyStyle.overflow = previous.body.overflow
       bodyStyle.width = previous.body.width
+      bodyStyle.left = previous.body.left
+      bodyStyle.right = previous.body.right
       window.scrollTo({ top: previous.scrollY })
       fullscreenScrollLockRef.current = null
     }
@@ -512,6 +518,8 @@ export default function SearchPage() {
         bodyStyle.position = previous.body.position
         bodyStyle.overflow = previous.body.overflow
         bodyStyle.width = previous.body.width
+        bodyStyle.left = previous.body.left
+        bodyStyle.right = previous.body.right
         window.scrollTo({ top: previous.scrollY })
         fullscreenScrollLockRef.current = null
       }
@@ -641,15 +649,7 @@ export default function SearchPage() {
       )}
 
       {showReelsFromSearch && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <button
-            type="button"
-            onClick={() => setShowReelsFromSearch(false)}
-            className="absolute top-6 left-6 z-50 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 focus:outline-none"
-            aria-label="閉じる"
-          >
-            ＜
-          </button>
+        <div className="fixed left-0 right-0 top-0 w-screen h-[var(--vvh)] translate-y-[var(--vvt)] z-50 bg-black [--footer-h:57px]">
           <ReelsScreen
             categorySlug={
               selectedCategory === "最新動画" || selectedCategory === "ガイドブック"
@@ -657,6 +657,7 @@ export default function SearchPage() {
                 : resolveCategorySlug(selectedCategory)
             }
             startVideoId={selectedVideo?.id ?? null}
+            onClose={() => setShowReelsFromSearch(false)}
           />
         </div>
       )}

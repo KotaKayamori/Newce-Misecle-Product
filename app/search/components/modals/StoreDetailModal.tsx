@@ -42,7 +42,7 @@ export function StoreDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg w-[400px] h-[700px] max-w-[92vw] max-h-[calc(100vh-32px)] overflow-y-auto pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center justify-between p-4">
           <Button
             variant="ghost"
