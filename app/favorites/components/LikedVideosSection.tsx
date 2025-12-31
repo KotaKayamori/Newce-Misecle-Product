@@ -3,7 +3,7 @@
 import { Play } from "lucide-react"
 import VideoCard from "@/components/VideoCard"
 import { FALLBACK_VIDEO_URL } from "@/lib/media"
-import { derivePosterUrl } from "@/app/favorites/utils"
+import { derivePosterUrl } from "@/lib/media"
 import type { FavoriteVideo, OwnerProfile } from "@/app/favorites/types"
 
 interface LikedVideosSectionProps {
@@ -78,6 +78,7 @@ export function LikedVideosSection({
             bottomMetaVariant="account"
             accountAvatarUrl={profile?.avatar_url ?? null}
             accountLabel={label}
+            accountUserId={video.owner_id}
             showTopBookmark
             isBookmarked={bookmarkedSet.has(video.id)}
             onToggleBookmark={() => onToggleBookmark(video)}

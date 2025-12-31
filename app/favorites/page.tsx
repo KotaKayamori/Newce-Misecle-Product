@@ -6,17 +6,14 @@ import { LikedVideosSection } from "./components/LikedVideosSection"
 import { SavedVideosSection } from "./components/SavedVideosSection"
 import { LikedAlbumsSection } from "./components/LikedAlbumsSection"
 import { SavedAlbumsSection } from "./components/SavedAlbumsSection"
-import { ReservationModal } from "./components/ReservationModal"
+import { ReservationModal } from "@/components/modals/ReservationModal"
 import { StoreDetailModal } from "./components/StoreDetailModal"
-// 画像サムネイル生成にSearchと同じ関数を利用
-// derivePosterUrl は Search ページ内で定義されているため、同等の処理をここにも定義
 import Navigation from "@/components/navigation"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { FALLBACK_VIDEO_URL } from "@/lib/media"
+import { FALLBACK_VIDEO_URL, derivePosterUrl } from "@/lib/media"
 import { openReservationForVideo as openReserveShared, openStoreDetailForVideo as openStoreShared } from "@/lib/video-actions"
-import { derivePosterUrl } from "./utils"
-import type { AlbumRow, FavoriteVideo, ReservationFormData, SelectedRestaurant } from "@/app/favorites/types"
+import type { AlbumRow, FavoriteVideo, ReservationFormData, RestaurantInfo } from "@/lib/types"
 import { useFavoriteVideos } from "./hooks/useFavoriteVideos"
 import { useFavoriteAlbums } from "./hooks/useFavoriteAlbums"
 
@@ -54,6 +51,7 @@ export default function FavoritesPage() {
   const [fsVideo, setFsVideo] = useState<{ id: string; playback_url: string; poster_url?: string | null; title?: string | null; caption?: string | null } | null>(null)
   const [fsOwnerHandle, setFsOwnerHandle] = useState<string>("")
   const [fsOwnerAvatar, setFsOwnerAvatar] = useState<string | null | undefined>(null)
+  const [fsOwnerUserId, setFsOwnerUserId] = useState<string | null | undefined>(null)
   const [fsMuted, setFsMuted] = useState(false)
 
   const [albumFsOpen, setAlbumFsOpen] = useState(false)
@@ -71,6 +69,7 @@ export default function FavoritesPage() {
     setFsVideo({ id: v.id, playback_url: v.playback_url || FALLBACK_VIDEO_URL, poster_url: derivePosterUrl(v.playback_url as any, (v as any).storage_path), title: v.title ?? null, caption: v.caption ?? null })
     setFsOwnerHandle(handle)
     setFsOwnerAvatar(prof?.avatar_url ?? null)
+    setFsOwnerUserId(v.owner_id)
     setFsMuted(false)
     setFsOpen(true)
   }
@@ -81,6 +80,7 @@ export default function FavoritesPage() {
     setFsVideo({ id: video.id, playback_url: video.playback_url || FALLBACK_VIDEO_URL, poster_url: derivePosterUrl(video.playback_url as any, (video as any).storage_path), title: video.title ?? null, caption: video.caption ?? null })
     setFsOwnerHandle(handle)
     setFsOwnerAvatar(prof?.avatar_url ?? null)
+    setFsOwnerUserId(video.owner_id)
     setFsMuted(false)
     setFsOpen(true)
   }
@@ -107,7 +107,7 @@ export default function FavoritesPage() {
 
   const [showReservationModal, setShowReservationModal] = useState(false)
   const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
-  const [selectedRestaurant, setSelectedRestaurant] = useState<SelectedRestaurant | null>(null)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantInfo | null>(null)
   // const [showUserProfile, setShowUserProfile] = useState(false) // TODO: 未使用
   // const [selectedUser, setSelectedUser] = useState(null) // TODO: 未使用
   const [reservationData, setReservationData] = useState<ReservationFormData>({
@@ -216,8 +216,6 @@ export default function FavoritesPage() {
         </Tabs>
       </div>
 
-      {/* Reel feed modals disabled (replaced by VideoFullscreenOverlay) */}
-
       {/* Unified fullscreen overlay */}
       {fsOpen && fsVideo && (
         <VideoFullscreenOverlay
@@ -225,9 +223,10 @@ export default function FavoritesPage() {
           video={fsVideo}
           ownerHandle={fsOwnerHandle}
           ownerAvatarUrl={fsOwnerAvatar ?? null}
-          liked={likedSet.has(fsVideo.id)}
-          likeCount={getLikeCount(fsVideo.id)}
-          onToggleLike={() => handleToggleLikeInFeed(fsVideo.id)}
+          ownerUserId={fsOwnerUserId ?? null}
+          // liked={likedSet.has(fsVideo.id)}
+          // likeCount={getLikeCount(fsVideo.id)}
+          // onToggleLike={() => handleToggleLikeInFeed(fsVideo.id)}
           bookmarked={bookmarkedSet.has(fsVideo.id)}
           onToggleBookmark={() => toggleBookmarkForVideo({ id: fsVideo.id } as any)}
           onShare={async () => { try { if ((navigator as any).share) { await (navigator as any).share({ url: fsVideo.playback_url }) } else { await navigator.clipboard.writeText(fsVideo.playback_url); alert("リンクをコピーしました") } } catch {} }}

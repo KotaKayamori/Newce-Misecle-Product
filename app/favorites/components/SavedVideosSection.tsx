@@ -3,7 +3,7 @@
 import { Play } from "lucide-react"
 import VideoCard from "@/components/VideoCard"
 import { FALLBACK_VIDEO_URL } from "@/lib/media"
-import { derivePosterUrl } from "@/app/favorites/utils"
+import { derivePosterUrl } from "@/lib/media"
 import type { BookmarkedVideo, FavoriteVideo, OwnerProfile } from "@/app/favorites/types"
 
 interface SavedVideosSectionProps {
@@ -93,6 +93,7 @@ export function SavedVideosSection({
             bottomMetaVariant="account"
             accountAvatarUrl={profile?.avatar_url ?? null}
             accountLabel={label}
+            accountUserId={video.owner_id}
             onClickCard={() => onVideoClick(video)}
           />
         )

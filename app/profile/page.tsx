@@ -1,12 +1,13 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Settings, Store, Bell, Shield, HelpCircle, Upload, Play, Star } from "lucide-react"
+import { Settings, Store, Bell, Shield, HelpCircle, Upload, Play, Image, Star, ChevronLeft, Menu, X } from "lucide-react"
 import Navigation from "@/components/navigation"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/components/auth-provider"
 import { useRouter } from "next/navigation"
 import { useUserProfile } from "@/hooks/useUserProfile"
+import { useFollow } from "@/hooks/useFollow"
 import { useToast } from "@/hooks/use-toast"
 import { useProfileModals } from "./hooks/useProfileModals"
 import { GenderAgeScreen } from "./components/GenderAgeScreen"
@@ -28,6 +29,16 @@ import { PasswordSuccessScreen } from "./components/PasswordSuccessScreen"
 import { UploadScreen } from "./components/UploadScreen"
 import { MyVideosScreen } from "./components/MyVideosScreen"
 import { NotificationPermissionScreen } from "./components/NotificationPermissionScreen"
+import type { UserVideo, UserAlbum } from "./types"
+import { derivePosterUrl, deriveAlbumCoverUrl } from "@/lib/media"
+import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
+import AlbumViewerOverlay, { AlbumAsset } from "@/components/AlbumViewerOverlay"
+import type { RestaurantInfo, ReservationFormData } from "@/lib/types"
+import { openReservationForVideo as openReserveShared, openStoreDetailForVideo as openStoreShared } from "@/lib/video-actions"
+import { ReservationModal } from "@/components/modals/ReservationModal"
+import { StoreDetailModal } from "@/components/modals/StoreDetailModal"
+
+import { supabase } from "@/lib/supabase"
 
 export default function ProfilePage() {
   const router = useRouter()
@@ -72,17 +83,170 @@ export default function ProfilePage() {
     setShowMyVideosModal,
   } = modals
 
+  // フォロー機能（自分自身のフォロワー/フォロー数を取得）
+  const { 
+    followersCount, 
+    followingCount 
+  } = useFollow(user?.id ?? null)
+
+  // 投稿数
+  const [postsCount, setPostsCount] = useState(0)
+
   const [showEmailSuccess, setShowEmailSuccess] = useState(false)
   const [emailSuccessMessage, setEmailSuccessMessage] = useState("")
   const [emailSuccessType, setEmailSuccessType] = useState<"contact" | "bug">("contact")
   const [showPasswordSuccess, setShowPasswordSuccess] = useState(false)
   const [isSavingGenderAge, setIsSavingGenderAge] = useState(false)
+  const [showMenuDrawer, setShowMenuDrawer] = useState(false)
+  const [activeTab, setActiveTab] = useState<"video" | "album">("video")
+
+  // 動画・アルバム用state
+  const [videos, setVideos] = useState<UserVideo[]>([])
+  const [videosLoading, setVideosLoading] = useState(true)
+  const [albums, setAlbums] = useState<UserAlbum[]>([])
+  const [albumsLoading, setAlbumsLoading] = useState(true)
+
+  // 予約・店舗詳細モーダル用 state
+  const [showReservationModal, setShowReservationModal] = useState(false)
+  const [showStoreDetailModal, setShowStoreDetailModal] = useState(false)
+  const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantInfo | null>(null)
+  const [reservationData, setReservationData] = useState<ReservationFormData>({
+    name: "",
+    people: 2,
+    date: "",
+    time: "18:00",
+    seatType: "指定なし",
+    message: "",
+  })
+
+  // 動画フルスクリーン用 state
+  const [fsOpen, setFsOpen] = useState(false)
+  const [fsVideo, setFsVideo] = useState<{ id: string; playback_url: string; poster_url?: string | null; title?: string | null; caption?: string | null } | null>(null)
+  const [fsOwnerHandle, setFsOwnerHandle] = useState<string>("")
+  const [fsOwnerAvatar, setFsOwnerAvatar] = useState<string | null>(null)
+  const [fsOwnerUserId, setFsOwnerUserId] = useState<string | null>(null)
+  const [fsMuted, setFsMuted] = useState(false)
+
+  // アルバム全画面表示用 state
+  const [albumViewerOpen, setAlbumViewerOpen] = useState(false)
+  const [selectedAlbum, setSelectedAlbum] = useState<UserAlbum | null>(null)
+  const [albumAssets, setAlbumAssets] = useState<AlbumAsset[]>([])
+  const [albumAssetIndex, setAlbumAssetIndex] = useState(0)
+  const [albumAssetsLoading, setAlbumAssetsLoading] = useState(false)
+
+  // 動画クリック時
+  const handleVideoClick = (video: UserVideo) => {
+    const handle = userProfile?.username ? `@${userProfile.username}` : "ユーザー"
+    setFsVideo({
+      id: video.id,
+      playback_url: video.playback_url,
+      poster_url: derivePosterUrl(video.playback_url, video.storage_path),
+      title: video.title,
+      caption: video.caption,
+    })
+    setFsOwnerHandle(handle)
+    setFsOwnerAvatar(userProfile?.avatar_url ?? null)
+    setFsOwnerUserId(video.owner_id)
+    setFsMuted(false)
+    setFsOpen(true)
+  }
 
   useEffect(() => {
     if (error === "PROFILE_NOT_FOUND") {
       router.push("/register")
     }
   }, [error, router])
+
+  // アルバムクリック時
+  const handleAlbumClick = async (album: UserAlbum) => {
+    setSelectedAlbum(album)
+    setAlbumAssetsLoading(true)
+    setAlbumViewerOpen(true)
+    setAlbumAssetIndex(0)
+    try {
+      const res = await fetch(`/api/guidebook/albums/${album.id}/assets`, { cache: "no-store" })
+      if (!res.ok) throw new Error("アルバムの取得に失敗しました")
+      const json = await res.json()
+      const assets: AlbumAsset[] = Array.isArray(json?.items)
+        ? json.items.map((asset: any) => ({
+            id: asset.id,
+            url: asset.url,
+            order: asset.order,
+            width: asset.width,
+            height: asset.height,
+          }))
+        : []
+      setAlbumAssets(assets)
+    } catch (err) {
+      setAlbumAssets([])
+    } finally {
+      setAlbumAssetsLoading(false)
+    }
+  }
+
+  // 自分の動画取得
+  useEffect(() => {
+    if (!user?.id) return
+    setVideosLoading(true)
+    supabase
+      .from("videos")
+      .select("id, owner_id, playback_url, storage_path, title, caption, created_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) setVideos([])
+        else setVideos(data || [])
+        setVideosLoading(false)
+      })
+  }, [user?.id])
+
+  // 自分のアルバム取得
+  useEffect(() => {
+    if (!user?.id) return
+    setAlbumsLoading(true)
+    supabase
+      .from("photo_albums")
+      .select("id, owner_id, title, caption, cover_path, created_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) setAlbums([])
+        else setAlbums(data || [])
+        setAlbumsLoading(false)
+      })
+  }, [user?.id])
+
+  // 自分の動画取得
+  useEffect(() => {
+    if (!user?.id) return
+    setVideosLoading(true)
+    supabase
+      .from("videos")
+      .select("id, owner_id, playback_url, storage_path, title, caption, created_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) setVideos([])
+        else setVideos(data || [])
+        setVideosLoading(false)
+      })
+  }, [user?.id])
+
+  // 自分のアルバム取得
+  useEffect(() => {
+    if (!user?.id) return
+    setAlbumsLoading(true)
+    supabase
+      .from("photo_albums")
+      .select("id, owner_id, title, caption, cover_path, created_at")
+      .eq("owner_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) setAlbums([])
+        else setAlbums(data || [])
+        setAlbumsLoading(false)
+      })
+  }, [user?.id])
 
   const visitHistory = [
     {
@@ -223,6 +387,7 @@ export default function ProfilePage() {
   }
 
   const handleLogout = () => {
+    setShowMenuDrawer(false)
     setShowLogoutConfirmation(true)
   }
 
@@ -249,50 +414,91 @@ export default function ProfilePage() {
     {
       category: "アカウント",
       items: [
-        { icon: Upload, label: "コンテンツをアップロード", onClick: () => setShowUploadModal(true) },
-        { icon: Play, label: "自分の動画", onClick: () => setShowMyVideosModal(true) },
-        { icon: Settings, label: "パスワード設定", onClick: () => setShowAccountSettings(true) },
+        { icon: Upload, label: "コンテンツをアップロード", onClick: () => { setShowMenuDrawer(false); setShowUploadModal(true) } },
+        { icon: Play, label: "自分の動画", onClick: () => { setShowMenuDrawer(false); setShowMyVideosModal(true) } },
+        { icon: Settings, label: "パスワード設定", onClick: () => { setShowMenuDrawer(false); setShowAccountSettings(true) } },
         { icon: Shield, label: "ログアウト", onClick: () => handleLogout() },
       ],
     },
     {
       category: "店舗",
       items: [
-        { icon: Store, label: "これまで来店した店舗", onClick: () => setShowVisitedStores(true) },
+        { icon: Store, label: "これまで来店した店舗", onClick: () => { setShowMenuDrawer(false); setShowVisitedStores(true) } },
       ],
     },
     {
       category: "通知とプライバシー",
       items: [
-        { icon: Bell, label: "位置情報の設定", onClick: () => setShowLocationSettings(true) },
-        { icon: Bell, label: "プッシュ通知設定", onClick: () => setShowNotificationPermission(true) },
-        { icon: Shield, label: "ミュートにしている店舗", onClick: () => setShowMutedStoresSettings(true) },
+        { icon: Bell, label: "位置情報の設定", onClick: () => { setShowMenuDrawer(false); setShowLocationSettings(true) } },
+        { icon: Bell, label: "プッシュ通知設定", onClick: () => { setShowMenuDrawer(false); setShowNotificationPermission(true) } },
+        { icon: Shield, label: "ミュートにしている店舗", onClick: () => { setShowMenuDrawer(false); setShowMutedStoresSettings(true) } },
       ],
     },
     {
       category: "サポート",
       items: [
-        { icon: HelpCircle, label: "お問い合わせ", onClick: () => setShowContactForm(true) },
-        { icon: HelpCircle, label: "よくある質問", onClick: () => setShowFAQ(true) },
-        { icon: HelpCircle, label: "アプリの不具合や、改善要望を報告", onClick: () => setShowBugReportForm(true) },
+        { icon: HelpCircle, label: "お問い合わせ", onClick: () => { setShowMenuDrawer(false); setShowContactForm(true) } },
+        { icon: HelpCircle, label: "よくある質問", onClick: () => { setShowMenuDrawer(false); setShowFAQ(true) } },
+        { icon: HelpCircle, label: "アプリの不具合や、改善要望を報告", onClick: () => { setShowMenuDrawer(false); setShowBugReportForm(true) } },
         { icon: HelpCircle, label: "サービスサイトはこちら", onClick: () => window.open("https://service.newce.co.jp", "_blank") },
         { icon: HelpCircle, label: "店舗様はこちら", onClick: () => window.open("https://ad.newce.co.jp", "_blank") },
       ],
     },
-    // 運営機能セクションは削除済み
   ]
+
+  // Menu Drawer Component
+  const MenuDrawer = () => (
+    <>
+      {/* Overlay */}
+      <div 
+        className="fixed inset-0 bg-black/50 z-40"
+        onClick={() => setShowMenuDrawer(false)}
+      />
+      {/* Drawer */}
+      <div className="fixed right-0 top-0 h-full w-80 bg-white z-50 overflow-y-auto shadow-xl">
+        <div className="p-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">メニュー</h2>
+          <button onClick={() => setShowMenuDrawer(false)} className="p-2">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="p-4 space-y-6">
+          {menuItems.map((section, sectionIndex) => (
+            <div key={sectionIndex}>
+              <h3 className="text-sm font-bold text-black mb-2">{section.category}</h3>
+              <div className="space-y-1">
+                {section.items.map((item, itemIndex) => {
+                  const IconComponent = item.icon
+                  return (
+                    <button
+                      key={itemIndex}
+                      onClick={item.onClick}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-gray-100 rounded-lg transition-colors text-left"
+                    >
+                      <IconComponent className="w-5 h-5 text-gray-600" />
+                      <span className="text-gray-800 text-sm">{item.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  )
 
   if (!user) {
     return (
       <div className="min-h-screen bg-white pb-20">
         {/* Header */}
-        <div className="bg-white px-6 py-4">
+        <div className="bg-white px-4 py-3">
           <div className="relative flex items-center justify-center">
-            <h1 className="text-xl font-semibold">マイページ</h1>
+            <h1 className="text-lg font-semibold">マイページ</h1>
           </div>
         </div>
 
-        {/* Login Required (お気に入りページと同様の見た目) */}
+        {/* Login Required */}
         <div className="px-6 py-12">
           <div className="text-center">
             <h1 className="text-xl font-semibold text-gray-900 mb-2">ログインが必要です</h1>
@@ -306,7 +512,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Footer */}
         <Navigation />
       </div>
     )
@@ -387,8 +592,6 @@ export default function ProfilePage() {
       />
     )
   }
-
-
 
   if (showReviews) {
     return <ReviewsScreen onClose={() => setShowReviews(false)} visitHistory={visitHistory} />
@@ -476,62 +679,266 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-white pb-20">
-      <div className="bg-white px-6 py-4">
-        <div className="relative flex items-center justify-center">
-          <h1 className="text-xl font-semibold">マイページ</h1>
+      {/* Menu Drawer */}
+      {showMenuDrawer && <MenuDrawer />}
+
+      {/* Header - Instagram style */}
+      <div className="bg-white px-4 py-3 sticky top-0 z-30">
+        <div className="flex items-center justify-between">
+          <div className="w-8"></div>
+          <span className="text-base font-semibold">
+            @{userProfile?.username || "username"}
+          </span>
+          <button onClick={() => setShowMenuDrawer(true)} className="p-1">
+            <Menu className="w-6 h-6" />
+          </button>
         </div>
       </div>
 
-      <div className="px-6 py-4 space-y-4 bg-white">
-        <div className="p-8">
-          <div className="flex flex-col items-center justify-center gap-4">
-            <div className="flex items-center justify-center gap-4">
-              <img
-                src={userProfile?.avatar_url || "/images/misecle-mascot.png"}
-                alt="Profile Icon"
-                className="w-24 h-24 rounded-full object-cover"
-              />
-              <div>
-                <h3 className="font-semibold text-xl">{userProfile?.username || "ユーザー"}</h3>
-                <p className="text-gray-600 text-sm">{userProfile?.name || ""}</p>
+      {/* Profile Section */}
+      <div className="px-6 py-4">
+        {/* Profile Info Row */}
+        <div className="flex items-center gap-6 mb-4">
+          {/* Avatar */}
+          <img
+            src={userProfile?.avatar_url || "/images/misecle-mascot.png"}
+            alt="Profile"
+            className="w-20 h-20 rounded-full object-cover border-2 border-gray-100"
+          />
+          
+          {/* Stats */}
+          <div className="flex-1">
+            {/* <h2 className="text-xl font-bold mb-2">{userProfile?.name || "ユーザー"}</h2> */}
+            <div className="flex gap-6">
+              <div className="text-center">
+                <div className="font-bold text-lg">{videos.length + albums.length}</div>
+                <div className="text-xs text-gray-500">投稿</div>
+              </div>
+              <div className="text-center">
+                <div className="font-bold text-lg">{followersCount}</div>
+                <div className="text-xs text-gray-500">フォロワー</div>
+              </div>
+              <div className="text-center">
+                <div className="font-bold text-lg">{followingCount}</div>
+                <div className="text-xs text-gray-500">フォロー中</div>
               </div>
             </div>
-            <Button
-              onClick={() => setShowProfileEdit(true)}
-              className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-12 rounded-full w-full max-w-xs"
-            >
-              プロフィールを編集する
-            </Button>
           </div>
         </div>
 
-        <div className="space-y-6">
-          {menuItems.map((section, sectionIndex) => (
-            <div key={sectionIndex}>
-              <h3 className="text-lg font-semibold text-gray-800 mb-3 px-2">{section.category}</h3>
-              <div className="bg-white rounded-lg overflow-hidden">
-                {section.items.map((item, itemIndex) => {
-                  const IconComponent = item.icon
-                  return (
-                    <div key={itemIndex}>
-                      <button
-                        onClick={item.onClick}
-                        className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-3">
-                          <IconComponent className="w-5 h-5 text-gray-600" />
-                          <span className="text-gray-800">{item.label}</span>
-                        </div>
-                        <span className="text-black">＞</span>
-                      </button>
-                      {itemIndex < section.items.length - 1 && <div className="border-b border-gray-200 mx-4"></div>}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          ))}
+        {/* Bio Section */}
+        <div className="mb-4">
+          <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+            {userProfile?.profile}
+          </p>
         </div>
+
+        {/* SNS Link */}
+        {userProfile?.sns_link && (
+          <div className="mb-4">
+            <a 
+              href={userProfile.sns_link.startsWith('http') ? userProfile.sns_link : `https://${userProfile.sns_link}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              {userProfile.sns_link}
+            </a>
+          </div>
+        )}
+
+        {/* Edit Profile Button */}
+        <Button
+          onClick={() => setShowProfileEdit(true)}
+          variant="outline"
+          className="w-full border-gray-300 text-gray-800 font-medium py-2 rounded-lg"
+        >
+          プロフィールを編集
+        </Button>
+      </div>
+
+      {/* 動画フルスクリーンオーバーレイ */}
+      {fsOpen && fsVideo && (
+        <VideoFullscreenOverlay
+          open={fsOpen}
+          video={fsVideo}
+          ownerHandle={fsOwnerHandle}
+          ownerAvatarUrl={fsOwnerAvatar}
+          ownerUserId={fsOwnerUserId}
+          muted={fsMuted}
+          onToggleMuted={() => setFsMuted((m) => !m)}
+          onClose={() => setFsOpen(false)}
+          onShare={async () => {
+            try {
+              if ((navigator as any).share) {
+                await (navigator as any).share({ url: fsVideo.playback_url })
+              } else {
+                await navigator.clipboard.writeText(fsVideo.playback_url)
+                alert("リンクをコピーしました")
+              }
+            } catch {}
+          }}
+          onReserve={() => {
+            openReserveShared(
+              { setSelectedRestaurant, setShowReservationModal, setShowFullscreenVideo: setFsOpen as any },
+              { id: fsVideo.id, title: fsVideo.title as any } as any,
+              { keepFullscreen: true }
+            )
+          }}
+          onMore={() => {
+            const videoForModal = {
+              id: fsVideo.id,
+              title: fsVideo.title as any,
+              caption: fsVideo.caption as any,
+              owner_label: fsOwnerHandle || null,
+              owner_avatar_url: fsOwnerAvatar || null,
+            }
+            openStoreShared(
+              { setSelectedRestaurant, setShowStoreDetailModal },
+              videoForModal as any,
+              { keepFullscreen: true }
+            )
+          }}
+        />
+      )}      
+
+      {/* 予約モーダル */}
+      <ReservationModal
+        open={showReservationModal}
+        restaurant={selectedRestaurant}
+        data={reservationData}
+        onChange={(values) => setReservationData((prev) => ({ ...prev, ...values }))}
+        onClose={() => setShowReservationModal(false)}
+        onSubmit={() => {
+          alert("予約リクエストを送信しました！")
+          setShowReservationModal(false)
+        }}
+      />
+
+      {/* 店舗詳細モーダル */}
+      <StoreDetailModal
+        open={showStoreDetailModal}
+        restaurant={selectedRestaurant}
+        onClose={() => setShowStoreDetailModal(false)}
+        onReserve={() => setShowReservationModal(true)}
+      />
+
+      {/* アルバム全画面オーバーレイ */}
+      {selectedAlbum && (
+        <AlbumViewerOverlay
+          open={albumViewerOpen}
+          assets={albumAssets}
+          index={albumAssetIndex}
+          loading={albumAssetsLoading}
+          onClose={() => setAlbumViewerOpen(false)}
+          onIndexChange={(next) => {
+            const clamped = Math.max(0, Math.min(next, albumAssets.length - 1))
+            setAlbumAssetIndex(clamped)
+          }}
+          title={selectedAlbum.title}
+          ownerAvatarUrl={userProfile?.avatar_url}
+          ownerLabel={`@${userProfile?.username || "user"}`}
+          ownerUserId={user?.id}
+          description={selectedAlbum.caption}
+          onShare={async () => {
+            const url = albumAssets[albumAssetIndex]?.url
+            if (!url) return
+            try {
+              if (navigator.share) await navigator.share({ url })
+              else {
+                await navigator.clipboard.writeText(url)
+                alert("リンクをコピーしました")
+              }
+            } catch {}
+          }}
+        />
+      )}
+
+      {/* Tab Navigation */}
+      <div className="border-b">
+        <div className="flex">
+          <button
+            onClick={() => setActiveTab("video")}
+            className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
+              activeTab === "video"
+                ? "text-gray-900 border-b-2 border-gray-900"
+                : "text-gray-400"
+            }`}
+          >
+            動画
+          </button>
+          <button
+            onClick={() => setActiveTab("album")}
+            className={`flex-1 py-3 text-center text-sm font-medium transition-colors ${
+              activeTab === "album"
+                ? "text-gray-900 border-b-2 border-gray-900"
+                : "text-gray-400"
+            }`}
+          >
+            アルバム
+          </button>
+        </div>
+      </div>
+
+      {/* Content Area - 3カラムグリッド、サムネイルのみ */}
+      <div>
+        {activeTab === "video" ? (
+          videosLoading ? (
+            <div className="py-8 text-center text-gray-500">読み込み中…</div>
+          ) : videos.length === 0 ? (
+            <div className="text-center py-12">
+              <Play className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">まだ動画がありません</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-[1px]">
+              {videos.map((video) => (
+                <button
+                  key={video.id}
+                  onClick={() => handleVideoClick(video)}
+                  className="aspect-square relative overflow-hidden bg-gray-100 hover:opacity-80 transition-opacity"
+                >
+                  <img
+                    src={derivePosterUrl(video.playback_url, video.storage_path) || "/placeholder.jpg"}
+                    alt={video.title || "動画"}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Play className="w-8 h-8 text-white drop-shadow-lg" fill="white" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )
+        ) : (
+          albumsLoading ? (
+            <div className="py-8 text-center text-gray-500">読み込み中…</div>
+          ) : albums.length === 0 ? (
+            <div className="text-center py-12">
+              <Image className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">まだアルバムがありません</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-[1px]">
+              {albums.map((album) => (
+                <button
+                  key={album.id}
+                  onClick={() => handleAlbumClick(album)}
+                  className="aspect-square relative overflow-hidden bg-gray-100 hover:opacity-80 transition-opacity"
+                >
+                  <img
+                    src={deriveAlbumCoverUrl(album.cover_path) || "/placeholder.jpg"}
+                    alt={album.title || "アルバム"}
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute top-2 right-2">
+                    <Image className="w-5 h-5 text-white drop-shadow-lg" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )
+        )}
       </div>
 
       <Navigation />

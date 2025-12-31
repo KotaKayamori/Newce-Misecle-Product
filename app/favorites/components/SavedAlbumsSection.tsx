@@ -2,7 +2,7 @@
 
 import AlbumCard from "@/components/AlbumCard"
 import type { AlbumRow, OwnerProfile } from "@/app/favorites/types"
-import { deriveAlbumCoverUrl } from "@/app/favorites/utils"
+import { deriveAlbumCoverUrl } from "@/lib/media"
 import { Image as ImageIcon } from "lucide-react"
 
 interface SavedAlbumsSectionProps {
@@ -82,6 +82,7 @@ export function SavedAlbumsSection({
             bottomMetaVariant="account"
             accountAvatarUrl={profile?.avatar_url ?? null}
             accountLabel={label}
+            accountUserId={album.owner_id}
           />
         )
       })}

@@ -1,6 +1,7 @@
 "use client"
 
 import React from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Bookmark, User } from "lucide-react"
 
@@ -23,10 +24,12 @@ export interface AlbumCardProps {
   bottomMetaVariant?: BottomMetaVariant
   accountAvatarUrl?: string | null
   accountLabel?: string | null
+  accountUserId?: string | null
   dateLabel?: string | null
 }
 
 export default function AlbumCard(props: AlbumCardProps) {
+  const router = useRouter()
   const {
     coverUrl,
     title,
@@ -38,8 +41,16 @@ export default function AlbumCard(props: AlbumCardProps) {
     bottomMetaVariant = "none",
     accountAvatarUrl,
     accountLabel,
+    accountUserId,
     dateLabel,
   } = props
+
+  const handleAccountClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (accountUserId) {
+      router.push(`/profile/${accountUserId}`)
+    }
+  }
 
   return (
     <Card className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow">
@@ -78,7 +89,11 @@ export default function AlbumCard(props: AlbumCardProps) {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 {bottomMetaVariant === "account" ? (
-                  <>
+                  <button
+                    onClick={handleAccountClick}
+                    className={`flex items-center gap-2 ${accountUserId ? "hover:opacity-70 transition-opacity" : ""}`}
+                    disabled={!accountUserId}
+                  >
                     <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                       {accountAvatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -88,7 +103,7 @@ export default function AlbumCard(props: AlbumCardProps) {
                       )}
                     </div>
                     <span className="text-xs text-gray-600">{accountLabel ?? "@user"}</span>
-                  </>
+                  </button>
                 ) : (
                   <span className="text-xs text-gray-600">{dateLabel}</span>
                 )}

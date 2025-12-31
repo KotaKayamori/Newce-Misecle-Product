@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import AlbumCard from "@/components/AlbumCard"
 import AlbumViewerOverlay from "@/components/AlbumViewerOverlay"
-import { derivePosterUrl } from "@/app/search/utils"
+import { derivePosterUrl, deriveAlbumCoverUrl } from "@/lib/media"
 import type { AssetItem } from "@/app/search/types"
 
 type Item = {
@@ -196,14 +196,6 @@ export default function MyVideosPanel() {
     }
   }
 
-  function deriveAlbumCoverUrl(coverPath?: string | null): string | null {
-    if (!coverPath) return null
-    const base = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "")
-    if (!base) return null
-    const objectPath = coverPath.replace(/^\/+/, "")
-    return `${base}/storage/v1/object/public/photos/${objectPath}`
-  }
-
   return (
     <div className="px-2 pb-2">
       <Tabs defaultValue="videos" className="w-full">
@@ -312,10 +304,6 @@ export default function MyVideosPanel() {
           }}
           ownerHandle={profile?.username ? `@${profile.username}` : profile?.display_name || "あなた"}
           ownerAvatarUrl={profile?.avatar_url ?? null}
-          ownerHandle={profile?.username ? `@${profile.username}` : profile?.display_name || "あなた"}
-          liked={false}
-          likeCount={0}
-          onToggleLike={() => {}}
           bookmarked={false}
           onToggleBookmark={() => {}}
           onShare={async () => {
