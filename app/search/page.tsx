@@ -27,27 +27,7 @@ import {
 import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
-import type { RestaurantInfo } from "./types"
-
-type SupabaseVideoRow = {
-  id: string
-  owner_id: string | null
-  playback_url: string
-  storage_path: string | null
-  title: string | null
-  caption: string | null
-  created_at: string
-  video_likes?: { count?: number }[]
-  store_1_name?: string | null
-  store_1_tel?: string | null
-  store_1_tabelog?: string | null
-  store_2_name?: string | null
-  store_2_tel?: string | null
-  store_2_tabelog?: string | null
-  store_3_name?: string | null
-  store_3_tel?: string | null
-  store_3_tabelog?: string | null
-}
+import type { SupabaseVideoRow, RestaurantInfo } from "./types"
 
 const CATEGORY_SLUG_MAP: Record<string, string> = {
   "あなたにおすすめ": "today_recommended",
@@ -384,18 +364,6 @@ export default function SearchPage() {
 
   const handleRefreshAlbums = albums.refreshAlbums
 
-  // const handleOpenUserProfile = (user: { id: string; name: string; avatar?: string | null; isFollowing: boolean }) => {
-  //   setSelectedUser({
-  //     id: user.id,
-  //     name: user.name ?? "ゲスト",
-  //     avatar: user.avatar,
-  //     isFollowing: user.isFollowing,
-  //   })
-  //   setShowUserProfile(true)
-  // }
-
-  // FilterButton は FilterModal.tsx に移動
-
   useEffect(() => {
     if (selectedCategory === "最新動画" || selectedCategory === "ガイドブック") return
     const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
@@ -578,6 +546,7 @@ export default function SearchPage() {
               onClear={handleClearSearch}
               onRetry={() => search.performSearch(searchTerm)}
               onSelectVideo={selectSupabaseVideo}
+              onSelectAlbum={albums.openAlbum}
               onToggleFavorite={toggleFavorite}
             />
 

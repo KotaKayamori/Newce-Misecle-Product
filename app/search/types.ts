@@ -38,6 +38,11 @@ export type AlbumItem = {
   } | null
 }
 
+export type SearchResults = {
+  videos: SupabaseVideoRow[]
+  albums: AlbumItem[]
+}
+
 // アルバム内のアセット（画像）の型
 export type AssetItem = {
   id: string
