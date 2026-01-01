@@ -10,6 +10,7 @@ import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import { useBookmark } from "@/hooks/useBookmark"
 import { useLike } from "@/hooks/useLike"
 import { supabase } from "@/lib/supabase"
+import { useVisualViewportVars } from "@/hooks/useVisualViewportVars"
 
 type VideoRow = {
   id: string
@@ -39,7 +40,24 @@ type OwnerProfile = {
 const PAGE_SIZE = 15
 const WINDOW = 2 // activeIndex ±2 を描画
 
-export default function ReelsScreen() {
+type ReelsScreenProps = {
+  categorySlug?: string
+  startVideoId?: string | null
+  onClose?: () => void
+}
+
+const moveStartIdToFront = (pool: string[], startVideoId?: string | null) => {
+  if (!startVideoId) return pool
+  const idx = pool.indexOf(startVideoId)
+  if (idx <= 0) return pool
+  const next = pool.slice()
+  next.splice(idx, 1)
+  next.unshift(startVideoId)
+  return next
+}
+
+export default function ReelsScreen({ categorySlug, startVideoId, onClose }: ReelsScreenProps) {
+  useVisualViewportVars()
   const [items, setItems] = useState<VideoRow[]>([])
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, OwnerProfile>>({})
   const [hasMore, setHasMore] = useState(true)
@@ -71,10 +89,31 @@ export default function ReelsScreen() {
   })
 
   useEffect(() => {
-    const onResize = () => setViewportH(window.innerHeight)
-    window.addEventListener("resize", onResize)
-    onResize()
-    return () => window.removeEventListener("resize", onResize)
+    if (typeof window === "undefined") return
+    let rafId = 0
+    const update = () => {
+      rafId = 0
+      const vv = window.visualViewport
+      const height = vv?.height ?? window.innerHeight
+      setViewportH(height)
+    }
+    const schedule = () => {
+      if (rafId) return
+      rafId = requestAnimationFrame(update)
+    }
+    schedule()
+    const vv = window.visualViewport
+    vv?.addEventListener("resize", schedule)
+    vv?.addEventListener("scroll", schedule)
+    window.addEventListener("resize", schedule)
+    window.addEventListener("orientationchange", schedule)
+    return () => {
+      if (rafId) cancelAnimationFrame(rafId)
+      vv?.removeEventListener("resize", schedule)
+      vv?.removeEventListener("scroll", schedule)
+      window.removeEventListener("resize", schedule)
+      window.removeEventListener("orientationchange", schedule)
+    }
   }, [])
 
   const fetchPage = useCallback(async () => {
@@ -83,7 +122,11 @@ export default function ReelsScreen() {
       let pool = idPool
       // IDプールが空なら全IDを取得してシャッフル
       if (pool.length === 0) {
-        const { data: ids, error: idErr } = await supabase.from("videos").select("id")
+        let idQuery = supabase.from("videos").select("id")
+        if (categorySlug) {
+          idQuery = idQuery.contains("categories", [categorySlug])
+        }
+        const { data: ids, error: idErr } = await idQuery
         if (idErr) throw idErr
         pool = ((ids as { id: string }[]) ?? []).map((r) => r.id)
         // シャッフル
@@ -91,8 +134,10 @@ export default function ReelsScreen() {
           const j = Math.floor(Math.random() * (i + 1))
           ;[pool[i], pool[j]] = [pool[j], pool[i]]
         }
+        pool = moveStartIdToFront(pool, startVideoId)
         setIdPool(pool)
         setIdCursor(0)
+        setActiveIndex(0)
       }
 
       const start = idCursor
@@ -216,51 +261,64 @@ export default function ReelsScreen() {
   const bottomSpacer = Math.max(0, (items.length - renderRange.end - 1) * viewportH)
 
   if (loading && items.length === 0) {
-    return <div className="h-screen w-screen flex items-center justify-center text-sm text-gray-300 bg-black">Loading…</div>
+    return (
+      <div className="fixed left-0 right-0 top-0 w-screen h-[var(--vvh)] translate-y-[var(--vvt)] flex items-center justify-center text-sm text-gray-300 bg-black">
+        Loading…
+      </div>
+    )
   }
 
   if (!items.length) {
-    return <div className="h-screen w-screen flex items-center justify-center text-sm text-gray-300 bg-black">まだ動画がありません</div>
+    return (
+      <div className="fixed left-0 right-0 top-0 w-screen h-[var(--vvh)] translate-y-[var(--vvt)] flex items-center justify-center text-sm text-gray-300 bg-black">
+        まだ動画がありません
+      </div>
+    )
   }
 
   return (
-    <div ref={listRef} className="h-screen w-screen bg-black text-white overflow-y-auto snap-y snap-mandatory overscroll-contain">
-      <div style={{ height: topSpacer }} />
-      {items.slice(renderRange.start, renderRange.end + 1).map((post, idx) => {
-        const globalIndex = renderRange.start + idx
-        return (
-          <ReelItem
-            key={post.id}
-            post={post}
-            index={globalIndex}
-            active={globalIndex === activeIndex}
-            videoUrl={videoUrlMap[post.id]}
-            bookmarked={bookmarkedVideoIds.has(post.id)}
-            onToggleBookmark={() => toggleBookmark(post.id)}
-            muted={muted}
-            onToggleMuted={() => setMuted((m) => !m)}
-            ownerProfile={post.owner_id ? ownerProfiles[post.owner_id] : undefined}
-            registerObserver={registerActiveTarget}
-            onCloseReel={() => window.history.back()}
-            onOpenReserve={() =>
-              openReservationForVideo({ setSelectedRestaurant, setShowReservationModal }, post, { keepFullscreen: true })
-            }
-            onOpenStore={() => {
-              const ownerProfile = post.owner_id ? ownerProfiles[post.owner_id] : undefined
-              const enriched = {
-                ...post,
-                owner_label: ownerProfile?.username ? `@${ownerProfile.username}` : ownerProfile?.display_name ?? null,
-                owner_avatar_url: ownerProfile?.avatar_url ?? null,
+    <>
+      <div
+        ref={listRef}
+        className="fixed left-0 right-0 top-0 w-screen h-[var(--vvh)] translate-y-[var(--vvt)] bg-black text-white overflow-y-auto snap-y snap-mandatory overscroll-contain [--footer-h:57px]"
+      >
+        <div style={{ height: topSpacer }} />
+        {items.slice(renderRange.start, renderRange.end + 1).map((post, idx) => {
+          const globalIndex = renderRange.start + idx
+          return (
+            <ReelItem
+              key={post.id}
+              post={post}
+              index={globalIndex}
+              active={globalIndex === activeIndex}
+              videoUrl={videoUrlMap[post.id]}
+              bookmarked={bookmarkedVideoIds.has(post.id)}
+              onToggleBookmark={() => toggleBookmark(post.id)}
+              muted={muted}
+              onToggleMuted={() => setMuted((m) => !m)}
+              ownerProfile={post.owner_id ? ownerProfiles[post.owner_id] : undefined}
+              registerObserver={registerActiveTarget}
+              onCloseReel={() => (onClose ? onClose() : window.history.back())}
+              onOpenReserve={() =>
+                openReservationForVideo({ setSelectedRestaurant, setShowReservationModal }, post, { keepFullscreen: true })
               }
-              openStoreDetailForVideo({ setSelectedRestaurant, setShowStoreDetailModal }, enriched as any, {
-                keepFullscreen: true,
-              })
-            }}
-          />
-        )
-      })}
-      <div style={{ height: bottomSpacer }} />
-      <div ref={sentinelRef} className="h-1" />
+              onOpenStore={() => {
+                const ownerProfile = post.owner_id ? ownerProfiles[post.owner_id] : undefined
+                const enriched = {
+                  ...post,
+                  owner_label: ownerProfile?.username ? `@${ownerProfile.username}` : ownerProfile?.display_name ?? null,
+                  owner_avatar_url: ownerProfile?.avatar_url ?? null,
+                }
+                openStoreDetailForVideo({ setSelectedRestaurant, setShowStoreDetailModal }, enriched as any, {
+                  keepFullscreen: true,
+                })
+              }}
+            />
+          )
+        })}
+        <div style={{ height: bottomSpacer }} />
+        <div ref={sentinelRef} className="h-1" />
+      </div>
 
       <ReservationModal
         open={showReservationModal}
@@ -282,7 +340,7 @@ export default function ReelsScreen() {
           setShowReservationModal(true)
         }}
       />
-    </div>
+    </>
   )
 }
 
@@ -336,7 +394,7 @@ function ReelItem({
   return (
     <div
       ref={wrapperRef}
-      className="relative h-screen w-screen snap-start"
+      className="relative h-[var(--vvh)] w-screen snap-start"
       style={{ scrollSnapStop: "always" as any }}
     >
       <VideoFullscreenOverlay
