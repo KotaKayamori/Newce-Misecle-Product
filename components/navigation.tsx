@@ -2,22 +2,38 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Search, Calendar, Heart, User } from "lucide-react"
+import { Home, Search, Calendar, Heart, User } from "lucide-react"
+import { useEffect, useState } from "react"
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars"
 
 export default function Navigation() {
   const pathname = usePathname()
   useVisualViewportVars()
 
+  const [bottomClass, setBottomClass] = useState("bottom-0")
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    // --vvb
+    const vvb = getComputedStyle(document.documentElement).getPropertyValue("--vvb").trim()
+    // env(safe-area-inset-bottom)は直接取得できないので、0px以外ならvvbと同じ扱い
+    // ここではvvbだけで判定（多くのケースで十分）
+    if (vvb && vvb !== "0px") {
+      setBottomClass("bottom-[calc(env(safe-area-inset-bottom)+var(--vvb))]")
+    } else {
+      setBottomClass("bottom-0")
+    }
+  }, [])
+
   const navItems = [
-    { label: "探す", icon: Search, href: "/search" },
+    { label: "ホーム", icon: Home, href: "/search" },
     { label: "予約履歴", icon: Calendar, href: "/reservations" },
     { label: "お気に入り", icon: Heart, href: "/favorites" },
     { label: "マイページ", icon: User, href: "/profile" },
   ]
 
   return (
-    <nav className="fixed left-0 right-0 bottom-[calc(env(safe-area-inset-bottom)+var(--vvb))] bg-white border-t border-gray-200 z-[70] pb-[env(safe-area-inset-bottom)]">
+    <nav className={`fixed left-0 right-0 ${bottomClass} bg-white border-t border-gray-200 z-[70] pb-[env(safe-area-inset-bottom)]`}>
       <div className="flex">
         {navItems.map((item) => {
           const IconComponent = item.icon

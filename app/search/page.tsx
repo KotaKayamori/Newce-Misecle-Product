@@ -400,18 +400,6 @@ export default function SearchPage() {
 
   const handleRefreshAlbums = albums.refreshAlbums
 
-  // const handleOpenUserProfile = (user: { id: string; name: string; avatar?: string | null; isFollowing: boolean }) => {
-  //   setSelectedUser({
-  //     id: user.id,
-  //     name: user.name ?? "ゲスト",
-  //     avatar: user.avatar,
-  //     isFollowing: user.isFollowing,
-  //   })
-  //   setShowUserProfile(true)
-  // }
-
-  // FilterButton は FilterModal.tsx に移動
-
   useEffect(() => {
     if (selectedCategory === "最新動画" || selectedCategory === "ガイドブック") return
     const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
@@ -689,27 +677,28 @@ export default function SearchPage() {
       )}
 
       {/* Album Viewer Modal */}
-      <><AlbumViewerOverlay
-      open={Boolean(albums.openAlbumId)}
-      assets={albums.albumAssets}
-      index={albums.albumIndex}
-      loading={albums.albumLoading}
-      onClose={albums.closeAlbum}
-      onIndexChange={(nextIndex) => {
-        const clamped = Math.max(0, Math.min(nextIndex, albums.albumAssets.length - 1))
-        albums.setAlbumIndex(clamped)
-      }}
-      title={albums.albums.find((a) => a.id === albums.openAlbumId)?.title || albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
-      ownerAvatarUrl={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.avatarUrl ?? null}
-      ownerLabel={(() => { const a = albums.albums.find((x) => x.id === albums.openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
-      ownerUserId={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.id || null}
-      description={albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
-      liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
-      onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
-      bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
-      onToggleBookmark={() => { if (albums.openAlbumId) albums.toggleAlbumBookmark(albums.openAlbumId) } } />
+      <AlbumViewerOverlay
+        open={Boolean(albums.openAlbumId)}
+        assets={albums.albumAssets}
+        index={albums.albumIndex}
+        loading={albums.albumLoading}
+        onClose={albums.closeAlbum}
+        onIndexChange={(nextIndex) => {
+          const clamped = Math.max(0, Math.min(nextIndex, albums.albumAssets.length - 1))
+          albums.setAlbumIndex(clamped)
+        }}
+        title={albums.albums.find((a) => a.id === albums.openAlbumId)?.title || albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
+        ownerAvatarUrl={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.avatarUrl ?? null}
+        ownerLabel={(() => { const a = albums.albums.find((x) => x.id === albums.openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
+        ownerUserId={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.id || null}
+        description={albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
+        liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
+        onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
+        bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
+        onToggleBookmark={() => { if (albums.openAlbumId) albums.toggleAlbumBookmark(albums.openAlbumId) } } 
+      />
+      
       <Navigation />
-      </>
    </div>
   )
 }
