@@ -30,6 +30,7 @@ export type AlbumItem = {
   description?: string | null
   coverUrl?: string | null
   createdAt?: string | null
+  assets?: AssetItem[]
   owner?: {
     id: string
     username?: string | null

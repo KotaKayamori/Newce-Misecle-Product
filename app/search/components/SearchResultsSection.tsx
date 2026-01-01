@@ -16,7 +16,7 @@ interface SearchResultsSectionProps {
   onClear: () => void
   onRetry: () => void
   onSelectVideo: (video: SupabaseVideoRow) => void
-  onSelectAlbum?: (id: string) => void
+  onSelectAlbum?: (albumId: string) => void
   onToggleFavorite: (id: string | number, e?: React.MouseEvent) => void
 }
 

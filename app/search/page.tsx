@@ -28,7 +28,7 @@ import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import ReelsScreen from "@/screens/ReelsScreen"
-import type { RestaurantInfo } from "./types"
+import type { RestaurantInfo, AlbumItem } from "./types"
 
 type SupabaseVideoRow = {
   id: string
@@ -91,6 +91,16 @@ export default function SearchPage() {
   
   // Albums hook
   const albums = useAlbums(isGuidebookCategory)
+
+  useEffect(() => {
+    // 検索取得
+    if (search.searchResults?.albums) {
+      albums.albums = search.searchResults.albums;
+    }
+    console.log("search albums", search.searchResults?.albums);
+    console.log("albums", albums);
+  }, [search.searchResults.albums]);
+
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<
     | {
@@ -198,6 +208,16 @@ export default function SearchPage() {
     setShowFullscreenVideo(false)
     setShowReelsFromSearch(true)
   }
+
+  // 検索中は検索結果、そうでなければランダム取得
+  const displayAlbums = search.didSearch && search.searchResults.albums.length > 0
+    ? search.searchResults.albums
+    : albums.albums;
+
+  // AlbumViewerOverlayの各種情報取得もdisplayAlbumsから
+  const openAlbum = albums.openAlbumId
+    ? displayAlbums.find((a) => a.id === albums.openAlbumId)
+    : null;
 
   // Fullscreen overlay interactions (like/favorite)
   const [likedVideoIds, setLikedVideoIds] = useState<Set<string>>(new Set())
@@ -406,6 +426,9 @@ export default function SearchPage() {
     fetchVideos(categorySlug, 10)
   }, [selectedCategory, fetchVideos])
 
+  useEffect(() => {
+    console.log("albumAssets", albums.albumAssets)
+  }, [albums.albumAssets])
 
   useEffect(() => {
     if (showFullscreenVideo) {
@@ -688,11 +711,11 @@ export default function SearchPage() {
           const clamped = Math.max(0, Math.min(nextIndex, albums.albumAssets.length - 1))
           albums.setAlbumIndex(clamped)
         }}
-        title={albums.albums.find((a) => a.id === albums.openAlbumId)?.title || albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
-        ownerAvatarUrl={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.avatarUrl ?? null}
-        ownerLabel={(() => { const a = albums.albums.find((x) => x.id === albums.openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
-        ownerUserId={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.id || null}
-        description={albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
+        title={openAlbum?.title || null}
+        ownerAvatarUrl={openAlbum?.owner?.avatarUrl ?? null}
+        ownerLabel={openAlbum?.owner?.username ? `@${openAlbum.owner.username}` : (openAlbum?.owner?.displayName || null)}
+        ownerUserId={openAlbum?.owner?.id || null}
+        description={openAlbum?.description || null}
         liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
         onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
         bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
