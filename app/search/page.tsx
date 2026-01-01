@@ -27,6 +27,7 @@ import {
 import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
+import ReelsScreen from "@/screens/ReelsScreen"
 import type { RestaurantInfo } from "./types"
 
 type SupabaseVideoRow = {
@@ -166,21 +167,36 @@ export default function SearchPage() {
 
   const [showFullscreenVideo, setShowFullscreenVideo] = useState(false)
   const [selectedVideo, setSelectedVideo] = useState<SupabaseVideoRow | null>(null)
+  const [showReelsFromSearch, setShowReelsFromSearch] = useState(false)
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
   const [ownerProfiles, setOwnerProfiles] = useState<Record<string, { username?: string | null; display_name?: string | null; avatar_url?: string | null }>>({})
   const [fullscreenMuted, setFullscreenMuted] = useState(false)
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
   const fullscreenScrollLockRef = useRef<{
     scrollY: number
-    body: { top: string; position: string; overflow: string; width: string }
+    body: { top: string; position: string; overflow: string; width: string; left: string; right: string }
   } | null>(null)
 
-  const selectSupabaseVideo = (video: SupabaseVideoRow) => {
+  const openSingleFullscreen = (video: SupabaseVideoRow) => {
     setSelectedVideo({
       ...video,
       caption: normalizeOptionalText(video.caption) ?? null,
     })
+    setShowReelsFromSearch(false)
     setShowFullscreenVideo(true)
+  }
+
+  const selectSupabaseVideo = (video: SupabaseVideoRow) => {
+    if (isGuidebookCategory) {
+      openSingleFullscreen(video)
+      return
+    }
+    setSelectedVideo({
+      ...video,
+      caption: normalizeOptionalText(video.caption) ?? null,
+    })
+    setShowFullscreenVideo(false)
+    setShowReelsFromSearch(true)
   }
 
   // Fullscreen overlay interactions (like/favorite)
@@ -287,7 +303,7 @@ export default function SearchPage() {
       store_3_tel: video.store_3_tel ?? null,
       store_3_tabelog: video.store_3_tabelog ?? null,
     })
-    setShowFullscreenVideo(true)
+    setShowReelsFromSearch(true)
   }
 
   async function handleSearchSubmit() {
@@ -384,18 +400,6 @@ export default function SearchPage() {
 
   const handleRefreshAlbums = albums.refreshAlbums
 
-  // const handleOpenUserProfile = (user: { id: string; name: string; avatar?: string | null; isFollowing: boolean }) => {
-  //   setSelectedUser({
-  //     id: user.id,
-  //     name: user.name ?? "ゲスト",
-  //     avatar: user.avatar,
-  //     isFollowing: user.isFollowing,
-  //   })
-  //   setShowUserProfile(true)
-  // }
-
-  // FilterButton は FilterModal.tsx に移動
-
   useEffect(() => {
     if (selectedCategory === "最新動画" || selectedCategory === "ガイドブック") return
     const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
@@ -457,7 +461,8 @@ export default function SearchPage() {
     if (typeof document === "undefined") return
     const bodyStyle = document.body.style
 
-    if (showFullscreenVideo) {
+    const shouldLock = showFullscreenVideo || showReelsFromSearch
+    if (shouldLock) {
       fullscreenScrollLockRef.current = {
         scrollY: window.scrollY,
         body: {
@@ -465,11 +470,15 @@ export default function SearchPage() {
           position: bodyStyle.position,
           overflow: bodyStyle.overflow,
           width: bodyStyle.width,
+          left: bodyStyle.left,
+          right: bodyStyle.right,
         },
       }
       bodyStyle.top = `-${window.scrollY}px`
       bodyStyle.position = "fixed"
       bodyStyle.overflow = "hidden"
+      bodyStyle.left = "0"
+      bodyStyle.right = "0"
       bodyStyle.width = "100%"
     } else if (fullscreenScrollLockRef.current) {
       const previous = fullscreenScrollLockRef.current
@@ -477,6 +486,8 @@ export default function SearchPage() {
       bodyStyle.position = previous.body.position
       bodyStyle.overflow = previous.body.overflow
       bodyStyle.width = previous.body.width
+      bodyStyle.left = previous.body.left
+      bodyStyle.right = previous.body.right
       window.scrollTo({ top: previous.scrollY })
       fullscreenScrollLockRef.current = null
     }
@@ -488,11 +499,13 @@ export default function SearchPage() {
         bodyStyle.position = previous.body.position
         bodyStyle.overflow = previous.body.overflow
         bodyStyle.width = previous.body.width
+        bodyStyle.left = previous.body.left
+        bodyStyle.right = previous.body.right
         window.scrollTo({ top: previous.scrollY })
         fullscreenScrollLockRef.current = null
       }
     }
-  }, [showFullscreenVideo])
+  }, [showFullscreenVideo, showReelsFromSearch])
 
   const selectedOwnerProfile = selectedVideo?.owner_id ? ownerProfiles[selectedVideo.owner_id] : undefined
   const selectedOwnerHandle = selectedOwnerProfile?.username
@@ -616,6 +629,20 @@ export default function SearchPage() {
         </div>
       )}
 
+      {showReelsFromSearch && (
+        <div className="fixed left-0 right-0 top-0 w-screen h-[var(--vvh)] translate-y-[var(--vvt)] z-50 bg-black [--footer-h:57px]">
+          <ReelsScreen
+            categorySlug={
+              selectedCategory === "最新動画" || selectedCategory === "ガイドブック"
+                ? undefined
+                : resolveCategorySlug(selectedCategory)
+            }
+            startVideoId={selectedVideo?.id ?? null}
+            onClose={() => setShowReelsFromSearch(false)}
+          />
+        </div>
+      )}
+
       {showFullscreenVideo && selectedVideo && (
         <VideoFullscreenOverlay
           open={showFullscreenVideo}
@@ -650,27 +677,28 @@ export default function SearchPage() {
       )}
 
       {/* Album Viewer Modal */}
-      <><AlbumViewerOverlay
-      open={Boolean(albums.openAlbumId)}
-      assets={albums.albumAssets}
-      index={albums.albumIndex}
-      loading={albums.albumLoading}
-      onClose={albums.closeAlbum}
-      onIndexChange={(nextIndex) => {
-        const clamped = Math.max(0, Math.min(nextIndex, albums.albumAssets.length - 1))
-        albums.setAlbumIndex(clamped)
-      }}
-      title={albums.albums.find((a) => a.id === albums.openAlbumId)?.title || albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
-      ownerAvatarUrl={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.avatarUrl ?? null}
-      ownerLabel={(() => { const a = albums.albums.find((x) => x.id === albums.openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
-      ownerUserId={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.id || null}
-      description={albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
-      liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
-      onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
-      bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
-      onToggleBookmark={() => { if (albums.openAlbumId) albums.toggleAlbumBookmark(albums.openAlbumId) } } />
+      <AlbumViewerOverlay
+        open={Boolean(albums.openAlbumId)}
+        assets={albums.albumAssets}
+        index={albums.albumIndex}
+        loading={albums.albumLoading}
+        onClose={albums.closeAlbum}
+        onIndexChange={(nextIndex) => {
+          const clamped = Math.max(0, Math.min(nextIndex, albums.albumAssets.length - 1))
+          albums.setAlbumIndex(clamped)
+        }}
+        title={albums.albums.find((a) => a.id === albums.openAlbumId)?.title || albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
+        ownerAvatarUrl={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.avatarUrl ?? null}
+        ownerLabel={(() => { const a = albums.albums.find((x) => x.id === albums.openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
+        ownerUserId={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.id || null}
+        description={albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
+        liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
+        onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
+        bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
+        onToggleBookmark={() => { if (albums.openAlbumId) albums.toggleAlbumBookmark(albums.openAlbumId) } } 
+      />
+      
       <Navigation />
-      </>
    </div>
   )
 }

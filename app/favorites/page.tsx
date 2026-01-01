@@ -166,7 +166,7 @@ export default function FavoritesPage() {
               onToggleBookmark={toggleBookmarkForVideo}
               onVideoClick={(video) => openOverlayForLiked(video)}
               onLoginRequest={() => router.push("/auth/login")}
-              onExploreVideos={() => router.push("/reels")}
+              onExploreVideos={() => router.push("/search")}
             />
           </TabsContent>
 
@@ -178,7 +178,7 @@ export default function FavoritesPage() {
               needLogin={needLogin}
               ownerProfiles={videoOwnerProfiles}
               onLoginRequest={() => router.push("/auth/login")}
-              onExploreVideos={() => router.push("/reels")}
+              onExploreVideos={() => router.push("/search")}
               onRemoveBookmark={removeBookmark}
               onVideoClick={(video) => openOverlayForBookmarked(video)}
             />

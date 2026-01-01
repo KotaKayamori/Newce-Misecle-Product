@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Heart, Bookmark, Send } from "lucide-react"
 import { useLike } from "@/hooks/useLike"
+import { useVisualViewportVars } from "@/hooks/useVisualViewportVars"
 
 export interface FullscreenVideoData {
   id: string
@@ -36,6 +37,7 @@ interface VideoFullscreenOverlayProps {
 
 export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProps) {
   const router = useRouter()
+  useVisualViewportVars()
   const {
     open,
     video,
@@ -258,9 +260,12 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   if (!open) return null
 
   const isReels = variant === "reels"
+  const rootClass = isReels
+    ? "absolute inset-0 z-40 bg-black touch-pan-y [--footer-h:57px]"
+    : "fixed left-0 right-0 top-0 w-screen h-[var(--vvh)] translate-y-[var(--vvt)] z-40 bg-black [--footer-h:57px]"
 
   return (
-    <div className={isReels ? "absolute inset-0 z-40 bg-black touch-pan-y" : "fixed inset-0 z-40 bg-black"}>
+    <div className={rootClass}>
       <video
         ref={videoRef}
         src={video.playback_url}
@@ -273,24 +278,21 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         {...{ "webkit-playsinline": "true" }}
         preload="auto"
         controls={false}
-        onClick={isReels ? handleTogglePlay : undefined}
       />
 
       {/* クリック判定用の透明レイヤ（video 全体をカバー） */}
-      {!isReels && (
-        <button
-          type="button"
-          className="absolute inset-0 z-20 cursor-pointer"
-          onClick={(e) => {
-            e.stopPropagation()
-            handleTogglePlay()
-          }}
-          aria-label="再生/一時停止"
-        />
-      )}
+      <button
+        type="button"
+        className="absolute inset-0 z-20 cursor-pointer"
+        onClick={(e) => {
+          e.stopPropagation()
+          handleTogglePlay()
+        }}
+        aria-label="再生/一時停止"
+      />
 
       {/* Back button */}
-      <div className="absolute top-6 left-6 z-30">
+      <div className="absolute left-6 top-[calc(env(safe-area-inset-top)+var(--vvt)+16px)] z-30">
         <Button
           variant="ghost"
           size="icon"                     // アイコンボタンサイズ
@@ -305,7 +307,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       </div>
 
       {/* Speaker toggle */}
-      <div className="absolute top-6 right-6 z-30">
+      <div className="absolute right-6 top-[calc(env(safe-area-inset-top)+var(--vvt)+16px)] z-30">
         <button
           type="button"
           onClick={onToggleMuted}
@@ -318,7 +320,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
 
       <div className="absolute inset-0 flex">
         {/* Left content */}
-        <div className="flex-1 flex flex-col justify-end p-4 pb-32">
+        <div className="flex-1 flex flex-col justify-end p-4 pb-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px)+96px)]">
           <div className="text-white z-30">
             <div className="mb-3">
               <button
@@ -354,7 +356,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         </div>
 
         {/* Right actions */}
-        <div className="w-16 flex flex-col items-center justify-end pb-40 gap-6">
+        <div className="w-16 flex flex-col items-center justify-end pb-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px)+96px)] gap-6">
           <div className="flex flex-col items-center z-30">
             <button className="w-12 h-12 flex items-center justify-center" onClick={toggleLike} aria-label={isLiked ? "いいね解除" : "いいね"}>
               <Heart
@@ -395,26 +397,20 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         </div>
       </div>
 
-      {/* Bottom CTA - onReserve または onMore が渡されている場合のみ表示 */}
-      {(onReserve || onMore) && (
-        <div className="absolute bottom-20 left-0 right-0 px-4 z-30">
-          <div className="flex gap-2">
-            {onReserve && (
-              <button type="button" onClick={onReserve} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
-                今すぐ予約する
-              </button>
-            )}
-            {onMore && (
-              <button type="button" onClick={onMore} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
-                もっと見る…
-              </button>
-            )}
-          </div>
+      {/* Bottom CTA */}
+      <div className="absolute left-0 right-0 px-4 z-30 bottom-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px)+32px)]">
+        <div className="flex gap-2">
+          <button type="button" onClick={onReserve} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
+            今すぐ予約する
+          </button>
+          <button type="button" onClick={onMore} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
+            もっと見る…
+          </button>
         </div>
-      )}
+      </div>
 
       {/* ★ 動画とフッターの“間”にシークバーを配置 */}
-      <div className="absolute inset-x-0 bottom-11 z-50">
+      <div className="absolute inset-x-0 z-30 bottom-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px))]">
         <div className="w-full h-8 flex items-center">
           <div
             ref={seekContainerRef}
@@ -525,4 +521,3 @@ function SpeakerIcon({ muted }: { muted: boolean }) {
     </svg>
   )
 }
-
