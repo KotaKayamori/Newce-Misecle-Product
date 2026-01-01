@@ -69,7 +69,7 @@ export default function ReelsScreen({ categorySlug, startVideoId, onClose }: Ree
   const [idPool, setIdPool] = useState<string[]>([])
   const [idCursor, setIdCursor] = useState(0)
   // リール滞在中は共通のミュート状態を使う（動画ごとではなくグローバル）
-  const [muted, setMuted] = useState(true)
+  const [muted, setMuted] = useState(false)
 
   const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
   const listRef = useRef<HTMLDivElement | null>(null)
