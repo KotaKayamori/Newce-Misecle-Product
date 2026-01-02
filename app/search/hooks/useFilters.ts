@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import type { FilterOptions } from "../types"
+import type { FilterOptions } from "@/lib/types"
 
 export function useFilters() {
   const [selectedFilters, setSelectedFilters] = useState<FilterOptions>({

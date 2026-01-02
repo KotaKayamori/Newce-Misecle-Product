@@ -28,7 +28,7 @@ import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import ReelsScreen from "@/screens/ReelsScreen"
-import type { RestaurantInfo, AlbumItem } from "./types"
+import type { RestaurantInfo, AlbumItem, OwnerProfile } from "@/lib/types"
 
 type SupabaseVideoRow = {
   id: string
@@ -188,7 +188,7 @@ export default function SearchPage() {
     if (search.searchResults?.albums) {
       albums.albums = search.searchResults.albums;
     }
-  }, [search.searchResults.albums]);
+  }, [search.searchResults]);
 
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<
@@ -268,7 +268,7 @@ export default function SearchPage() {
   const [selectedVideo, setSelectedVideo] = useState<SupabaseVideoRow | null>(null)
   const [showReelsFromSearch, setShowReelsFromSearch] = useState(false)
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
-  const [ownerProfiles, setOwnerProfiles] = useState<Record<string, { username?: string | null; display_name?: string | null; avatar_url?: string | null }>>({})
+  const [ownerProfiles, setOwnerProfiles] = useState<Record<string, OwnerProfile>>({})
   const [fullscreenMuted, setFullscreenMuted] = useState(false)
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
   const fullscreenScrollLockRef = useRef<{
@@ -371,6 +371,7 @@ export default function SearchPage() {
       setOwnerProfiles((prev) => {
         const existing = prev[video.user!.id!]
         const nextProfile = {
+          id: video.user!.id!,
           username: video.user?.username,
           display_name: video.user?.name,
           avatar_url: video.user?.avatar_url ?? null,
@@ -441,7 +442,7 @@ export default function SearchPage() {
           setOwnerProfiles((prev) => {
             const next = { ...prev }
             ;(profileRows as any[]).forEach((p) => {
-              next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
+              next[p.id] = { id: p.id, username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
             })
             return next
           })
@@ -516,10 +517,6 @@ export default function SearchPage() {
   }, [selectedCategory, fetchVideos])
 
   useEffect(() => {
-    console.log("albumAssets", albums.albumAssets)
-  }, [albums.albumAssets])
-
-  useEffect(() => {
     if (showFullscreenVideo) {
       setFullscreenMuted(false)
     }
@@ -549,6 +546,7 @@ export default function SearchPage() {
         const user = video.user
         if (user?.id) {
           const nextProfile = {
+            id: user.id,
             username: user.username,
             display_name: user.name,
             avatar_url: user.avatar_url ?? null,

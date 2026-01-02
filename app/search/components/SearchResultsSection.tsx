@@ -3,7 +3,7 @@
 import VideoCard from "@/components/VideoCard"
 import AlbumCard from "@/components/AlbumCard"
 import { derivePosterUrl } from "@/app/search/utils"
-import type { OwnerProfile, SearchResults, SupabaseVideoRow, AlbumItem } from "../types"
+import type { OwnerProfile, SearchResults, SupabaseVideoRow, AlbumItem } from "@/lib/types"
 
 interface SearchResultsSectionProps {
   visible: boolean

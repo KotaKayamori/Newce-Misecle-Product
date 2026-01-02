@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { supabase } from "@/lib/supabase"
-import type { SupabaseVideoRow, AlbumItem, SearchResults } from "../types"
+import type { SupabaseVideoRow, AlbumItem, SearchResults } from "@/lib/types"
 import { deriveAlbumCoverUrl } from "@/lib/media"
 
 export function useSearchVideos() {

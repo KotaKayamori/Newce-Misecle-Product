@@ -2,7 +2,7 @@
 
 import { RefreshCw } from "lucide-react"
 import AlbumCard from "@/components/AlbumCard"
-import type { AlbumItem } from "../types"
+import type { AlbumItem } from "@/lib/types"
 
 interface GuidebookSectionProps {
   visible: boolean
@@ -34,21 +34,6 @@ export function GuidebookSection({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{categoryLabel}</h2>
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">{albums.length}件</span>
-          <button
-            onClick={onRefresh}
-            disabled={loading}
-            className="p-1 hover:bg-gray-100 rounded transition-colors"
-            aria-label="アルバムを更新"
-          >
-            <RefreshCw className={`w-4 h-4 text-gray-600 ${loading ? "animate-spin" : ""}`} />
-          </button>
-        </div>
-      </div>
-
       {error && (
         <div className="text-sm text-red-500">{error}</div>
       )}

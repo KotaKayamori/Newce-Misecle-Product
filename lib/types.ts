@@ -112,3 +112,8 @@ export interface ReservationFormData {
   seatType: string
   message: string
 }
+
+export type SearchResults = {
+  videos: SupabaseVideoRow[]
+  albums: AlbumItem[]
+}

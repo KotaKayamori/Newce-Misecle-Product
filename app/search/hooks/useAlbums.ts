@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import type { AlbumItem, AssetItem } from "../types"
+import type { AlbumItem, AssetItem } from "@/lib/types"
 
 export function useAlbums(isActive: boolean) {
   const router = useRouter()

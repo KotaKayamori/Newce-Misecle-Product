@@ -262,7 +262,7 @@ export function SearchHeader({
                         >
                           <img
                             src={acc.avatar_url || "/images/misecle-mascot.png"}
-                            alt={acc.display_name ?? acc.username ?? undefined}
+                            alt={acc.display_name ?? acc.username ?? "user avatar"}
                             className="w-8 h-8 rounded-full object-cover border border-gray-200 bg-white flex-shrink-0"
                           />
                           {/* 右側：2段表示 */}
