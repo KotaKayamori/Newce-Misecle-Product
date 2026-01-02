@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { derivePosterUrl } from "@/app/search/utils"
 import { ReservationModal } from "@/app/search/components/modals/ReservationModal"
-import { StoreDetailModal } from "@/app/search/components/modals/StoreDetailModal"
+import { StoreDetailModal } from "@/components/modals/StoreDetailModal"
 import type { RestaurantInfo } from "@/lib/types"
 import { openReservationForVideo, openStoreDetailForVideo, normalizeOptionalText } from "@/lib/video-actions"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"

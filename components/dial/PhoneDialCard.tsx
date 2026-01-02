@@ -1,5 +1,7 @@
 "use client"
 
+import * as gtag from "@/lib/gtag"
+
 interface PhoneDialCardProps {
   open: boolean
   stores?: { name: string; tel: string | null; tabelog?: string | null }[]
@@ -23,10 +25,27 @@ export function PhoneDialCard({ open, stores, onClose }: PhoneDialCardProps) {
     }
   })
 
-  const handleCall = (tel: string) => {
+  const handleCall = (storeName: string, tel: string) => {
     if (!tel) return
+
+    // GA計測: 電話発信
+    gtag.event({
+      action: 'click_phone',
+      category: 'conversion',
+      label: `store:${storeName}`,
+    });
+
     window.location.href = `tel:${tel}`
     onClose()
+  }
+
+  const handleTabelogClick = (storeName: string) => {
+    // GA計測: 食べログ遷移
+    gtag.event({
+      action: 'click_tabelog',
+      category: 'conversion',
+      label: `store:${storeName}`,
+    });
   }
 
   return (
@@ -53,7 +72,7 @@ export function PhoneDialCard({ open, stores, onClose }: PhoneDialCardProps) {
                   <button
                     type="button"
                     className="w-full rounded-2xl bg-orange-600 py-2 text-base font-semibold text-white shadow transition hover:bg-orange-700"
-                    onClick={() => handleCall(store.sanitizedTel)}
+                    onClick={() => handleCall(store.name, store.sanitizedTel)}
                   >
                     {store.displayTel} に発信
                   </button>
@@ -72,6 +91,7 @@ export function PhoneDialCard({ open, stores, onClose }: PhoneDialCardProps) {
                     target="_blank"
                     rel="noreferrer"
                     className="block text-center w-full rounded-2xl bg-[#f5b400] py-2 text-sm font-semibold text-white shadow transition hover:bg-[#e0a200]"
+                    onClick={() => handleTabelogClick(store.name)}
                   >
                     食べログで見る
                   </a>

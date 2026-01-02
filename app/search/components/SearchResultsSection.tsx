@@ -37,6 +37,16 @@ export function SearchResultsSection({
   if (!visible) return null
   const { videos, albums } = results
 
+  if (visible && !loading) {
+    console.log("SearchResultsSection Data:", {
+      searchTerm,
+      videoCount: results.videos.length,
+      albumCount: results.albums.length,
+      availableProfileIds: Object.keys(ownerProfiles),
+      ownerProfiles
+    });
+  }
+
   // 動画とアルバムをcreatedAtで混在ソート
   const merged = [
     ...videos.map((v) => ({ type: "video" as const, data: v, createdAt: v.created_at })),

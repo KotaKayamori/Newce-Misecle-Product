@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, Play, Image } from "lucide-react"
 import Navigation from "@/components/navigation"
-import { useState, useEffect, use } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useAuth } from "@/components/auth-provider"
 import { fetchUserProfile, UserProfile } from "@/lib/api/profile"
