@@ -28,7 +28,7 @@ import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import ReelsScreen from "@/screens/ReelsScreen"
-import type { RestaurantInfo } from "./types"
+import type { RestaurantInfo, AlbumItem, OwnerProfile } from "@/lib/types"
 
 type SupabaseVideoRow = {
   id: string
@@ -67,7 +67,11 @@ function resolveCategorySlug(category?: string | null) {
 export default function SearchPage() {
   const router = useRouter()
   const { videos, loading, error, fetchVideos, refreshVideos } = useRandomVideos()
-  
+  const [allVideos, setAllVideos] = useState<VideoData[]>([])
+  const [hasMore, setHasMore] = useState(true)
+  const observerRef = useRef<HTMLDivElement | null>(null)
+  const [page, setPage] = useState(1)
+
   // Custom hooks
   const filters = useFilters()
   const search = useSearchVideos()
@@ -91,6 +95,101 @@ export default function SearchPage() {
   
   // Albums hook
   const albums = useAlbums(isGuidebookCategory)
+  const [allAlbums, setAllAlbums] = useState<AlbumItem[]>([])
+  const [albumPage, setAlbumPage] = useState(1)
+  const [hasMoreAlbums, setHasMoreAlbums] = useState(true)
+  const albumObserverRef = useRef<HTMLDivElement | null>(null)
+
+
+  // 初回・タブ切り替え時はリセット
+  useEffect(() => {
+    setAllVideos([])
+    setPage(1)
+    setHasMore(true)
+    fetchVideos(undefined, 10).then((newVideos) => {
+      if (Array.isArray(newVideos) && newVideos.length > 0) {
+        setAllVideos(newVideos)
+      }
+    })
+  }, [selectedCategory])
+
+  // 追加取得
+  const loadMore = useCallback(() => {
+    if (loading || !hasMore) return
+    fetchVideos(undefined, 10, page * 10).then((newVideos) => {
+      if (Array.isArray(newVideos) && newVideos.length > 0) {
+        setAllVideos((prev) => [...prev, ...newVideos])
+        setPage((p) => p + 1)
+        if (newVideos.length < 10) setHasMore(false)
+      } else {
+        setHasMore(false)
+      }
+    })
+  }, [loading, hasMore, page, fetchVideos])
+
+  // Intersection Observer
+  useEffect(() => {
+    if (!observerRef.current || !hasMore) return
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore()
+        }
+      },
+      { threshold: 1 }
+    )
+    observer.observe(observerRef.current)
+    return () => observer.disconnect()
+  }, [observerRef, loadMore, hasMore])
+
+  useEffect(() => {
+    if (!isGuidebookCategory) return
+    setAllAlbums([])
+    setAlbumPage(1)
+    setHasMoreAlbums(true)
+    albums.fetchAlbums(10, 0).then((newAlbums) => {
+      if (Array.isArray(newAlbums) && newAlbums.length > 0) {
+        setAllAlbums(newAlbums)
+      }
+    })
+  }, [selectedCategory])
+
+  // 3. 追加取得
+  const loadMoreAlbums = useCallback(() => {
+    if (!hasMoreAlbums || albums.albumsLoading) return
+    albums.fetchAlbums(10, albumPage * 10).then((newAlbums) => {
+      if (Array.isArray(newAlbums) && newAlbums.length > 0) {
+        setAllAlbums((prev) => [...prev, ...newAlbums])
+        setAlbumPage((p) => p + 1)
+        if (newAlbums.length < 10) setHasMoreAlbums(false)
+      } else {
+        setHasMoreAlbums(false)
+      }
+    })
+  }, [hasMoreAlbums, albumPage, albums])
+
+  // 4. Intersection Observer
+  useEffect(() => {
+    if (!albumObserverRef.current || !hasMoreAlbums) return
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreAlbums()
+        }
+      },
+      { threshold: 1 }
+    )
+    observer.observe(albumObserverRef.current)
+    return () => observer.disconnect()
+  }, [albumObserverRef, loadMoreAlbums, hasMoreAlbums])
+
+  useEffect(() => {
+    // 検索取得
+    if (search.searchResults?.albums) {
+      albums.albums = search.searchResults.albums;
+    }
+  }, [search.searchResults]);
+
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<
     | {
@@ -169,7 +268,7 @@ export default function SearchPage() {
   const [selectedVideo, setSelectedVideo] = useState<SupabaseVideoRow | null>(null)
   const [showReelsFromSearch, setShowReelsFromSearch] = useState(false)
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
-  const [ownerProfiles, setOwnerProfiles] = useState<Record<string, { username?: string | null; display_name?: string | null; avatar_url?: string | null }>>({})
+  const [ownerProfiles, setOwnerProfiles] = useState<Record<string, OwnerProfile>>({})
   const [fullscreenMuted, setFullscreenMuted] = useState(false)
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
   const fullscreenScrollLockRef = useRef<{
@@ -198,6 +297,16 @@ export default function SearchPage() {
     setShowFullscreenVideo(false)
     setShowReelsFromSearch(true)
   }
+
+  // 検索中は検索結果、そうでなければランダム取得
+  const displayAlbums = search.didSearch && search.searchResults.albums.length > 0
+    ? search.searchResults.albums
+    : albums.albums;
+
+  // AlbumViewerOverlayの各種情報取得もdisplayAlbumsから
+  const openAlbum = albums.openAlbumId
+    ? displayAlbums.find((a) => a.id === albums.openAlbumId)
+    : null;
 
   // Fullscreen overlay interactions (like/favorite)
   const [likedVideoIds, setLikedVideoIds] = useState<Set<string>>(new Set())
@@ -262,6 +371,7 @@ export default function SearchPage() {
       setOwnerProfiles((prev) => {
         const existing = prev[video.user!.id!]
         const nextProfile = {
+          id: video.user!.id!,
           username: video.user?.username,
           display_name: video.user?.name,
           avatar_url: video.user?.avatar_url ?? null,
@@ -332,7 +442,7 @@ export default function SearchPage() {
           setOwnerProfiles((prev) => {
             const next = { ...prev }
             ;(profileRows as any[]).forEach((p) => {
-              next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
+              next[p.id] = { id: p.id, username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
             })
             return next
           })
@@ -406,7 +516,6 @@ export default function SearchPage() {
     fetchVideos(categorySlug, 10)
   }, [selectedCategory, fetchVideos])
 
-
   useEffect(() => {
     if (showFullscreenVideo) {
       setFullscreenMuted(false)
@@ -437,6 +546,7 @@ export default function SearchPage() {
         const user = video.user
         if (user?.id) {
           const nextProfile = {
+            id: user.id,
             username: user.username,
             display_name: user.name,
             avatar_url: user.avatar_url ?? null,
@@ -591,13 +701,14 @@ export default function SearchPage() {
               onClear={handleClearSearch}
               onRetry={() => search.performSearch(searchTerm)}
               onSelectVideo={selectSupabaseVideo}
+              onSelectAlbum={albums.openAlbum}
               onToggleFavorite={toggleFavorite}
             />
 
             <CategoryVideosSection
               visible={!search.didSearch && !isLatestCategory && !isGuidebookCategory}
               categoryLabel={selectedCategory}
-              videos={videos}
+              videos={allVideos}
               loading={loading}
               error={error}
               bookmarkedVideoIds={bookmarkedVideoIds}
@@ -617,7 +728,7 @@ export default function SearchPage() {
             <GuidebookSection
               visible={!search.didSearch && isGuidebookCategory}
               categoryLabel={selectedCategory}
-              albums={albums.albums}
+              albums={allAlbums}
               loading={albums.albumsLoading}
               error={albums.albumsError}
               albumBookmarkedSet={albums.albumBookmarkedSet}
@@ -625,6 +736,9 @@ export default function SearchPage() {
               onOpenAlbum={albums.openAlbum}
               onToggleBookmark={albums.toggleAlbumBookmark}
             />
+
+            <div ref={observerRef} style={{ height: 1 }} />
+            <div ref={albumObserverRef} style={{ height: 1 }} />
           </div>
         </div>
       )}
@@ -687,11 +801,11 @@ export default function SearchPage() {
           const clamped = Math.max(0, Math.min(nextIndex, albums.albumAssets.length - 1))
           albums.setAlbumIndex(clamped)
         }}
-        title={albums.albums.find((a) => a.id === albums.openAlbumId)?.title || albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
-        ownerAvatarUrl={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.avatarUrl ?? null}
-        ownerLabel={(() => { const a = albums.albums.find((x) => x.id === albums.openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
-        ownerUserId={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.id || null}
-        description={albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
+        title={openAlbum?.title || null}
+        ownerAvatarUrl={openAlbum?.owner?.avatarUrl ?? null}
+        ownerLabel={openAlbum?.owner?.username ? `@${openAlbum.owner.username}` : (openAlbum?.owner?.displayName || null)}
+        ownerUserId={openAlbum?.owner?.id || null}
+        description={openAlbum?.description || null}
         liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
         onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
         bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
