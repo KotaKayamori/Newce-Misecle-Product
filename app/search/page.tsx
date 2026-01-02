@@ -3,7 +3,7 @@
 import Navigation from "@/components/navigation"
 import { FilterModal } from "./components/modals/FilterModal"
 import { UserProfileModal } from "./components/modals/UserProfileModal"
-import { StoreDetailModal } from "./components/modals/StoreDetailModal"
+import { StoreDetailModal } from "@/components/modals/StoreDetailModal"
 import { ReservationModal } from "./components/modals/ReservationModal"
 import { SearchControls } from "./components/SearchControls"
 import { SearchResultsSection } from "./components/SearchResultsSection"
@@ -538,11 +538,13 @@ export default function SearchPage() {
   }, [fullscreenMuted])
 
   useEffect(() => {
-    if (videos.length === 0) return
+    // 監視対象を allVideos に変更
+    if (allVideos.length === 0) return
+
     setOwnerProfiles((prev) => {
       let changed = false
       const next = { ...prev }
-      videos.forEach((video) => {
+      allVideos.forEach((video) => { // videos ではなく allVideos をループ
         const user = video.user
         if (user?.id) {
           const nextProfile = {
@@ -565,7 +567,9 @@ export default function SearchPage() {
       })
       return changed ? next : prev
     })
-  }, [videos])
+    // ログも allVideos に合わせて修正
+    console.log("Owner profiles updated from allVideos", allVideos)
+  }, [allVideos])
 
   useEffect(() => {
     if (typeof document === "undefined") return

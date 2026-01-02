@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { supabase } from "@/lib/supabase"
+import { StoreDetailModal } from "@/components/modals/StoreDetailModal"
 
 interface BookmarkedVideo {
   id: string
@@ -406,100 +407,15 @@ export default function BookmarksPage() {
       )}
 
       {/* 店舗詳細モーダル */}
-      {showStoreDetailModal && selectedRestaurant && (
-        <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto scrollbar-hide">
-            {/* ヘッダー */}
-            <div className="flex items-center justify-between p-4">
-              <Button variant="ghost" size="sm" onClick={() => setShowStoreDetailModal(false)}>
-                ＜
-              </Button>
-              <h2 className="text-lg font-semibold">店舗詳細</h2>
-              <div className="w-8"></div>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* 店舗名 */}
-              <div>
-                <h3 className="text-xl font-bold text-gray-800 mb-2">{selectedRestaurant.restaurantName}</h3>
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-                  <span>{selectedRestaurant.rating}</span>
-                  <span>•</span>
-                  <span>{selectedRestaurant.genre}</span>
-                  <span>•</span>
-                  <span>{selectedRestaurant.distance}</span>
-                </div>
-              </div>
-
-              {/* 店舗情報 */}
-              <div className="space-y-4">
-                <h4 className="font-semibold text-gray-800">店舗情報</h4>
-
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">📍</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">住所</p>
-                      <p className="text-sm text-gray-600">東京都渋谷区渋谷1-2-3 渋谷ビル2F</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">📞</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">電話番号</p>
-                      <p className="text-sm text-gray-600">03-1234-5678</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">🕒</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">営業時間</p>
-                      <p className="text-sm text-gray-600">月〜土: 11:30-14:00, 17:00-23:00</p>
-                      <p className="text-sm text-gray-600">日: 11:30-14:00, 17:00-22:00</p>
-                      <p className="text-sm text-red-600">定休日: 火曜日</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">💳</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">決済方法</p>
-                      <p className="text-sm text-gray-600">現金、QRコード、電子マネー</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start gap-3">
-                    <div className="w-5 h-5 text-gray-600 mt-0.5">🗺️</div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">アクセス</p>
-                      <button
-                        onClick={() => window.open("https://maps.google.com", "_blank")}
-                        className="text-sm text-blue-600 hover:text-blue-700 underline"
-                      >
-                        Googleマップで見る
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 予約ボタン */}
-              <Button
-                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-lg font-semibold"
-                onClick={() => {
-                  setShowStoreDetailModal(false)
-                  setShowReservationModal(true)
-                }}
-              >
-                この店舗を予約する
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <StoreDetailModal
+        open={showStoreDetailModal}
+        restaurant={selectedRestaurant}
+        onClose={() => setShowStoreDetailModal(false)}
+        onReserve={() => {
+          setShowStoreDetailModal(false)
+          setShowReservationModal(true)
+        }}
+      />
 
       <Navigation />
     </div>
