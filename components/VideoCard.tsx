@@ -67,7 +67,7 @@ export default function VideoCard(props: VideoCardProps) {
 
   return (
     <Card
-      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow border-none shadow-none"
       aria-label={cardAriaLabel}
       title={cardTitleAttribute}
     >
