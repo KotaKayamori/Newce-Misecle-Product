@@ -22,9 +22,12 @@ export function useAlbums(isActive: boolean) {
   const [albumIndex, setAlbumIndex] = useState(0)
   const [albumLoading, setAlbumLoading] = useState(false)
 
-  const fetchAlbumList = async () => {
-    const res = await fetch('/api/guidebook/albums?random=10', { cache: 'no-store' })
-    if (!res.ok) throw new Error('アルバムの取得に失敗しました')
+  const fetchAlbums = async (limit: number = 10, offset: number = 0) => {
+    const params = new URLSearchParams()
+    params.set("limit", limit.toString())
+    params.set("offset", offset.toString())
+    const res = await fetch(`/api/guidebook/albums?${params.toString()}`, { cache: "no-store" })
+    if (!res.ok) throw new Error("アルバムの取得に失敗しました")
     const json = await res.json().catch(() => ({}))
     return Array.isArray(json?.items) ? json.items : []
   }
@@ -71,7 +74,7 @@ export function useAlbums(isActive: boolean) {
       try {
         setAlbumsLoading(true)
         setAlbumsError(null)
-        const items = await fetchAlbumList()
+        const items = await fetchAlbums()
         if (aborted) return
         setAlbums(items)
         await prefetchAlbumAssets(items, () => cancelled || aborted)
@@ -220,7 +223,7 @@ export function useAlbums(isActive: boolean) {
     try {
       setAlbumsLoading(true)
       setAlbumsError(null)
-      const items = await fetchAlbumList()
+      const items = await fetchAlbums(10, 0)
       setAlbums(items)
       await prefetchAlbumAssets(items)
     } catch (e) {
@@ -253,5 +256,6 @@ export function useAlbums(isActive: boolean) {
     openAlbum,
     closeAlbum,
     refreshAlbums,
+    fetchAlbums,
   }
 }

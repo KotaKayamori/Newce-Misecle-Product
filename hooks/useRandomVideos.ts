@@ -33,13 +33,15 @@ export function useRandomVideos() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchVideos = useCallback(async (category?: string, limit: number = 10) => {
+  // offsetを追加
+  const fetchVideos = useCallback(async (category?: string, limit: number = 10, offset: number = 0) => {
     setLoading(true)
     setError(null)
 
     try {
       const params = new URLSearchParams()
       params.set('limit', limit.toString())
+      params.set('offset', offset.toString())
       if (category) {
         params.set('category', category)
       }
@@ -51,18 +53,21 @@ export function useRandomVideos() {
       }
 
       const data = await response.json()
-      setVideos(data.videos || [])
+      // 追加取得時はsetVideosしない（呼び出し元で管理）
+      return data.videos || []
     } catch (err) {
       console.error('Error fetching videos:', err)
       setError(err instanceof Error ? err.message : 'Failed to fetch videos')
-      setVideos([])
+      return []
     } finally {
       setLoading(false)
     }
   }, [])
 
   const refreshVideos = useCallback((category?: string, limit: number = 10) => {
-    fetchVideos(category, limit)
+    fetchVideos(category, limit, 0).then((newVideos) => {
+      setVideos(newVideos)
+    })
   }, [fetchVideos])
 
   return {

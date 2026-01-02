@@ -67,7 +67,11 @@ function resolveCategorySlug(category?: string | null) {
 export default function SearchPage() {
   const router = useRouter()
   const { videos, loading, error, fetchVideos, refreshVideos } = useRandomVideos()
-  
+  const [allVideos, setAllVideos] = useState<VideoData[]>([])
+  const [hasMore, setHasMore] = useState(true)
+  const observerRef = useRef<HTMLDivElement | null>(null)
+  const [page, setPage] = useState(1)
+
   // Custom hooks
   const filters = useFilters()
   const search = useSearchVideos()
@@ -91,14 +95,99 @@ export default function SearchPage() {
   
   // Albums hook
   const albums = useAlbums(isGuidebookCategory)
+  const [allAlbums, setAllAlbums] = useState<AlbumItem[]>([])
+  const [albumPage, setAlbumPage] = useState(1)
+  const [hasMoreAlbums, setHasMoreAlbums] = useState(true)
+  const albumObserverRef = useRef<HTMLDivElement | null>(null)
+
+
+  // 初回・タブ切り替え時はリセット
+  useEffect(() => {
+    setAllVideos([])
+    setPage(1)
+    setHasMore(true)
+    fetchVideos(undefined, 10).then((newVideos) => {
+      if (Array.isArray(newVideos) && newVideos.length > 0) {
+        setAllVideos(newVideos)
+      }
+    })
+  }, [selectedCategory])
+
+  // 追加取得
+  const loadMore = useCallback(() => {
+    if (loading || !hasMore) return
+    fetchVideos(undefined, 10, page * 10).then((newVideos) => {
+      if (Array.isArray(newVideos) && newVideos.length > 0) {
+        setAllVideos((prev) => [...prev, ...newVideos])
+        setPage((p) => p + 1)
+        if (newVideos.length < 10) setHasMore(false)
+      } else {
+        setHasMore(false)
+      }
+    })
+  }, [loading, hasMore, page, fetchVideos])
+
+  // Intersection Observer
+  useEffect(() => {
+    if (!observerRef.current || !hasMore) return
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore()
+        }
+      },
+      { threshold: 1 }
+    )
+    observer.observe(observerRef.current)
+    return () => observer.disconnect()
+  }, [observerRef, loadMore, hasMore])
+
+  useEffect(() => {
+    if (!isGuidebookCategory) return
+    setAllAlbums([])
+    setAlbumPage(1)
+    setHasMoreAlbums(true)
+    albums.fetchAlbums(10, 0).then((newAlbums) => {
+      if (Array.isArray(newAlbums) && newAlbums.length > 0) {
+        setAllAlbums(newAlbums)
+      }
+    })
+  }, [selectedCategory])
+
+  // 3. 追加取得
+  const loadMoreAlbums = useCallback(() => {
+    if (!hasMoreAlbums || albums.albumsLoading) return
+    albums.fetchAlbums(10, albumPage * 10).then((newAlbums) => {
+      if (Array.isArray(newAlbums) && newAlbums.length > 0) {
+        setAllAlbums((prev) => [...prev, ...newAlbums])
+        setAlbumPage((p) => p + 1)
+        if (newAlbums.length < 10) setHasMoreAlbums(false)
+      } else {
+        setHasMoreAlbums(false)
+      }
+    })
+  }, [hasMoreAlbums, albumPage, albums])
+
+  // 4. Intersection Observer
+  useEffect(() => {
+    if (!albumObserverRef.current || !hasMoreAlbums) return
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreAlbums()
+        }
+      },
+      { threshold: 1 }
+    )
+    observer.observe(albumObserverRef.current)
+    return () => observer.disconnect()
+  }, [albumObserverRef, loadMoreAlbums, hasMoreAlbums])
 
   useEffect(() => {
     // 検索取得
     if (search.searchResults?.albums) {
       albums.albums = search.searchResults.albums;
     }
-    console.log("search albums", search.searchResults?.albums);
-    console.log("albums", albums);
   }, [search.searchResults.albums]);
 
   const [showUserProfile, setShowUserProfile] = useState(false)
@@ -621,7 +710,7 @@ export default function SearchPage() {
             <CategoryVideosSection
               visible={!search.didSearch && !isLatestCategory && !isGuidebookCategory}
               categoryLabel={selectedCategory}
-              videos={videos}
+              videos={allVideos}
               loading={loading}
               error={error}
               bookmarkedVideoIds={bookmarkedVideoIds}
@@ -641,7 +730,7 @@ export default function SearchPage() {
             <GuidebookSection
               visible={!search.didSearch && isGuidebookCategory}
               categoryLabel={selectedCategory}
-              albums={albums.albums}
+              albums={allAlbums}
               loading={albums.albumsLoading}
               error={albums.albumsError}
               albumBookmarkedSet={albums.albumBookmarkedSet}
@@ -649,6 +738,9 @@ export default function SearchPage() {
               onOpenAlbum={albums.openAlbum}
               onToggleBookmark={albums.toggleAlbumBookmark}
             />
+
+            <div ref={observerRef} style={{ height: 1 }} />
+            <div ref={albumObserverRef} style={{ height: 1 }} />
           </div>
         </div>
       )}
