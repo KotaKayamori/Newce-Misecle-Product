@@ -28,6 +28,7 @@ import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import ReelsScreen from "@/screens/ReelsScreen"
+import MixedFeedSection from "./components/MixedFeedSection"
 import type { RestaurantInfo, AlbumItem, OwnerProfile } from "@/lib/types"
 
 type SupabaseVideoRow = {
@@ -55,7 +56,6 @@ const CATEGORY_SLUG_MAP: Record<string, string> = {
   "人気急上昇中のお店": "popular_now",
   "SNSで人気のお店": "sns_popular",
   "若年層に人気のお店": "gen_z_popular",
-  "デートにおすすめ": "date_recommended",
   "デートにおすすめのお店": "date_recommended",
 }
 
@@ -86,8 +86,8 @@ export default function SearchPage() {
     "SNSで人気のお店",
     "若年層に人気のお店",
     "デートにおすすめのお店",
-    "最新動画",
-    "ガイドブック",
+    // "最新動画",
+    // "ガイドブック",
   ]
   const [selectedCategory, setSelectedCategory] = useState("あなたにおすすめ")
   const isLatestCategory = selectedCategory === "最新動画"
@@ -100,24 +100,60 @@ export default function SearchPage() {
   const [hasMoreAlbums, setHasMoreAlbums] = useState(true)
   const albumObserverRef = useRef<HTMLDivElement | null>(null)
 
+  const [randomAlbums, setRandomAlbums] = useState<AlbumItem[]>([])
+  const [albumsLoadingMixed, setAlbumsLoadingMixed] = useState(false)
+  const [albumBookmarkedSetMixed, setAlbumBookmarkedSetMixed] = useState<Set<string>>(new Set())
 
-  // 初回・タブ切り替え時はリセット
-  useEffect(() => {
-    setAllVideos([])
-    setPage(1)
-    setHasMore(true)
-    fetchVideos(undefined, 10).then((newVideos) => {
-      if (Array.isArray(newVideos) && newVideos.length > 0) {
-        setAllVideos(newVideos)
+  // fetch random albums
+  const fetchRandomAlbums = useCallback(async (count: number = 6) => {
+    setAlbumsLoadingMixed(true)
+    try {
+      const res = await fetch(`/api/guidebook/albums?random=${count}`, { cache: "no-store" })
+      if (!res.ok) throw new Error("アルバムの取得に失敗しました")
+      const json = await res.json().catch(() => ({}))
+      const items: AlbumItem[] = Array.isArray(json?.items) ? json.items : []
+      setRandomAlbums((prev) => {
+        const seen = new Set(prev.map((a) => a.id))
+        const merged = [...prev, ...items.filter((a) => !seen.has(a.id))]
+        return merged
+      })
+      // ブクマ初期状態（任意・可能なら）
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user && items.length) {
+        const ids = items.map((a) => a.id)
+        const { data, error } = await supabase
+          .from("photo_album_bookmarks").select("album_id")
+          .eq("user_id", user.id).in("album_id", ids)
+        if (!error && data) {
+          setAlbumBookmarkedSetMixed((prev) => {
+            const s = new Set(prev)
+            ;(data as any[]).forEach((r) => s.add(r.album_id))
+            return s
+          })
+        }
       }
-    })
+    } finally {
+      setAlbumsLoadingMixed(false)
+    }
+  }, [])
+
+  // 初期化・タブ切替（通常カテゴリ時のみアルバムも準備）
+  useEffect(() => {
+    setAllVideos([]); setPage(1); setHasMore(true)
+    setRandomAlbums([]); setAlbumBookmarkedSetMixed(new Set())
+    const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    fetchVideos(categorySlug, 10).then((newVideos) => { if (newVideos?.length) setAllVideos(newVideos) })
+    if (!isLatestCategory && !isGuidebookCategory) {
+      fetchRandomAlbums(6)
+    }
   }, [selectedCategory])
 
-  // 追加取得
+  // 追加取得（動画スクロールに合わせてアルバムも補充）
   const loadMore = useCallback(() => {
     if (loading || !hasMore) return
-    fetchVideos(undefined, 10, page * 10).then((newVideos) => {
-      if (Array.isArray(newVideos) && newVideos.length > 0) {
+    const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    fetchVideos(categorySlug, 10, page * 10).then((newVideos) => {
+      if (newVideos?.length) {
         setAllVideos((prev) => [...prev, ...newVideos])
         setPage((p) => p + 1)
         if (newVideos.length < 10) setHasMore(false)
@@ -125,7 +161,11 @@ export default function SearchPage() {
         setHasMore(false)
       }
     })
-  }, [loading, hasMore, page, fetchVideos])
+    if (!isLatestCategory && !isGuidebookCategory) {
+      fetchRandomAlbums(3) // 追随で少量追加
+    }
+  }, [loading, hasMore, page, fetchVideos, selectedCategory, isLatestCategory, isGuidebookCategory, fetchRandomAlbums])
+
 
   // Intersection Observer
   useEffect(() => {
@@ -189,6 +229,47 @@ export default function SearchPage() {
       albums.albums = search.searchResults.albums;
     }
   }, [search.searchResults]);
+
+  // インターリーブ
+  type MixedItem = { kind:"video"; video: VideoData } | { kind:"album"; album: AlbumItem }
+  const mixedItems: MixedItem[] = useMemo(() => {
+    const v = allVideos.slice()
+    const a = randomAlbums.slice()
+    const out: MixedItem[] = []
+    const ratio = 3 // 動画3:アルバム1
+    let vi = 0, ai = 0
+    while (vi < v.length || ai < a.length) {
+      for (let i = 0; i < ratio && vi < v.length; i++) out.push({ kind: "video", video: v[vi++] })
+      if (ai < a.length) out.push({ kind: "album", album: a[ai++] })
+    }
+    return out
+  }, [allVideos, randomAlbums])
+
+  // アルバムのブクマ切替（楽観更新）
+  const toggleAlbumBookmarkMixed = useCallback(async (albumId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+      if (!accessToken) { router.push("/auth/login"); return }
+      setAlbumBookmarkedSetMixed((prev) => {
+        const s = new Set(prev)
+        s.has(albumId) ? s.delete(albumId) : s.add(albumId)
+        return s
+      })
+      await fetch(`/api/guidebook/albums/${albumId}/bookmarks`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+    } catch {
+      // 失敗時はロールバック
+      setAlbumBookmarkedSetMixed((prev) => {
+        const s = new Set(prev)
+        s.has(albumId) ? s.delete(albumId) : s.add(albumId)
+        return s
+      })
+    }
+  }, [router])
 
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<
@@ -709,16 +790,15 @@ export default function SearchPage() {
               onToggleFavorite={toggleFavorite}
             />
 
-            <CategoryVideosSection
+            <MixedFeedSection
               visible={!search.didSearch && !isLatestCategory && !isGuidebookCategory}
-              categoryLabel={selectedCategory}
-              videos={allVideos}
-              loading={loading}
-              error={error}
+              items={mixedItems}
               bookmarkedVideoIds={bookmarkedVideoIds}
-              onRefresh={handleRefreshVideos}
+              albumBookmarkedSet={albumBookmarkedSetMixed}
               onVideoSelect={openRandomVideoFullscreen}
-              onToggleFavorite={toggleFavorite}
+              onOpenAlbum={albums.openAlbum}
+              onToggleVideoBookmark={toggleFavorite}
+              onToggleAlbumBookmark={toggleAlbumBookmarkMixed}
             />
 
             <LatestVideosSection
