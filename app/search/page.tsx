@@ -95,6 +95,7 @@ export default function SearchPage() {
   
   // Albums hook
   const albums = useAlbums(isGuidebookCategory)
+  const [openAlbumMeta, setOpenAlbumMeta] = useState<AlbumItem | null>(null)
   const [allAlbums, setAllAlbums] = useState<AlbumItem[]>([])
   const [albumPage, setAlbumPage] = useState(1)
   const [hasMoreAlbums, setHasMoreAlbums] = useState(true)
@@ -389,6 +390,9 @@ export default function SearchPage() {
     ? displayAlbums.find((a) => a.id === albums.openAlbumId)
     : null;
 
+  // Overlayに渡すデータはメタ優先で統合
+  const effectiveAlbum = openAlbumMeta ?? openAlbum
+
   // Fullscreen overlay interactions (like/favorite)
   const [likedVideoIds, setLikedVideoIds] = useState<Set<string>>(new Set())
   const likeMutationRef = useRef<Set<string>>(new Set())
@@ -648,8 +652,6 @@ export default function SearchPage() {
       })
       return changed ? next : prev
     })
-    // ログも allVideos に合わせて修正
-    console.log("Owner profiles updated from allVideos", allVideos)
   }, [allVideos])
 
   useEffect(() => {
@@ -796,7 +798,10 @@ export default function SearchPage() {
               bookmarkedVideoIds={bookmarkedVideoIds}
               albumBookmarkedSet={albumBookmarkedSetMixed}
               onVideoSelect={openRandomVideoFullscreen}
-              onOpenAlbum={albums.openAlbum}
+              onOpenAlbum={(album) => {
+                setOpenAlbumMeta(album)
+                albums.openAlbum(album.id)
+              }}
               onToggleVideoBookmark={toggleFavorite}
               onToggleAlbumBookmark={toggleAlbumBookmarkMixed}
             />
@@ -880,16 +885,19 @@ export default function SearchPage() {
         assets={albums.albumAssets}
         index={albums.albumIndex}
         loading={albums.albumLoading}
-        onClose={albums.closeAlbum}
+        onClose={() => { 
+          albums.closeAlbum()
+          setOpenAlbumMeta(null)
+        }}
         onIndexChange={(nextIndex) => {
           const clamped = Math.max(0, Math.min(nextIndex, albums.albumAssets.length - 1))
           albums.setAlbumIndex(clamped)
         }}
-        title={openAlbum?.title || null}
-        ownerAvatarUrl={openAlbum?.owner?.avatarUrl ?? null}
-        ownerLabel={openAlbum?.owner?.username ? `@${openAlbum.owner.username}` : (openAlbum?.owner?.displayName || null)}
-        ownerUserId={openAlbum?.owner?.id || null}
-        description={openAlbum?.description || null}
+        title={effectiveAlbum?.title || null}
+        ownerAvatarUrl={effectiveAlbum?.owner?.avatarUrl ?? null}
+        ownerLabel={effectiveAlbum?.owner?.username ? `@${effectiveAlbum.owner.username}` : (effectiveAlbum?.owner?.displayName || null)}
+        ownerUserId={effectiveAlbum?.owner?.id || null}
+        description={effectiveAlbum?.description || null}
         liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
         onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
         bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
