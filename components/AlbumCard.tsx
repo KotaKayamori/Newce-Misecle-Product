@@ -53,8 +53,8 @@ export default function AlbumCard(props: AlbumCardProps) {
   }
 
   return (
-    <Card className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow border-none shadow-none">
-      <CardContent className="p-0">
+    <Card className="border-none shadow-none transition-shadow">
+      <CardContent className="cursor-pointer p-0 rounded-lg overflow-hidden transition-shadow hover:shadow-md">
         <div className="aspect-[4/5] relative" onClick={onClickCard} role="button" aria-label={title ?? "アルバムを開く"}>
           {/* Cover image */}
           {coverUrl ? (
@@ -78,8 +78,6 @@ export default function AlbumCard(props: AlbumCardProps) {
               </button>
             </div>
           )}
-
-          {/* Title strip removed: align with VideoCard */}
         </div>
 
         {/* Bottom white meta (optional) */}

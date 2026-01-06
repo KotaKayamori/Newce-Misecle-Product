@@ -93,6 +93,7 @@ export interface AlbumRow {
   owner_id: string
   title: string | null
   caption: string | null
+  categories: string[] | null
   cover_path: string | null
   created_at: string
 }

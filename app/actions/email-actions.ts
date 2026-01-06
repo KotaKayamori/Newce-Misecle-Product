@@ -246,8 +246,6 @@ export async function sendBugReportAction(params: { message: string; name?: stri
       // ユーザープロフィールを取得
       const profile = await getUserProfile(user.id)
       userName = profile?.name || user.user_metadata?.name || null
-      
-      console.log("User profile data:", { userName, userEmail })
     } else {
       console.log("No authenticated user found for bug report")
     }

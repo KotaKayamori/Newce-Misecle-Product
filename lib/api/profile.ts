@@ -17,9 +17,7 @@ export interface UserProfile {
 /**
  * ユーザープロフィールを取得する
  */
-export async function fetchUserProfile(userId: string): Promise<UserProfile> {
-  console.log("Fetching user profile for user:", userId)
-  
+export async function fetchUserProfile(userId: string): Promise<UserProfile> {  
   const { data: profile, error } = await supabase
     .from('user_profiles')
     .select('*')
@@ -34,7 +32,6 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile> {
     throw new Error(error.message || "プロフィールの取得に失敗しました")
   }
 
-  console.log("User profile fetched:", profile)
   return profile
 }
 
@@ -42,8 +39,6 @@ export async function fetchUserProfile(userId: string): Promise<UserProfile> {
  * ユーザープロフィールを更新する
  */
 export async function updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile> {
-  console.log("Updating user profile:", updates)
-  
   const { data, error } = await supabase
     .from('user_profiles')
     .update(updates)
@@ -56,7 +51,6 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
     throw new Error(error.message || "プロフィールの更新に失敗しました")
   }
 
-  console.log("Profile updated successfully:", data)
   return data
 }
 
@@ -64,8 +58,6 @@ export async function updateUserProfile(userId: string, updates: Partial<UserPro
  * ユーザープロフィールを作成する
  */
 export async function createUserProfile(profileData: Omit<UserProfile, 'created_at' | 'updated_at'>): Promise<UserProfile> {
-  console.log("Creating user profile:", profileData)
-  
   const { data, error } = await supabase
     .from('user_profiles')
     .insert(profileData)
@@ -83,7 +75,6 @@ export async function createUserProfile(profileData: Omit<UserProfile, 'created_
     throw new Error(error.message || "プロフィールの作成に失敗しました")
   }
 
-  console.log("User profile created successfully:", data)
   return data
 }
 

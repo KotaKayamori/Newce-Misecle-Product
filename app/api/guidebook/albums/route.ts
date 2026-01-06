@@ -11,6 +11,7 @@ type CreateAlbumBody = {
   description?: string | null
   caption?: string | null
   visibility?: "public" | "private"
+  categories?: string[] | null
 }
 
 const createAdminClient = () => {
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
       const fetches = Array.from(chosen).map(async (off) => {
         const { data, error } = await supabase
           .from("photo_albums")
-          .select("id, owner_id, title, description, caption, visibility, cover_path, created_at")
+          .select("id, owner_id, title, description, caption, visibility, categories, cover_path, created_at")
           .eq("visibility", "public")
           .range(off, off)
         if (error) return [] as any[]
@@ -94,6 +95,7 @@ export async function GET(req: NextRequest) {
         createdAt: album.created_at,
         ownerId: album.owner_id,
         owner: album.owner_id ? ownerMap[album.owner_id] ?? null : null,
+        categories: album.categories ?? null,
       }))
       return NextResponse.json({ items, nextOffset: null }, { headers: { "Cache-Control": "no-store" } })
     }
@@ -101,7 +103,7 @@ export async function GET(req: NextRequest) {
     // default: latest pagination
     const { data, error } = await supabase
       .from("photo_albums")
-      .select("id, owner_id, title, description, caption, visibility, cover_path, created_at")
+      .select("id, owner_id, title, description, caption, visibility, categories, cover_path, created_at")
       .eq("visibility", "public")
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1)
@@ -141,6 +143,7 @@ export async function GET(req: NextRequest) {
       createdAt: album.created_at,
       ownerId: album.owner_id,
       owner: album.owner_id ? ownerMap[album.owner_id] ?? null : null,
+      categories: album.categories ?? null,
     }))
 
     return NextResponse.json(
@@ -184,8 +187,9 @@ export async function POST(req: NextRequest) {
         description: body.description ?? null,
         caption: body.caption ?? null,
         visibility: body.visibility === "private" ? "private" : "public",
+        categories: body.categories
       })
-      .select("id, owner_id, title, description, caption, visibility, cover_path, created_at")
+      .select("id, owner_id, title, description, caption, visibility, categories, cover_path, created_at")
       .single()
 
     if (error || !data) return NextResponse.json({ error: "failed to create album" }, { status: 500 })
