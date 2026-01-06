@@ -16,7 +16,7 @@ interface MixedFeedSectionProps {
   bookmarkedVideoIds: Set<string>
   albumBookmarkedSet: Set<string>
   onVideoSelect: (video: VideoData) => void
-  onOpenAlbum: (albumId: string) => void
+  onOpenAlbum: (album: AlbumItem) => void
   onToggleVideoBookmark: (id: string | number, e?: React.MouseEvent) => void
   onToggleAlbumBookmark: (albumId: string, e?: React.MouseEvent) => void
 }
@@ -57,7 +57,7 @@ export default function MixedFeedSection({
             key={`a-${it.album.id}-${idx}`}
             coverUrl={it.album.coverUrl}
             title={it.album.title || it.album.description || "アルバム"}
-            onClickCard={() => onOpenAlbum(it.album.id)}
+            onClickCard={() => onOpenAlbum(it.album)}
             showTopBookmark
             isBookmarked={albumBookmarkedSet.has(it.album.id)}
             onToggleBookmark={(e) => onToggleAlbumBookmark(it.album.id, e)}
