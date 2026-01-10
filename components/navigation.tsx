@@ -37,7 +37,7 @@ export default function Navigation() {
       <div className="flex">
         {navItems.map((item) => {
           const IconComponent = item.icon
-          const isActive = pathname === item.href
+          const isActive = pathname.startsWith(item.href)
 
           return (
             <Link
@@ -46,12 +46,21 @@ export default function Navigation() {
               prefetch={false}
               scroll={false}
               replace={false}
-              className={`flex-1 flex flex-col items-center py-2 px-1 transition-colors duration-150 ${
-                isActive ? "text-orange-500" : "text-gray-600 hover:text-black"
-              }`}
+              aria-current={isActive ? "page" : undefined}
+              className="flex-1 flex items-center justify-center py-2.5"
             >
-              <IconComponent className={`w-5 h-5 mb-1 ${isActive ? "text-orange-500" : ""}`} />
-              <span className={`text-xs ${isActive ? "text-orange-500 font-medium" : ""}`}>{item.label}</span>
+              <span
+                className={`flex flex-col items-center transition-all duration-200 py-1 rounded-full whitespace-nowrap w-full max-w-[72px] ${
+                  isActive
+                    ? "bg-[#EFEFEF] text-orange-500"
+                    : "text-[#B0B0B0] hover:bg-gray-50"
+                }`}
+              >
+                <IconComponent className="w-5 h-5 mb-0.5" />
+                <span className={`text-xs ${isActive ? "font-medium" : ""}`}>
+                  {item.label}
+                </span>
+              </span>
             </Link>
           )
         })}
