@@ -172,6 +172,7 @@ export default function ProfilePage() {
             id: asset.id,
             url: asset.url,
             order: asset.order,
+            type: asset.type,
             width: asset.width,
             height: asset.height,
           }))

@@ -55,7 +55,7 @@ export default function FavoritesPage() {
   const [fsMuted, setFsMuted] = useState(false)
 
   const [albumFsOpen, setAlbumFsOpen] = useState(false)
-  const [albumFsAssets, setAlbumFsAssets] = useState<{ id: string; url: string; order: number; width?: number | null; height?: number | null }[]>([])
+  const [albumFsAssets, setAlbumFsAssets] = useState<{ id: string; url: string; order: number; type?: "image" | "video"; width?: number | null; height?: number | null }[]>([])
   const [albumFsIndex, setAlbumFsIndex] = useState(0)
   const [albumFsTitle, setAlbumFsTitle] = useState<string | null>(null)
   const [albumFsOwnerLabel, setAlbumFsOwnerLabel] = useState<string | null>(null)
@@ -98,7 +98,7 @@ export default function FavoritesPage() {
       setAlbumFsOwnerAvatar(profile?.avatar_url ?? null)
       const res = await fetch(`/api/guidebook/albums/${album.id}/assets`, { cache: "no-store" })
       const json = await res.json()
-      const items = (json?.items ?? []).map((a: any) => ({ id: a.id, url: a.url, order: a.order, width: a.width, height: a.height }))
+      const items = (json?.items ?? []).map((a: any) => ({ id: a.id, url: a.url, order: a.order, type: a.type, width: a.width, height: a.height }))
       setAlbumFsAssets(items)
       setAlbumFsIndex(Math.min(Math.max(0, startIndex), Math.max(0, items.length - 1)))
       setAlbumFsOpen(true)

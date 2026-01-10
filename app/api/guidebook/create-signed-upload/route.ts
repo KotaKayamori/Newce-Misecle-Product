@@ -4,7 +4,17 @@ import { createClient } from "@supabase/supabase-js"
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-const ALLOWED_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"])
+const ALLOWED_EXTENSIONS = new Set([
+  "jpg",
+  "jpeg",
+  "png",
+  "webp",
+  "heic",
+  "heif",
+  "mp4",
+  "mov",
+  "webm",
+])
 const BUCKET = "photos"
 
 function extFromContentType(ct: string | undefined | null): string | null {
@@ -15,6 +25,9 @@ function extFromContentType(ct: string | undefined | null): string | null {
   if (lc === "image/webp") return "webp"
   if (lc === "image/heic") return "heic"
   if (lc === "image/heif") return "heif"
+  if (lc === "video/mp4") return "mp4"
+  if (lc === "video/quicktime") return "mov"
+  if (lc === "video/webm") return "webm"
   return null
 }
 
