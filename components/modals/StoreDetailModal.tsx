@@ -1,6 +1,5 @@
 "use client"
 
-import { Star } from "lucide-react"
 import type { SelectedRestaurant } from "@/app/favorites/types"
 
 interface StoreDetailModalProps {
@@ -25,30 +24,27 @@ export function StoreDetailModal({ open, restaurant, onClose, onReserve }: Store
         </div>
 
         <div className="flex-1 overflow-y-auto scrollbar-hide p-6 space-y-6">
-          <div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">{restaurant.restaurantName}</h3>
-            <div className="flex items-center gap-2 text-sm text-gray-600">
-              <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
-              {restaurant.rating && <span>{restaurant.rating}</span>}
-              {restaurant.genre && (
-                <>
-                  <span>•</span>
-                  <span>{restaurant.genre}</span>
-                </>
-              )}
-              {restaurant.distance && (
-                <>
-                  <span>•</span>
-                  <span>{restaurant.distance}</span>
-                </>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-200 rounded-full overflow-hidden flex items-center justify-center text-gray-600 font-semibold">
+              {restaurant.ownerAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={restaurant.ownerAvatarUrl} alt={restaurant.ownerLabel ?? "user"} className="w-full h-full object-cover" />
+              ) : (
+                (restaurant.ownerLabel ?? "U").replace(/^@/, "").charAt(0).toUpperCase()
               )}
             </div>
-            {restaurant.caption && (
-              <div className="mt-3">
-                <p className="text-sm text-gray-700 whitespace-pre-wrap">{restaurant.caption}</p>
-              </div>
-            )}
+            <div className="flex flex-col">
+              <span className="text-gray-900 font-semibold text-base">
+                {restaurant.ownerLabel ?? "投稿者"}
+              </span>
+            </div>
           </div>
+
+          {restaurant.caption && (
+            <div>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{restaurant.caption}</p>
+            </div>
+          )}
         </div>
 
         <div className="p-4 border-t bg-white pb-[calc(env(safe-area-inset-bottom)+var(--vvb)+24px)]">
