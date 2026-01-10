@@ -159,7 +159,7 @@ export default function Navigation() {
 
         {navItems.map((item, index) => {
           const IconComponent = item.icon
-          const isActive = pathname === item.href
+          const isActive = pathname.startsWith(item.href)
 
           return (
             <Link

@@ -3,9 +3,16 @@
 import React, { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Heart, Bookmark, Send } from "lucide-react"
-import { ImageCarousel } from "./ImageCarousel"
+import { MediaCarousel } from "./MediaCarousel"
 
-export type AlbumAsset = { id: string; url: string; order: number; width?: number | null; height?: number | null }
+export type AlbumAsset = {
+  id: string
+  url: string
+  order: number
+  type?: "image" | "video"
+  width?: number | null
+  height?: number | null
+}
 
 interface AlbumViewerOverlayProps {
   open: boolean
@@ -59,6 +66,36 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
   const totalAssets = assets?.length ?? 0
   const canPrev = index > 0
   const canNext = index < totalAssets - 1
+  const currentAsset = assets?.[index]
+  const assetWidth = currentAsset?.width ?? null
+  const assetHeight = currentAsset?.height ?? null
+  const minAspect = 4 / 5
+  const maxAspect = 3 / 4
+  const lowerAspect = Math.min(minAspect, maxAspect)
+  const upperAspect = Math.max(minAspect, maxAspect)
+  const assetAspect = assetWidth && assetHeight ? assetWidth / assetHeight : null
+  const clampedAspect = assetAspect
+    ? Math.min(Math.max(assetAspect, lowerAspect), upperAspect)
+    : upperAspect
+  const chromeHeight = "160px"
+  const maxHeight = `calc(100svh - ${chromeHeight})`
+  const maxWidth = `min(92vw, calc(${maxHeight} * ${upperAspect}))`
+  const mediaWidth = assetWidth && assetHeight
+    ? `min(${assetWidth}px, calc(${assetHeight}px * ${clampedAspect}), ${maxWidth})`
+    : maxWidth
+  const mediaBoxStyle = {
+    width: mediaWidth,
+    aspectRatio: `${clampedAspect}`,
+    maxHeight,
+  }
+  const mediaItems = useMemo(
+    () =>
+      assets.map((asset) => ({
+        url: asset.url,
+        type: asset.type ?? inferAssetType(asset.url),
+      })),
+    [assets],
+  )
 
   if (!open) return null
 
@@ -126,53 +163,53 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
       ) : !hasAssets ? (
         <div className="flex h-full w-full items-center justify-center text-sm text-black/70">このアルバムには写真がありません。</div>
       ) : (
-        <div className="flex flex-col h-full pt-12 pb-8 overflow-y-auto">
-          <div className="flex-1 flex items-center justify-center mt-4">
-            <div className="relative flex items-center justify-center">
-              <ImageCarousel
-                images={assets.map((asset) => asset.url)}
+        <div className="flex flex-col h-full pt-16 pb-8 overflow-y-auto">
+          <div className="flex flex-col items-center gap-0">
+            <div className="relative flex items-center justify-center" style={mediaBoxStyle}>
+              <MediaCarousel
+                items={mediaItems}
                 currentIndex={index}
                 onIndexChange={onIndexChange}
                 // showControls={false}
-                className="w-screen max-w-[100vw] max-h-[85vh]"
-                imageClassName="max-h-[85vh]"
-                fit="contain"
+                className="h-full w-full"
+                mediaClassName="h-full w-full"
+                fit="cover"
               />
               <span className="absolute right-0 top-0 rounded-full bg-black/70 px-2 py-1 text-xs font-medium text-white">
                 {index + 1} / {assets.length}
               </span>
-              {assets.length > 1 && (
-                <div className="absolute -bottom-8 left-0 right-0 flex items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={handlePrev}
-                    disabled={!canPrev}
-                    aria-label="前へ"
-                    className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white/50 text-black hover:bg-white/70 disabled:opacity-30"
-                  >
-                    ‹
-                  </button>
-                  <div className="flex items-center justify-center gap-2">
-                    {assets.map((_, i) => (
-                      <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-black" : "bg-black/40"}`} />
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    disabled={!canNext}
-                    aria-label="次へ"
-                    className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white/50 text-black hover:bg-white/70 disabled:opacity-30"
-                  >
-                    ›
-                  </button>
-                </div>
-              )}
             </div>
+            {assets.length > 1 && (
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={handlePrev}
+                  disabled={!canPrev}
+                  aria-label="前へ"
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white/50 text-black hover:bg-white/70 disabled:opacity-30"
+                >
+                  ‹
+                </button>
+                <div className="flex items-center justify-center gap-2">
+                  {assets.map((_, i) => (
+                    <span key={i} className={`h-1.5 w-1.5 rounded-full ${i === index ? "bg-black" : "bg-black/40"}`} />
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  disabled={!canNext}
+                  aria-label="次へ"
+                  className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white/50 text-black hover:bg-white/70 disabled:opacity-30"
+                >
+                  ›
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Bottom actions: いいね / 保存 / 共有（横並び・黒ボタン） */}
-          <div className="mt-4">
+          <div>
             <div className="flex justify-start">
               <div className="flex flex-col items-center">
                 <button
@@ -245,4 +282,11 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
       )}      
     </div>
   )
+}
+
+function inferAssetType(url: string): "image" | "video" {
+  const cleanUrl = url.split("?")[0]?.split("#")[0] ?? ""
+  const ext = cleanUrl.split(".").pop()?.toLowerCase()
+  if (ext === "mp4" || ext === "mov" || ext === "webm") return "video"
+  return "image"
 }
