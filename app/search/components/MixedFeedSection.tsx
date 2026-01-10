@@ -33,41 +33,43 @@ export default function MixedFeedSection({
 }: MixedFeedSectionProps) {
   if (!visible) return null
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="columns-2 gap-3">
       {items.map((it, idx) =>
         it.kind === "video" ? (
-          <VideoCard
-            key={`v-${it.video.id}-${idx}`}
-            posterUrl={derivePosterUrl(it.video.public_url) || "/placeholder.jpg"}
-            title={it.video.title}
-            onClickCard={() => onVideoSelect(it.video)}
-            thumbnailOnly
-            showTopBookmark
-            isBookmarked={bookmarkedVideoIds.has(it.video.id)}
-            onToggleBookmark={(e) => onToggleVideoBookmark(it.video.id, e)}
-            bottomMetaVariant="account"
-            accountAvatarUrl={it.video.user?.avatar_url ?? null}
-            accountLabel={
-              it.video.user?.username ? `@${it.video.user.username}` : (it.video.user?.name || "ユーザー")
-            }
-            accountUserId={it.video.user?.id ?? null}
-          />
+          <div key={`v-${it.video.id}-${idx}`} className="break-inside-avoid mb-3">
+            <VideoCard
+              posterUrl={derivePosterUrl(it.video.public_url) || "/placeholder.jpg"}
+              title={it.video.title}
+              onClickCard={() => onVideoSelect(it.video)}
+              thumbnailOnly
+              showTopBookmark
+              isBookmarked={bookmarkedVideoIds.has(it.video.id)}
+              onToggleBookmark={(e) => onToggleVideoBookmark(it.video.id, e)}
+              bottomMetaVariant="account"
+              accountAvatarUrl={it.video.user?.avatar_url ?? null}
+              accountLabel={
+                it.video.user?.username ? `@${it.video.user.username}` : (it.video.user?.name || "ユーザー")
+              }
+              accountUserId={it.video.user?.id ?? null}
+            />
+          </div>
         ) : (
-          <AlbumCard
-            key={`a-${it.album.id}-${idx}`}
-            coverUrl={it.album.coverUrl}
-            title={it.album.title || it.album.description || "アルバム"}
-            onClickCard={() => onOpenAlbum(it.album)}
-            showTopBookmark
-            isBookmarked={albumBookmarkedSet.has(it.album.id)}
-            onToggleBookmark={(e) => onToggleAlbumBookmark(it.album.id, e)}
-            bottomMetaVariant="account"
-            accountAvatarUrl={it.album.owner?.avatarUrl ?? null}
-            accountLabel={
-              it.album.owner?.username ? `@${it.album.owner.username}` : (it.album.owner?.displayName || "ユーザー")
-            }
-            accountUserId={it.album.owner?.id ?? null}
-          />
+          <div key={`a-${it.album.id}-${idx}`} className="break-inside-avoid mb-3">
+            <AlbumCard
+              coverUrl={it.album.coverUrl}
+              title={it.album.title || it.album.description || "アルバム"}
+              onClickCard={() => onOpenAlbum(it.album)}
+              showTopBookmark
+              isBookmarked={albumBookmarkedSet.has(it.album.id)}
+              onToggleBookmark={(e) => onToggleAlbumBookmark(it.album.id, e)}
+              bottomMetaVariant="account"
+              accountAvatarUrl={it.album.owner?.avatarUrl ?? null}
+              accountLabel={
+                it.album.owner?.username ? `@${it.album.owner.username}` : (it.album.owner?.displayName || "ユーザー")
+              }
+              accountUserId={it.album.owner?.id ?? null}
+            />
+          </div>
         )
       )}
     </div>
