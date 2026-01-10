@@ -450,6 +450,9 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
         </div>
       </div>
 
+      {/* シークバーより下を黒背景で覆う */}
+      <div className="absolute inset-x-0 z-20 bottom-0 h-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px))] bg-black" />
+
       {/* ★ 動画とフッターの“間”にシークバーを配置 */}
       <div className="absolute inset-x-0 z-30 bottom-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px))]">
         <div className="w-full h-1 flex items-center">
