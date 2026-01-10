@@ -33,7 +33,7 @@ export default function MixedFeedSection({
 }: MixedFeedSectionProps) {
   if (!visible) return null
   return (
-    <div className="columns-2 gap-3 space-y-3">
+    <div className="columns-2 gap-3">
       {items.map((it, idx) =>
         it.kind === "video" ? (
           <div key={`v-${it.video.id}-${idx}`} className="break-inside-avoid mb-3">
