@@ -106,8 +106,6 @@ export default function NotificationsPage() {
           })}
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

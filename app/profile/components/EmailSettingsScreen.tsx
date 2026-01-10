@@ -33,8 +33,6 @@ export function EmailSettingsScreen({ onClose }: EmailSettingsScreenProps) {
           </Button>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

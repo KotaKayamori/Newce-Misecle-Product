@@ -8,7 +8,6 @@ import { LikedAlbumsSection } from "./components/LikedAlbumsSection"
 import { SavedAlbumsSection } from "./components/SavedAlbumsSection"
 import { ReservationModal } from "@/components/modals/ReservationModal"
 import { StoreDetailModal } from "@/components/modals/StoreDetailModal"
-import Navigation from "@/components/navigation"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { FALLBACK_VIDEO_URL, derivePosterUrl } from "@/lib/media"
@@ -292,8 +291,6 @@ export default function FavoritesPage() {
         onClose={() => setShowStoreDetailModal(false)}
         onReserve={() => setShowReservationModal(true)}
       />
-
-      <Navigation />
     </div>
   )
 }

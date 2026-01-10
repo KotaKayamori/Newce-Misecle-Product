@@ -208,8 +208,6 @@ export function AccountSettingsScreen({ onClose, user, onPasswordResetSuccess }:
           </Button>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

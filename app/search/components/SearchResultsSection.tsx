@@ -78,41 +78,43 @@ export function SearchResultsSection({
           {searchTerm ? `「${searchTerm}」に一致する結果はありません` : "検索結果が見つかりませんでした"}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
-          {merged.map((item) =>
+        <div className="columns-2 gap-3">
+          {merged.map((item, idx) =>
             item.type === "video" ? (
-              <VideoCard
-                key={item.data.id}
-                posterUrl={derivePosterUrl(item.data.playback_url, item.data.storage_path) || "/placeholder.jpg"}
-                title={item.data.title || item.data.caption || "動画"}
-                onClickCard={() => onSelectVideo(item.data)}
-                thumbnailOnly
-                showTopBookmark
-                isBookmarked={bookmarkedVideoIds.has(item.data.id)}
-                onToggleBookmark={(e) => onToggleFavorite(item.data.id, e)}
-                bottomMetaVariant="account"
-                accountAvatarUrl={item.data.owner_id ? ownerProfiles[item.data.owner_id]?.avatar_url : undefined}
-                accountLabel={
-                  item.data.owner_id
-                    ? ownerProfiles[item.data.owner_id]?.username
-                      ? `@${ownerProfiles[item.data.owner_id]?.username}`
-                      : ownerProfiles[item.data.owner_id]?.display_name || "ユーザー"
-                    : "ユーザー"
-                }
-                accountUserId={item.data.owner_id}
-              />
+              <div key={`v-${item.data.id}-${idx}`} className="break-inside-avoid mb-3">
+                <VideoCard
+                  posterUrl={derivePosterUrl(item.data.playback_url, item.data.storage_path) || "/placeholder.jpg"}
+                  title={item.data.title || item.data.caption || "動画"}
+                  onClickCard={() => onSelectVideo(item.data)}
+                  thumbnailOnly
+                  showTopBookmark
+                  isBookmarked={bookmarkedVideoIds.has(item.data.id)}
+                  onToggleBookmark={(e) => onToggleFavorite(item.data.id, e)}
+                  bottomMetaVariant="account"
+                  accountAvatarUrl={item.data.owner_id ? ownerProfiles[item.data.owner_id]?.avatar_url : undefined}
+                  accountLabel={
+                    item.data.owner_id
+                      ? ownerProfiles[item.data.owner_id]?.username
+                        ? `@${ownerProfiles[item.data.owner_id]?.username}`
+                        : ownerProfiles[item.data.owner_id]?.display_name || "ユーザー"
+                      : "ユーザー"
+                  }
+                  accountUserId={item.data.owner_id}
+                />
+              </div>
             ) : (
-              <AlbumCard
-                key={item.data.id}
-                coverUrl={item.data.coverUrl}
-                title={item.data.title}
-                description={item.data.description}
-                onClickCard={() => onSelectAlbum && onSelectAlbum(item.data.id)}
-                bottomMetaVariant="account"
-                accountAvatarUrl={item.data.owner?.avatarUrl}
-                accountLabel={item.data.owner?.username ? `@${item.data.owner.username}` : item.data.owner?.displayName}
-                accountUserId={item.data.owner?.id}
-              />
+              <div key={`a-${item.data.id}-${idx}`} className="break-inside-avoid mb-3">
+                <AlbumCard
+                  coverUrl={item.data.coverUrl}
+                  title={item.data.title}
+                  description={item.data.description}
+                  onClickCard={() => onSelectAlbum && onSelectAlbum(item.data.id)}
+                  bottomMetaVariant="account"
+                  accountAvatarUrl={item.data.owner?.avatarUrl}
+                  accountLabel={item.data.owner?.username ? `@${item.data.owner.username}` : item.data.owner?.displayName}
+                  accountUserId={item.data.owner?.id}
+                />
+              </div>
             )
           )}
         </div>

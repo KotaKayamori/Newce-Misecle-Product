@@ -383,8 +383,6 @@ export function ProfileEditScreen({
           </Button>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

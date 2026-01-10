@@ -78,8 +78,6 @@ export function FAQScreen({ onClose }: FAQScreenProps) {
           ))}
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

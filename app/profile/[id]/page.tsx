@@ -257,8 +257,6 @@ export default function UserProfilePage() {
             </Button>
           </div>
         </div>
-
-        <Navigation />
       </div>
     )
   }
@@ -506,8 +504,6 @@ export default function UserProfilePage() {
           )
         )}
       </div>
-
-      <Navigation />
     </div>
   )
 }

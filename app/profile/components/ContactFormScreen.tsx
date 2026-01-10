@@ -416,8 +416,6 @@ export function ContactFormScreen({ onClose, onSuccess }: ContactFormScreenProps
           </Button>
         </form>
       </div>
-
-      <Navigation />
     </div>
   )
 }

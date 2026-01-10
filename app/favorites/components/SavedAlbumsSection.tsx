@@ -1,7 +1,7 @@
 "use client"
 
 import AlbumCard from "@/components/AlbumCard"
-import type { AlbumRow, OwnerProfile } from "@/app/favorites/types"
+import type { AlbumRow, OwnerProfile } from "@/lib/types"
 import { deriveAlbumCoverUrl } from "@/lib/media"
 import { Image as ImageIcon } from "lucide-react"
 
