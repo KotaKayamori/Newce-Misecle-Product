@@ -3,9 +3,16 @@
 import React, { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Heart, Bookmark, Send } from "lucide-react"
-import { ImageCarousel } from "./ImageCarousel"
+import { MediaCarousel } from "./MediaCarousel"
 
-export type AlbumAsset = { id: string; url: string; order: number; width?: number | null; height?: number | null }
+export type AlbumAsset = {
+  id: string
+  url: string
+  order: number
+  type?: "image" | "video"
+  width?: number | null
+  height?: number | null
+}
 
 interface AlbumViewerOverlayProps {
   open: boolean
@@ -59,6 +66,14 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
   const totalAssets = assets?.length ?? 0
   const canPrev = index > 0
   const canNext = index < totalAssets - 1
+  const mediaItems = useMemo(
+    () =>
+      assets.map((asset) => ({
+        url: asset.url,
+        type: asset.type ?? inferAssetType(asset.url),
+      })),
+    [assets],
+  )
 
   if (!open) return null
 
@@ -128,14 +143,14 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
       ) : (
         <div className="flex flex-col h-full pt-12 pb-8 overflow-y-auto">
           <div className="flex-1 flex items-center justify-center mt-4">
-            <div className="relative flex items-center justify-center">
-              <ImageCarousel
-                images={assets.map((asset) => asset.url)}
+            <div className="relative flex items-center justify-center w-full">
+              <MediaCarousel
+                items={mediaItems}
                 currentIndex={index}
                 onIndexChange={onIndexChange}
                 // showControls={false}
-                className="w-screen max-w-[100vw] max-h-[85vh]"
-                imageClassName="max-h-[85vh]"
+                className="aspect-[4/6] w-[min(100vw,calc(85vh*4/6))] max-w-[100vw] max-h-[85vh]"
+                mediaClassName="max-h-full max-w-full"
                 fit="contain"
               />
               <span className="absolute right-0 top-0 rounded-full bg-black/70 px-2 py-1 text-xs font-medium text-white">
@@ -245,4 +260,11 @@ export default function AlbumViewerOverlay(props: AlbumViewerOverlayProps) {
       )}      
     </div>
   )
+}
+
+function inferAssetType(url: string): "image" | "video" {
+  const cleanUrl = url.split("?")[0]?.split("#")[0] ?? ""
+  const ext = cleanUrl.split(".").pop()?.toLowerCase()
+  if (ext === "mp4" || ext === "mov" || ext === "webm") return "video"
+  return "image"
 }

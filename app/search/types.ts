@@ -43,6 +43,7 @@ export type AssetItem = {
   id: string
   url: string
   order: number
+  type?: "image" | "video"
   width?: number | null
   height?: number | null
 }

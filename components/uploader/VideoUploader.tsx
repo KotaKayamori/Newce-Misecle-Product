@@ -18,6 +18,8 @@ const CATEGORY_OPTIONS: { value: VideoCategory; label: string }[] = [
 ]
 
 const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]
+const VIDEO_MIME_TYPES = ["video/mp4", "video/webm", "video/quicktime"]
+const ALBUM_MIME_TYPES = [...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES]
 const MAX_VIDEO_BYTES = 1024 * 1024 * 1024
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const STORE_INPUT_COUNT = 3
@@ -103,7 +105,7 @@ export default function VideoUploader() {
   const handlePhotoFiles = useCallback((files: FileList | null) => {
     if (!files) return
     const accepted = Array.from(files).filter((file) =>
-      IMAGE_MIME_TYPES.includes(file.type.toLowerCase()),
+      ALBUM_MIME_TYPES.includes(file.type.toLowerCase()),
     )
     if (!accepted.length) return
     setPhotoFiles((prev) => [...prev, ...accepted])
@@ -223,7 +225,7 @@ export default function VideoUploader() {
     setPhotoResult([])
 
     if (!photoFiles.length) {
-      setPhotoError("アップロードする写真を選択してください")
+      setPhotoError("アップロードする写真/動画を選択してください")
       setPhotoState("error")
       return
     }
@@ -266,12 +268,18 @@ export default function VideoUploader() {
       }
 
       const uploadedPaths: string[] = []
+      let coverCandidate: string | null = null
 
       for (const file of photoFiles) {
-        if (!IMAGE_MIME_TYPES.includes(file.type.toLowerCase())) {
+        const lowerType = file.type.toLowerCase()
+        const isVideo = VIDEO_MIME_TYPES.includes(lowerType)
+        if (!ALBUM_MIME_TYPES.includes(lowerType)) {
           throw new Error(`${file.name} は対応していないファイル形式です`)
         }
-        if (file.size > MAX_IMAGE_BYTES) {
+        if (isVideo && file.size > MAX_VIDEO_BYTES) {
+          throw new Error(`${file.name} が大きすぎます（1GB以下推奨）`)
+        }
+        if (!isVideo && file.size > MAX_IMAGE_BYTES) {
           throw new Error(`${file.name} が大きすぎます（1枚10MB以下推奨）`)
         }
 
@@ -316,19 +324,22 @@ export default function VideoUploader() {
           },
         ])
         if (assetErr) {
-          throw new Error(assetErr.message || "写真データの保存に失敗しました")
+          throw new Error(assetErr.message || "アルバムデータの保存に失敗しました")
         }
+        if (!isVideo && !coverCandidate) {
+          coverCandidate = path
+        }
+      }
 
-        if (uploadedPaths.length === 1) {
-          await fetch(`/api/guidebook/albums/${activeAlbumId}`, {
-            method: "PATCH",
-            headers: {
-              "content-type": "application/json",
-              Authorization: `Bearer ${accessToken}`,
-            },
-            body: JSON.stringify({ coverPath: path }),
-          }).catch(() => {})
-        }
+      if (coverCandidate) {
+        await fetch(`/api/guidebook/albums/${activeAlbumId}`, {
+          method: "PATCH",
+          headers: {
+            "content-type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ coverPath: coverCandidate }),
+        }).catch(() => {})
       }
 
       setPhotoResult(uploadedPaths)
@@ -348,7 +359,7 @@ export default function VideoUploader() {
       }
     } catch (err: any) {
       console.error("photo upload error", err)
-      setPhotoError(err?.message || "写真のアップロードに失敗しました")
+      setPhotoError(err?.message || "写真/動画のアップロードに失敗しました")
       setPhotoState("error")
     }
   }
@@ -400,8 +411,8 @@ export default function VideoUploader() {
     ? "アップロード中…"
     : isVideoMode
       ? "動画をアップロードする"
-      : isAlbumMode
-        ? "写真をアップロードする"
+    : isAlbumMode
+        ? "写真/動画をアップロードする"
         : "アップロードする"
 
   // フォーム無効化フラグ
@@ -434,9 +445,9 @@ export default function VideoUploader() {
                 type="file"
                 accept={
                   mode === "album"
-                    ? IMAGE_MIME_TYPES.join(",")
+                    ? ALBUM_MIME_TYPES.join(",")
                     : mode === "video"
-                      ? "video/mp4,video/webm,video/quicktime"
+                      ? VIDEO_MIME_TYPES.join(",")
                       : ""
                 }
                 multiple={mode === "album"}
@@ -587,11 +598,11 @@ export default function VideoUploader() {
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  {isAlbumMode ? "写真ファイル" : isVideoMode ? "動画ファイル" : "ファイル"}{" "}
+                  {isAlbumMode ? "写真/動画ファイル" : isVideoMode ? "動画ファイル" : "ファイル"}{" "}
                   <span className="text-red-500">*</span>
                 </label>
                 <div
-                  className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors ${
+                  className={`rounded-lg border-2 border-dashed p-6 text-center transition-colors w-full max-w-full overflow-hidden ${
                     dragOver ? "border-orange-500 bg-orange-50" : "border-gray-300 hover:border-gray-400"
                   } ${isUploading ? "pointer-events-none opacity-75" : "cursor-pointer"}`}
                   onClick={pickFile}
@@ -614,7 +625,7 @@ export default function VideoUploader() {
                     else handleVideoFiles(e.dataTransfer.files)
                   }}
                 >
-                  <div className="flex flex-col items-center gap-3">
+                  <div className="flex w-full max-w-full flex-col items-center gap-3">
                     {isUploading ? (
                       <Loader2 className="h-6 w-6 animate-spin text-orange-600" />
                     ) : (
@@ -648,30 +659,39 @@ export default function VideoUploader() {
                       <div className="w-full space-y-3">
                         <p className="text-sm text-gray-700 text-center">
                           {photoFiles.length
-                            ? "追加で写真を選択するにはクリックまたはドロップしてください"
+                            ? "追加で写真/動画を選択するにはクリックまたはドロップしてください"
                             : dragOver
                               ? "ここにドロップしてください"
-                              : "クリックまたはドラッグ＆ドロップで写真を選択（複数可）"}
+                              : "クリックまたはドラッグ＆ドロップで写真/動画を選択（複数可）"}
                         </p>
                         {photoFiles.length > 0 && (
-                          <ul className="space-y-2 text-left">
+                          <ul className="space-y-2 text-left w-full max-w-full">
                             {photoFiles.map((file, index) => (
                               <li
                                 key={`${file.name}-${index}`}
-                                className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2"
+                                className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 w-full max-w-full overflow-hidden"
                               >
                                 <div className="flex items-center gap-2 min-w-0 flex-1">
                                   <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden flex-shrink-0">
                                     {photoPreviews[index] ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img src={photoPreviews[index]} alt={file.name} className="w-full h-full object-cover" />
+                                      file.type.toLowerCase().startsWith("video/") ? (
+                                        <video
+                                          src={photoPreviews[index]}
+                                          className="w-full h-full object-cover"
+                                          muted
+                                          playsInline
+                                        />
+                                      ) : (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={photoPreviews[index]} alt={file.name} className="w-full h-full object-cover" />
+                                      )
                                     ) : (
                                       <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Preview</div>
                                     )}
                                   </div>
                                   <span className="truncate text-sm font-medium text-gray-700 block">{index + 1}. {file.name}</span>
                                 </div>
-                                <div className="flex items-center gap-1">
+                                <div className="flex items-center gap-1 flex-shrink-0">
                                   <button
                                     type="button"
                                     disabled={index === 0 || isUploading}
@@ -719,7 +739,7 @@ export default function VideoUploader() {
 
             <p className="text-xs text-gray-500">
               {isAlbumMode
-                ? "jpeg / png / webp（1枚10MB以下・複数可）"
+                ? "jpeg / png / webp（1枚10MB以下）・mp4 / webm / mov（1GB以下）"
                 : isVideoMode
                   ? "mp4 / webm / mov（上限1GB）"
                   : ""}
@@ -766,7 +786,7 @@ export default function VideoUploader() {
 
             {isAlbumMode && photoState === "success" && photoResult.length > 0 && (
               <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
-                <p className="text-sm font-medium text-green-700">✓ 写真アルバムのアップロードが完了しました</p>
+                <p className="text-sm font-medium text-green-700">✓ アルバムのアップロードが完了しました</p>
                 <ul className="space-y-1 text-sm text-gray-700">
                   {photoResult.map((path, index) => (
                     <li key={`${path}-${index}`} className="truncate">
