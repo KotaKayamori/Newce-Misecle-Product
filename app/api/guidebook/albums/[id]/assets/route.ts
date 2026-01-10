@@ -6,6 +6,15 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY
 const BUCKET = "photos"
 
+const VIDEO_EXTENSIONS = new Set(["mp4", "mov", "webm"])
+
+function inferAssetType(path: string | null | undefined): "image" | "video" {
+  if (!path) return "image"
+  const ext = path.split(".").pop()?.toLowerCase()
+  if (ext && VIDEO_EXTENSIONS.has(ext)) return "video"
+  return "image"
+}
+
 const createAdminClient = () => {
   if (SUPABASE_SERVICE_ROLE_KEY) {
     return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -36,6 +45,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       width: asset.width,
       height: asset.height,
       createdAt: asset.created_at,
+      type: inferAssetType(asset.storage_path),
       url: `${base}/storage/v1/object/public/${BUCKET}/${asset.storage_path}`,
     }))
 
