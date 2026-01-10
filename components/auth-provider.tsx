@@ -36,8 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // メール認証の場合は少し遅延を持たせる
         const hashParams = new URLSearchParams(window.location.hash.substring(1))
         const isEmailVerification = hashParams.get('type') === 'signup'
-        console.log("Is email verification:", isEmailVerification)
-        
+
         if (isEmailVerification) {
           setTimeout(() => setLoading(false), 500)
         } else {
@@ -51,11 +50,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // 認証状態の変更を監視
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, session?.user?.id)
-      
+    } = supabase.auth.onAuthStateChange(async (event, session) => {      
       if (event === 'SIGNED_IN') {
-        console.log('User signed in:', session?.user?.email)
+        console.log('User signed in')
       }
       
       if (event === 'SIGNED_OUT') {

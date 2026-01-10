@@ -16,7 +16,7 @@ export function CategoryTabs({
   if (isSearchMode) return null
 
   return (
-    <div className="mb-4">
+    <div>
       <div className="flex overflow-x-auto scrollbar-hide pb-2 gap-1">
         {categories.map((category) => (
           <button

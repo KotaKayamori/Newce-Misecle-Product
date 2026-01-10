@@ -46,9 +46,7 @@ export default function RegisterPage() {
       const type = hashParams.get('type')
       const accessToken = hashParams.get('access_token')
 
-      if (type === 'signup' && accessToken) {
-        console.log('Email verification detected on register page')
-        
+      if (type === 'signup' && accessToken) { 
         // URLをクリーンアップ
         window.history.replaceState({}, document.title, window.location.pathname)
         
@@ -59,7 +57,6 @@ export default function RegisterPage() {
         if (user) {
           const profileExists = await checkUserProfileExists(user.id)
           if (profileExists) {
-            console.log('Profile already exists, redirecting to search')
             router.push('/search')
             return
           }
@@ -208,14 +205,11 @@ export default function RegisterPage() {
   }
 
   const handleIconSetupComplete = async () => {
-    console.log("Icon setup completed:", iconChoice)
-
     // 画像がアップロードされている場合は、Storageにアップロード
     if (selectedImage && user && iconChoice === "upload") {
       const uploadedUrl = await uploadImageToStorage(selectedImage, user.id)
       if (uploadedUrl) {
         setAvatarUrl(uploadedUrl)
-        console.log("Avatar URL set:", uploadedUrl)
       } else {
         // アップロードに失敗した場合は、iconChoiceをリセット
         setIconChoice("")

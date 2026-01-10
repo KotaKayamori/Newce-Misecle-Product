@@ -23,12 +23,6 @@ export interface AlbumRow {
   created_at: string
 }
 
-export interface OwnerProfile {
-  username?: string | null
-  display_name?: string | null
-  avatar_url?: string | null
-}
-
 export interface ReservationFormData {
   name: string
   people: number

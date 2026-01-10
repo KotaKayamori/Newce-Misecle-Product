@@ -493,14 +493,14 @@ export default function VideoUploader() {
                 />
               </div>
 
-              {/* { changed code } カテゴリUIを複数選択(チェックボックス)に */}
+              {/* カテゴリUIを複数選択(チェックボックス)に（アルバムでも選択可能） */}
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700">
                   カテゴリ <span className="text-red-500">*</span>
                   <span className="ml-2 text-xs text-gray-500">(複数選択可)</span>
                 </label>
 
-                <div className={`grid grid-cols-1 gap-2 sm:grid-cols-2 ${isAlbumMode ? "opacity-60 pointer-events-none" : ""}`}>
+                <div className={`grid grid-cols-1 gap-2 sm:grid-cols-2`}>
                   {CATEGORY_OPTIONS.map((opt) => {
                     const checked = categories.includes(opt.value)
                     return (
@@ -508,7 +508,6 @@ export default function VideoUploader() {
                         <input
                           type="checkbox"
                           className="h-4 w-4"
-                          disabled={isAlbumMode}
                           checked={checked}
                           onChange={(e) => {
                             setCategories((prev) => {
@@ -525,10 +524,6 @@ export default function VideoUploader() {
                     )
                   })}
                 </div>
-
-                {isAlbumMode && (
-                  <p className="text-xs text-gray-500">アルバムではカテゴリ選択は不要です</p>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -786,7 +781,12 @@ export default function VideoUploader() {
 
             {isAlbumMode && photoState === "success" && photoResult.length > 0 && (
               <div className="space-y-3 rounded-md border border-green-200 bg-green-50 p-4">
-                <p className="text-sm font-medium text-green-700">✓ アルバムのアップロードが完了しました</p>
+                <p className="text-sm font-medium text-green-700">✓ 写真アルバムのアップロードが完了しました</p>
+                {categories.length > 0 && (
+                  <p className="text-sm">
+                    カテゴリ: {categories.map((v) => CATEGORY_OPTIONS.find((o) => o.value === v)?.label || v).join("、")}
+                  </p>
+                )}
                 <ul className="space-y-1 text-sm text-gray-700">
                   {photoResult.map((path, index) => (
                     <li key={`${path}-${index}`} className="truncate">

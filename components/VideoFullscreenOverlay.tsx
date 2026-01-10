@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Heart, Bookmark, Send } from "lucide-react"
 import { useLike } from "@/hooks/useLike"
 import { useVisualViewportVars } from "@/hooks/useVisualViewportVars"
+import * as gtag from "@/lib/gtag"
 
 export interface FullscreenVideoData {
   id: string
@@ -255,6 +256,26 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
     }
   }, [video.playback_url, isSeeking])
 
+  // 予約ボタンクリック時の計測
+  const handleReserveClick = () => {
+    gtag.event({
+      action: 'click_reserve',
+      category: 'engagement',
+      label: `video_id:${video.id}`,
+    });
+    onReserve?.();
+  };
+
+  // もっと見るボタンクリック時の計測
+  const handleMoreClick = () => {
+    gtag.event({
+      action: 'click_more_info',
+      category: 'engagement',
+      label: `video_id:${video.id}`,
+    });
+    onMore?.();
+  };
+
   const progress = duration ? seekPercent : 0
 
   if (!open) return null
@@ -400,10 +421,10 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       {/* Bottom CTA */}
       <div className="absolute left-0 right-0 px-4 z-30 bottom-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px)+32px)]">
         <div className="flex gap-2">
-          <button type="button" onClick={onReserve} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
+          <button type="button" onClick={handleReserveClick} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
             今すぐ予約する
           </button>
-          <button type="button" onClick={onMore} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
+          <button type="button" onClick={handleMoreClick} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
             もっと見る…
           </button>
         </div>
@@ -411,7 +432,7 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
 
       {/* ★ 動画とフッターの“間”にシークバーを配置 */}
       <div className="absolute inset-x-0 z-30 bottom-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px))]">
-        <div className="w-full h-8 flex items-center">
+        <div className="w-full h-1 flex items-center">
           <div
             ref={seekContainerRef}
             className="relative w-full h-full touch-pan-x select-none"

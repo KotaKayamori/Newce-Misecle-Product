@@ -3,7 +3,7 @@
 import Navigation from "@/components/navigation"
 import { FilterModal } from "./components/modals/FilterModal"
 import { UserProfileModal } from "./components/modals/UserProfileModal"
-import { StoreDetailModal } from "./components/modals/StoreDetailModal"
+import { StoreDetailModal } from "@/components/modals/StoreDetailModal"
 import { ReservationModal } from "./components/modals/ReservationModal"
 import { SearchControls } from "./components/SearchControls"
 import { SearchResultsSection } from "./components/SearchResultsSection"
@@ -28,7 +28,8 @@ import { useBookmark } from "@/hooks/useBookmark"
 import AlbumViewerOverlay from "../../components/AlbumViewerOverlay"
 import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import ReelsScreen from "@/screens/ReelsScreen"
-import type { RestaurantInfo } from "./types"
+import MixedFeedSection from "./components/MixedFeedSection"
+import type { RestaurantInfo, AlbumItem, OwnerProfile } from "@/lib/types"
 
 type SupabaseVideoRow = {
   id: string
@@ -55,7 +56,6 @@ const CATEGORY_SLUG_MAP: Record<string, string> = {
   "人気急上昇中のお店": "popular_now",
   "SNSで人気のお店": "sns_popular",
   "若年層に人気のお店": "gen_z_popular",
-  "デートにおすすめ": "date_recommended",
   "デートにおすすめのお店": "date_recommended",
 }
 
@@ -67,7 +67,11 @@ function resolveCategorySlug(category?: string | null) {
 export default function SearchPage() {
   const router = useRouter()
   const { videos, loading, error, fetchVideos, refreshVideos } = useRandomVideos()
-  
+  const [allVideos, setAllVideos] = useState<VideoData[]>([])
+  const [hasMore, setHasMore] = useState(true)
+  const observerRef = useRef<HTMLDivElement | null>(null)
+  const [page, setPage] = useState(1)
+
   // Custom hooks
   const filters = useFilters()
   const search = useSearchVideos()
@@ -82,8 +86,8 @@ export default function SearchPage() {
     "SNSで人気のお店",
     "若年層に人気のお店",
     "デートにおすすめのお店",
-    "最新動画",
-    "ガイドブック",
+    // "最新動画",
+    // "ガイドブック",
   ]
   const [selectedCategory, setSelectedCategory] = useState("あなたにおすすめ")
   const isLatestCategory = selectedCategory === "最新動画"
@@ -91,6 +95,183 @@ export default function SearchPage() {
   
   // Albums hook
   const albums = useAlbums(isGuidebookCategory)
+  const [openAlbumMeta, setOpenAlbumMeta] = useState<AlbumItem | null>(null)
+  const [allAlbums, setAllAlbums] = useState<AlbumItem[]>([])
+  const [albumPage, setAlbumPage] = useState(1)
+  const [hasMoreAlbums, setHasMoreAlbums] = useState(true)
+  const albumObserverRef = useRef<HTMLDivElement | null>(null)
+
+  const [randomAlbums, setRandomAlbums] = useState<AlbumItem[]>([])
+  const [albumsLoadingMixed, setAlbumsLoadingMixed] = useState(false)
+  const [albumBookmarkedSetMixed, setAlbumBookmarkedSetMixed] = useState<Set<string>>(new Set())
+
+  // fetch random albums
+  const fetchRandomAlbums = useCallback(async (count: number = 6) => {
+    setAlbumsLoadingMixed(true)
+    try {
+      const res = await fetch(`/api/guidebook/albums?random=${count}`, { cache: "no-store" })
+      if (!res.ok) throw new Error("アルバムの取得に失敗しました")
+      const json = await res.json().catch(() => ({}))
+      const items: AlbumItem[] = Array.isArray(json?.items) ? json.items : []
+      setRandomAlbums((prev) => {
+        const seen = new Set(prev.map((a) => a.id))
+        const merged = [...prev, ...items.filter((a) => !seen.has(a.id))]
+        return merged
+      })
+      // ブクマ初期状態（任意・可能なら）
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user && items.length) {
+        const ids = items.map((a) => a.id)
+        const { data, error } = await supabase
+          .from("photo_album_bookmarks").select("album_id")
+          .eq("user_id", user.id).in("album_id", ids)
+        if (!error && data) {
+          setAlbumBookmarkedSetMixed((prev) => {
+            const s = new Set(prev)
+            ;(data as any[]).forEach((r) => s.add(r.album_id))
+            return s
+          })
+        }
+      }
+    } finally {
+      setAlbumsLoadingMixed(false)
+    }
+  }, [])
+
+  // 初期化・タブ切替（通常カテゴリ時のみアルバムも準備）
+  useEffect(() => {
+    setAllVideos([]); setPage(1); setHasMore(true)
+    setRandomAlbums([]); setAlbumBookmarkedSetMixed(new Set())
+    const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    fetchVideos(categorySlug, 10).then((newVideos) => { if (newVideos?.length) setAllVideos(newVideos) })
+    if (!isLatestCategory && !isGuidebookCategory) {
+      fetchRandomAlbums(6)
+    }
+  }, [selectedCategory])
+
+  // 追加取得（動画スクロールに合わせてアルバムも補充）
+  const loadMore = useCallback(() => {
+    if (loading || !hasMore) return
+    const categorySlug = selectedCategory === "あなたにおすすめ" ? undefined : resolveCategorySlug(selectedCategory)
+    fetchVideos(categorySlug, 10, page * 10).then((newVideos) => {
+      if (newVideos?.length) {
+        setAllVideos((prev) => [...prev, ...newVideos])
+        setPage((p) => p + 1)
+        if (newVideos.length < 10) setHasMore(false)
+      } else {
+        setHasMore(false)
+      }
+    })
+    if (!isLatestCategory && !isGuidebookCategory) {
+      fetchRandomAlbums(3) // 追随で少量追加
+    }
+  }, [loading, hasMore, page, fetchVideos, selectedCategory, isLatestCategory, isGuidebookCategory, fetchRandomAlbums])
+
+
+  // Intersection Observer
+  useEffect(() => {
+    if (!observerRef.current || !hasMore) return
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMore()
+        }
+      },
+      { threshold: 1 }
+    )
+    observer.observe(observerRef.current)
+    return () => observer.disconnect()
+  }, [observerRef, loadMore, hasMore])
+
+  useEffect(() => {
+    if (!isGuidebookCategory) return
+    setAllAlbums([])
+    setAlbumPage(1)
+    setHasMoreAlbums(true)
+    albums.fetchAlbums(10, 0).then((newAlbums) => {
+      if (Array.isArray(newAlbums) && newAlbums.length > 0) {
+        setAllAlbums(newAlbums)
+      }
+    })
+  }, [selectedCategory])
+
+  // 3. 追加取得
+  const loadMoreAlbums = useCallback(() => {
+    if (!hasMoreAlbums || albums.albumsLoading) return
+    albums.fetchAlbums(10, albumPage * 10).then((newAlbums) => {
+      if (Array.isArray(newAlbums) && newAlbums.length > 0) {
+        setAllAlbums((prev) => [...prev, ...newAlbums])
+        setAlbumPage((p) => p + 1)
+        if (newAlbums.length < 10) setHasMoreAlbums(false)
+      } else {
+        setHasMoreAlbums(false)
+      }
+    })
+  }, [hasMoreAlbums, albumPage, albums])
+
+  // 4. Intersection Observer
+  useEffect(() => {
+    if (!albumObserverRef.current || !hasMoreAlbums) return
+    const observer = new window.IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadMoreAlbums()
+        }
+      },
+      { threshold: 1 }
+    )
+    observer.observe(albumObserverRef.current)
+    return () => observer.disconnect()
+  }, [albumObserverRef, loadMoreAlbums, hasMoreAlbums])
+
+  useEffect(() => {
+    // 検索取得
+    if (search.searchResults?.albums) {
+      albums.albums = search.searchResults.albums;
+    }
+  }, [search.searchResults]);
+
+  // インターリーブ
+  type MixedItem = { kind:"video"; video: VideoData } | { kind:"album"; album: AlbumItem }
+  const mixedItems: MixedItem[] = useMemo(() => {
+    const v = allVideos.slice()
+    const a = randomAlbums.slice()
+    const out: MixedItem[] = []
+    const ratio = 3 // 動画3:アルバム1
+    let vi = 0, ai = 0
+    while (vi < v.length || ai < a.length) {
+      for (let i = 0; i < ratio && vi < v.length; i++) out.push({ kind: "video", video: v[vi++] })
+      if (ai < a.length) out.push({ kind: "album", album: a[ai++] })
+    }
+    return out
+  }, [allVideos, randomAlbums])
+
+  // アルバムのブクマ切替（楽観更新）
+  const toggleAlbumBookmarkMixed = useCallback(async (albumId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation()
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const accessToken = session?.access_token
+      if (!accessToken) { router.push("/auth/login"); return }
+      setAlbumBookmarkedSetMixed((prev) => {
+        const s = new Set(prev)
+        s.has(albumId) ? s.delete(albumId) : s.add(albumId)
+        return s
+      })
+      await fetch(`/api/guidebook/albums/${albumId}/bookmarks`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      })
+    } catch {
+      // 失敗時はロールバック
+      setAlbumBookmarkedSetMixed((prev) => {
+        const s = new Set(prev)
+        s.has(albumId) ? s.delete(albumId) : s.add(albumId)
+        return s
+      })
+    }
+  }, [router])
+
   const [showUserProfile, setShowUserProfile] = useState(false)
   const [selectedUser, setSelectedUser] = useState<
     | {
@@ -169,7 +350,7 @@ export default function SearchPage() {
   const [selectedVideo, setSelectedVideo] = useState<SupabaseVideoRow | null>(null)
   const [showReelsFromSearch, setShowReelsFromSearch] = useState(false)
   const [videoLikeCounts, setVideoLikeCounts] = useState<Record<string, number>>({})
-  const [ownerProfiles, setOwnerProfiles] = useState<Record<string, { username?: string | null; display_name?: string | null; avatar_url?: string | null }>>({})
+  const [ownerProfiles, setOwnerProfiles] = useState<Record<string, OwnerProfile>>({})
   const [fullscreenMuted, setFullscreenMuted] = useState(false)
   const fullscreenVideoRef = useRef<HTMLVideoElement | null>(null)
   const fullscreenScrollLockRef = useRef<{
@@ -198,6 +379,19 @@ export default function SearchPage() {
     setShowFullscreenVideo(false)
     setShowReelsFromSearch(true)
   }
+
+  // 検索中は検索結果、そうでなければランダム取得
+  const displayAlbums = search.didSearch && search.searchResults.albums.length > 0
+    ? search.searchResults.albums
+    : albums.albums;
+
+  // AlbumViewerOverlayの各種情報取得もdisplayAlbumsから
+  const openAlbum = albums.openAlbumId
+    ? displayAlbums.find((a) => a.id === albums.openAlbumId)
+    : null;
+
+  // Overlayに渡すデータはメタ優先で統合
+  const effectiveAlbum = openAlbumMeta ?? openAlbum
 
   // Fullscreen overlay interactions (like/favorite)
   const [likedVideoIds, setLikedVideoIds] = useState<Set<string>>(new Set())
@@ -262,6 +456,7 @@ export default function SearchPage() {
       setOwnerProfiles((prev) => {
         const existing = prev[video.user!.id!]
         const nextProfile = {
+          id: video.user!.id!,
           username: video.user?.username,
           display_name: video.user?.name,
           avatar_url: video.user?.avatar_url ?? null,
@@ -332,7 +527,7 @@ export default function SearchPage() {
           setOwnerProfiles((prev) => {
             const next = { ...prev }
             ;(profileRows as any[]).forEach((p) => {
-              next[p.id] = { username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
+              next[p.id] = { id: p.id, username: p.username, display_name: p.display_name, avatar_url: p.avatar_url }
             })
             return next
           })
@@ -406,7 +601,6 @@ export default function SearchPage() {
     fetchVideos(categorySlug, 10)
   }, [selectedCategory, fetchVideos])
 
-
   useEffect(() => {
     if (showFullscreenVideo) {
       setFullscreenMuted(false)
@@ -429,14 +623,17 @@ export default function SearchPage() {
   }, [fullscreenMuted])
 
   useEffect(() => {
-    if (videos.length === 0) return
+    // 監視対象を allVideos に変更
+    if (allVideos.length === 0) return
+
     setOwnerProfiles((prev) => {
       let changed = false
       const next = { ...prev }
-      videos.forEach((video) => {
+      allVideos.forEach((video) => { // videos ではなく allVideos をループ
         const user = video.user
         if (user?.id) {
           const nextProfile = {
+            id: user.id,
             username: user.username,
             display_name: user.name,
             avatar_url: user.avatar_url ?? null,
@@ -455,7 +652,7 @@ export default function SearchPage() {
       })
       return changed ? next : prev
     })
-  }, [videos])
+  }, [allVideos])
 
   useEffect(() => {
     if (typeof document === "undefined") return
@@ -591,19 +788,22 @@ export default function SearchPage() {
               onClear={handleClearSearch}
               onRetry={() => search.performSearch(searchTerm)}
               onSelectVideo={selectSupabaseVideo}
+              onSelectAlbum={albums.openAlbum}
               onToggleFavorite={toggleFavorite}
             />
 
-            <CategoryVideosSection
+            <MixedFeedSection
               visible={!search.didSearch && !isLatestCategory && !isGuidebookCategory}
-              categoryLabel={selectedCategory}
-              videos={videos}
-              loading={loading}
-              error={error}
+              items={mixedItems}
               bookmarkedVideoIds={bookmarkedVideoIds}
-              onRefresh={handleRefreshVideos}
+              albumBookmarkedSet={albumBookmarkedSetMixed}
               onVideoSelect={openRandomVideoFullscreen}
-              onToggleFavorite={toggleFavorite}
+              onOpenAlbum={(album) => {
+                setOpenAlbumMeta(album)
+                albums.openAlbum(album.id)
+              }}
+              onToggleVideoBookmark={toggleFavorite}
+              onToggleAlbumBookmark={toggleAlbumBookmarkMixed}
             />
 
             <LatestVideosSection
@@ -617,7 +817,7 @@ export default function SearchPage() {
             <GuidebookSection
               visible={!search.didSearch && isGuidebookCategory}
               categoryLabel={selectedCategory}
-              albums={albums.albums}
+              albums={allAlbums}
               loading={albums.albumsLoading}
               error={albums.albumsError}
               albumBookmarkedSet={albums.albumBookmarkedSet}
@@ -625,6 +825,18 @@ export default function SearchPage() {
               onOpenAlbum={albums.openAlbum}
               onToggleBookmark={albums.toggleAlbumBookmark}
             />
+
+            <div ref={observerRef} style={{ height: 1 }} />
+            {/* Loading indicator */}
+            {loading && hasMore && !search.didSearch && !isLatestCategory && !isGuidebookCategory && (
+              <div className="flex justify-center items-center py-8">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-8 h-8 border-4 border-gray-200 border-t-orange-500 rounded-full animate-spin"></div>
+                  <p className="text-sm text-gray-500">読み込み中...</p>
+                </div>
+              </div>
+            )}
+            <div ref={albumObserverRef} style={{ height: 1 }} />
           </div>
         </div>
       )}
@@ -682,16 +894,19 @@ export default function SearchPage() {
         assets={albums.albumAssets}
         index={albums.albumIndex}
         loading={albums.albumLoading}
-        onClose={albums.closeAlbum}
+        onClose={() => { 
+          albums.closeAlbum()
+          setOpenAlbumMeta(null)
+        }}
         onIndexChange={(nextIndex) => {
           const clamped = Math.max(0, Math.min(nextIndex, albums.albumAssets.length - 1))
           albums.setAlbumIndex(clamped)
         }}
-        title={albums.albums.find((a) => a.id === albums.openAlbumId)?.title || albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
-        ownerAvatarUrl={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.avatarUrl ?? null}
-        ownerLabel={(() => { const a = albums.albums.find((x) => x.id === albums.openAlbumId); const o = a?.owner; return o?.username ? `@${o.username}` : (o?.displayName || null) })()}
-        ownerUserId={albums.albums.find((a) => a.id === albums.openAlbumId)?.owner?.id || null}
-        description={albums.albums.find((a) => a.id === albums.openAlbumId)?.description || null}
+        title={effectiveAlbum?.title || null}
+        ownerAvatarUrl={effectiveAlbum?.owner?.avatarUrl ?? null}
+        ownerLabel={effectiveAlbum?.owner?.username ? `@${effectiveAlbum.owner.username}` : (effectiveAlbum?.owner?.displayName || null)}
+        ownerUserId={effectiveAlbum?.owner?.id || null}
+        description={effectiveAlbum?.description || null}
         liked={albums.openAlbumId ? albums.albumLikedSet.has(albums.openAlbumId) : false}
         onToggleLike={() => { if (albums.openAlbumId) albums.toggleAlbumLike(albums.openAlbumId) } }
         bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}

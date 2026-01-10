@@ -1,7 +1,7 @@
 "use client"
 
 import { Card, CardContent } from "@/components/ui/card"
-import { Bookmark, User } from "lucide-react"
+import { Bookmark, User, Play } from "lucide-react"
 import { useRouter } from "next/navigation"
 import React from "react"
 
@@ -67,7 +67,7 @@ export default function VideoCard(props: VideoCardProps) {
 
   return (
     <Card
-      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+      className="overflow-hidden cursor-pointer hover:shadow-md transition-shadow border-none shadow-none"
       aria-label={cardAriaLabel}
       title={cardTitleAttribute}
     >
@@ -101,21 +101,23 @@ export default function VideoCard(props: VideoCardProps) {
             />
           )}
 
-          {showTopBookmark && (
-            <div className="absolute top-2 right-2 z-10">
-              <button
-                type="button"
-                onClick={(e) => onToggleBookmark?.(e)}
-                className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
-                aria-label={isBookmarked ? "ブックマーク解除" : "ブックマーク"}
-              >
-                <Bookmark className={`w-4 h-4 ${isBookmarked ? "fill-orange-500 text-orange-500" : "text-white"}`} />
-              </button>
-            </div>
-          )}
+          {/* Play button in top-right */}
+          <div className="absolute top-2 right-2 z-10">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onClickCard?.()
+              }}
+              className="p-2 rounded-full bg-black/50 hover:bg-black/70 transition"
+              aria-label="再生"
+            >
+              <Play className="w-4 h-4 text-white fill-white" />
+            </button>
+          </div>
 
-          {/* Play overlay */}
-          <div
+          {/* Play overlay (center) */}
+          {/* <div
             className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 hover:bg-opacity-30 transition-all cursor-pointer rounded-t-lg"
             onClick={(e) => {
               e.stopPropagation()
@@ -125,7 +127,7 @@ export default function VideoCard(props: VideoCardProps) {
             <div className="w-16 h-16 bg-white bg-opacity-90 rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all">
               <div className="w-0 h-0 border-l-[20px] border-l-gray-800 border-t-[12px] border-t-transparent border-b-[12px] border-b-transparent ml-1"></div>
             </div>
-          </div>
+          </div> */}
         </div>
 
         {footer ? (

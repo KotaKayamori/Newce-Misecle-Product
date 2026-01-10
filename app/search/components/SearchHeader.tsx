@@ -1,12 +1,13 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus } from "lucide-react"
 import { Search } from "lucide-react"
 import { SearchHistory } from "./SearchHistory"
 import { useRouter } from "next/navigation"
+import type { OwnerProfile } from "@/lib/types"
 import { supabase } from "@/lib/supabase"
 
 interface SearchHeaderProps {
@@ -36,6 +37,67 @@ export function SearchHeader({
   onPopularKeywordsRefresh,
   onKeywordSelect,
 }: SearchHeaderProps) {
+  // アカウント候補のstate
+  const [accountSuggestions, setAccountSuggestions] = useState<OwnerProfile[]>([])
+  const [accountLoading, setAccountLoading] = useState(false)
+  const [accountError, setAccountError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setAccountSuggestions([])
+      setAccountError(null)
+      return
+    }
+    setAccountLoading(true)
+    setAccountError(null)
+    // Supabaseで部分一致検索
+    supabase
+      .from("allowed_uploaders")
+      .select("user_id")
+      .then(({ data: allowed, error: allowedError }) => {
+        if (allowedError) {
+          console.error(allowedError)
+          setAccountError("アカウント候補の取得に失敗しました")
+          setAccountSuggestions([])
+          setAccountLoading(false)
+          return
+        }
+        // 除外したいID
+        const excludeId = "e47816e8-9b90-4498-9ac9-59ff61e80eef"
+        // 除外IDを除いたリストを作成
+        const allowedIds = (allowed || [])
+          .map((row: any) => row.user_id)
+          .filter((id: string) => id !== excludeId)
+        if (allowedIds.length === 0) {
+          setAccountSuggestions([])
+          setAccountLoading(false)
+          return
+        }
+        supabase
+          .from("user_profiles")
+          .select("id, username, name, avatar_url")
+          .in("id", allowedIds)
+          .or(`username.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`)
+          .limit(10)
+          .then(({ data, error }) => {
+            if (error) {
+              setAccountError("アカウント候補の取得に失敗しました")
+              setAccountSuggestions([])
+            } else {
+              setAccountSuggestions(
+                (data || []).map((u: any) => ({
+                  id: u.id,
+                  username: u.username || "",
+                  display_name: u.name || u.username || "名無し",
+                  avatar_url: u.avatar_url || undefined,
+                }))
+              )
+            }
+            setAccountLoading(false)
+          })
+      })
+  }, [searchTerm])
+
   const handleCloseModal = () => {
     if (!searchTerm.trim()) {
       onClearSearch()
@@ -60,6 +122,20 @@ export function SearchHeader({
       router.push("/auth/login?redirect=/upload")
     }
   }
+
+  // 仮の候補データ
+  const wordSuggestions = useMemo(
+    () =>
+      searchTerm
+        ? [
+            searchTerm,
+            searchTerm + " ランチ",
+            searchTerm + " カフェ",
+            searchTerm + " おすすめ",
+          ]
+        : [],
+    [searchTerm]
+  )
 
   return (
     <div className="bg-white px-4 py-4">
@@ -87,24 +163,26 @@ export function SearchHeader({
         </Button>
       </div>
 
-      {/* 検索バー直下の人気キーワード */}
-      <div className="mt-1 -mx-6">
-        <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4">
-          <div className="flex gap-2 whitespace-nowrap">
-            {popularKeywordsSets?.map((keyword) => (
-              <button
-                key={keyword}
-                type="button"
-                onClick={() => onKeywordSelect(keyword)}
-                className="px-2 py-1.5 text-xs rounded-full border border-gray-300 bg-white text-black hover:bg-gray-50 flex items-center gap-1 flex-shrink-0"
-              >
-                <Search className="w-4 h-4 text-gray-400" />
-                <span>{keyword}</span>
-              </button>
-            ))}
+      {/* 検索バー直下の人気キーワード（入力中は非表示） */}
+      {(!searchTerm || !isSearchMode) && (
+        <div className="mt-1 -mx-6">
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide px-4">
+            <div className="flex gap-2 whitespace-nowrap">
+              {popularKeywordsSets?.map((keyword) => (
+                <button
+                  key={keyword}
+                  type="button"
+                  onClick={() => onKeywordSelect(keyword)}
+                  className="px-2 py-1.5 text-xs rounded-full border border-gray-300 bg-white text-black hover:bg-gray-50 flex items-center gap-1 flex-shrink-0"
+                >
+                  <Search className="w-4 h-4 text-gray-400" />
+                  <span>{keyword}</span>
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {isSearchMode && (
         <>
@@ -145,15 +223,72 @@ export function SearchHeader({
             {didSearch && <p className="text-sm text-gray-500">現在の検索結果を表示中です</p>}
 
             <div className="flex-1 overflow-y-auto">
-              <SearchHistory
-                isSearchMode
-                popularKeywordsSets={popularKeywordsSets}
-                onPopularKeywordsRefresh={onPopularKeywordsRefresh}
-                onKeywordSelect={(keyword) => {
-                  onKeywordSelect(keyword)
-                  onSearchModeChange(false)
-                }}
-              />
+              {/* 入力中は候補を表示、未入力なら人気キーワード */}
+              {searchTerm ? (
+                <div className="space-y-6 max-h-[60vh] overflow-y-auto scrollbar-hide bg-white px-2 py-2">
+                  {/* 検索ワード候補 */}
+                  <div>
+                    <h3 className="text-sm font-bold text-black mb-2">検索ワード候補</h3>
+                    <div className="flex flex-col gap-1">
+                      {wordSuggestions.map((word, idx) => (
+                        <button
+                          key={word + idx}
+                          onClick={() => {
+                            onSearchChange(word)
+                            onSearchSubmit()
+                            onSearchModeChange(false)
+                          }}
+                          className="text-left px-3 py-2 rounded hover:bg-gray-100 text-black"
+                        >
+                          {word}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {/* アカウント候補 */}
+                  <div>
+                    <h3 className="text-sm font-bold text-black mb-2">アカウント候補</h3>
+                    {accountLoading && <div className="text-gray-400 text-sm px-3 py-2">検索中...</div>}
+                    {accountError && <div className="text-red-500 text-sm px-3 py-2">{accountError}</div>}
+                    <div className="flex flex-col gap-1">
+                      {accountSuggestions.map((acc, idx) => (
+                        <button
+                          key={acc.id + idx}
+                          onClick={() => {
+                            router.push(`/profile/${acc.id}`)
+                            onSearchModeChange(false)
+                          }}
+                          className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-100 text-black"
+                        >
+                          <img
+                            src={acc.avatar_url || "/images/misecle-mascot.png"}
+                            alt={acc.display_name ?? acc.username ?? "user avatar"}
+                            className="w-8 h-8 rounded-full object-cover border border-gray-200 bg-white flex-shrink-0"
+                          />
+                          {/* 右側：2段表示 */}
+                          <div className="flex flex-col items-start">
+                            <span className="font-bold text-sm">{acc.display_name || acc.username}</span>
+                            <span className="text-xs text-gray-500">@{acc.username}</span>
+                          </div>
+                        </button>
+                      ))}
+                      {!accountLoading && !accountError && accountSuggestions.length === 0 && (
+                        <div className="text-gray-400 text-sm px-3 py-2">該当するアカウントがありません</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <SearchHistory
+                  isSearchMode
+                  popularKeywordsSets={popularKeywordsSets}
+                  onPopularKeywordsRefresh={onPopularKeywordsRefresh}
+                  onKeywordSelect={(keyword) => {
+                    onKeywordSelect(keyword)
+                    onSearchModeChange(false)
+                  }}
+                />
+              )}
             </div>
           </div>
         </>

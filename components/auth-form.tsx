@@ -46,8 +46,6 @@ export function AuthForm() {
       const accessToken = hashParams.get('access_token')
       const type = hashParams.get('type')
 
-      console.log('AuthForm: URL parameters:', { type, accessToken: !!accessToken })
-
       if (type === 'signup' && accessToken) {
         console.log('AuthForm: Email verification detected, redirecting to register page')
         router.push(`/register${window.location.hash}`)
@@ -221,8 +219,6 @@ export function AuthForm() {
         throw new Error("現在はメールアドレスでの登録のみサポートしています")
       }
 
-      console.log("Attempting to sign up with:", registrationData.contact)
-
       const { data, error } = await supabase.auth.signUp({
         email: registrationData.contact,
         password: registrationData.password,
@@ -230,8 +226,6 @@ export function AuthForm() {
           emailRedirectTo: `${window.location.origin}/register`
         }
       })
-
-      console.log("Sign up result:", { data, error })
 
       if (error) {
         // Supabaseからの重複エラーもキャッチ
@@ -246,14 +240,12 @@ export function AuthForm() {
       }
 
       if (!data.session && data.user && !data.user.email_confirmed_at) {
-        console.log("Email verification required")
         setPendingEmail(registrationData.contact)
         setShowEmailVerification(true)
         setShowRegistration(false)
         return
       }
 
-      console.log("Registration completed, proceeding to name setup")
       setShowRegistration(false)
     } catch (error: any) {
       console.error("Registration error:", error)

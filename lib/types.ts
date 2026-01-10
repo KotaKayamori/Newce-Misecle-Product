@@ -93,11 +93,13 @@ export interface AlbumRow {
   owner_id: string
   title: string | null
   caption: string | null
+  categories: string[] | null
   cover_path: string | null
   created_at: string
 }
 
 export interface OwnerProfile {
+  id: string
   username?: string | null
   display_name?: string | null
   avatar_url?: string | null
@@ -110,4 +112,9 @@ export interface ReservationFormData {
   time: string
   seatType: string
   message: string
+}
+
+export type SearchResults = {
+  videos: SupabaseVideoRow[]
+  albums: AlbumItem[]
 }
