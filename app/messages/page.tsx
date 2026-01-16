@@ -185,8 +185,6 @@ export default function MessagesPage() {
           </TabsContent>
         </Tabs>
       </div>
-
-      <Navigation />
     </div>
   )
 }

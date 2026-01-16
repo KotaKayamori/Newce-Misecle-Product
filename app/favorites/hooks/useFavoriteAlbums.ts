@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import type { AlbumRow, OwnerProfile } from "@/app/favorites/types"
+import type { AlbumRow, OwnerProfile } from "@/lib/types"
 
 export function useFavoriteAlbums() {
   const router = useRouter()
@@ -100,6 +100,7 @@ export function useFavoriteAlbums() {
             const next = { ...prev }
             ;(data as any[]).forEach((profile) => {
               next[profile.id] = {
+                id: profile.id,
                 username: profile.username,
                 display_name: profile.display_name,
                 avatar_url: profile.avatar_url,

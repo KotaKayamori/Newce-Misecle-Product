@@ -116,7 +116,6 @@ export default function BookmarksPage() {
           <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
           <p>ブックマークを読み込み中...</p>
         </div>
-        <Navigation />
       </div>
     )
   }
@@ -134,7 +133,6 @@ export default function BookmarksPage() {
             再試行
           </Button>
         </div>
-        <Navigation />
       </div>
     )
   }
@@ -154,7 +152,6 @@ export default function BookmarksPage() {
             動画を探す
           </Button>
         </div>
-        <Navigation />
       </div>
     )
   }
@@ -416,8 +413,6 @@ export default function BookmarksPage() {
           setShowReservationModal(true)
         }}
       />
-
-      <Navigation />
     </div>
   )
 }

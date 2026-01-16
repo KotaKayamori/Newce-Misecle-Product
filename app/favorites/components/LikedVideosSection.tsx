@@ -4,7 +4,7 @@ import { Play } from "lucide-react"
 import VideoCard from "@/components/VideoCard"
 import { FALLBACK_VIDEO_URL } from "@/lib/media"
 import { derivePosterUrl } from "@/lib/media"
-import type { FavoriteVideo, OwnerProfile } from "@/app/favorites/types"
+import type { FavoriteVideo, OwnerProfile } from "@/lib/types"
 
 interface LikedVideosSectionProps {
   videos: FavoriteVideo[] | null

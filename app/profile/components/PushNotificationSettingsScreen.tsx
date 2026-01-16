@@ -25,8 +25,6 @@ export function PushNotificationSettingsScreen({ onClose }: PushNotificationSett
           <button className="text-blue-600 hover:text-blue-700 transition-colors">通知設定を開く</button>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

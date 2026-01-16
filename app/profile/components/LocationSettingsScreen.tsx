@@ -26,8 +26,6 @@ export function LocationSettingsScreen({ onClose }: LocationSettingsScreenProps)
           <button className="text-blue-600 hover:text-blue-700 transition-colors">位置情報の取得を許可する</button>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

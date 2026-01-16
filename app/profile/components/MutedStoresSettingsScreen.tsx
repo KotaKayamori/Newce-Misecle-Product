@@ -25,8 +25,6 @@ export function MutedStoresSettingsScreen({ onClose }: MutedStoresSettingsScreen
           </p>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

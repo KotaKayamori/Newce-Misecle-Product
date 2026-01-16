@@ -23,8 +23,6 @@ export function VisitedStoresScreen({ onClose }: VisitedStoresScreenProps) {
           <p className="text-xs text-gray-400">来店後に店舗名が表示されます</p>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

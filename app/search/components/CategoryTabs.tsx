@@ -16,7 +16,7 @@ export function CategoryTabs({
   if (isSearchMode) return null
 
   return (
-    <div>
+    <div className="sticky top-0 z-30 bg-white">
       <div className="flex overflow-x-auto scrollbar-hide pb-2 gap-1">
         {categories.map((category) => (
           <button
@@ -36,5 +36,3 @@ export function CategoryTabs({
     </div>
   )
 }
-
-

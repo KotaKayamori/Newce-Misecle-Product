@@ -11,10 +11,10 @@ type UploadMode = "" | "video" | "album"
 
 const CATEGORY_OPTIONS: { value: VideoCategory; label: string }[] = [
   { value: "today_recommended", label: "あなたにおすすめ" },
-  { value: "popular_now", label: "人気急上昇中のお店" },
-  { value: "sns_popular", label: "SNSで人気のお店" },
-  { value: "gen_z_popular", label: "若年層に人気のお店" },
-  { value: "date_recommended", label: "デートでおすすめのお店" },
+  { value: "popular_now", label: "人気急上昇中" },
+  { value: "sns_popular", label: "SNSで人気" },
+  { value: "gen_z_popular", label: "若年層に人気" },
+  { value: "date_recommended", label: "デートでおすすめ" },
 ]
 
 const IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp"]

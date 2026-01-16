@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase"
 import { toggleLike } from "@/lib/likes"
 import { FALLBACK_VIDEO_URL } from "@/lib/media"
 import { useBookmark } from "@/hooks/useBookmark"
-import type { BookmarkedVideo, FavoriteVideo, OwnerProfile } from "@/app/favorites/types"
+import type { BookmarkedVideo, FavoriteVideo, OwnerProfile } from "@/lib/types"
 
 export function useFavoriteVideos() {
   const router = useRouter()
@@ -142,6 +142,7 @@ export function useFavoriteVideos() {
           const map: Record<string, OwnerProfile> = {}
           ;(data as any[]).forEach((profile) => {
             map[profile.id] = {
+              id: profile.id,
               username: profile.username,
               display_name: profile.display_name,
               avatar_url: profile.avatar_url,
@@ -184,6 +185,7 @@ export function useFavoriteVideos() {
             const next = { ...prev }
             ;(data as any[]).forEach((profile) => {
               next[profile.id] = {
+                id: profile.id,
                 username: profile.username,
                 display_name: profile.display_name,
                 avatar_url: profile.avatar_url,

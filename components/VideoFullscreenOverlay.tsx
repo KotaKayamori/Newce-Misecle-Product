@@ -77,6 +77,26 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
   const seekContainerRef = useRef<HTMLDivElement | null>(null)
   const [previewX, setPreviewX] = useState<number | null>(null)
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    // variant が "reels" の場合は、親コンポーネント（ReelsScreen）で制御するのでスキップ
+    if (variant === "reels") return
+    
+    const el = document.documentElement
+    if (open) {
+      el.classList.add("is-fullscreen")
+      el.style.setProperty("--footer-h", "0px")
+    } else {
+      el.classList.remove("is-fullscreen")
+      el.style.removeProperty("--footer-h")
+    }
+    return () => {
+      // アンマウント時も必ず復元
+      el.classList.remove("is-fullscreen")
+      el.style.removeProperty("--footer-h")
+    }
+  }, [open, variant])
+
   // 再生/一時停止トグル
   const handleTogglePlay = () => {
     const v = videoRef.current
@@ -429,6 +449,9 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
           </button>
         </div>
       </div>
+
+      {/* シークバーより下を黒背景で覆う */}
+      <div className="absolute inset-x-0 z-20 bottom-0 h-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px))] bg-black" />
 
       {/* ★ 動画とフッターの“間”にシークバーを配置 */}
       <div className="absolute inset-x-0 z-30 bottom-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px))]">

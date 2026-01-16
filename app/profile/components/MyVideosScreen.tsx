@@ -20,7 +20,6 @@ export function MyVideosScreen({ onClose }: MyVideosScreenProps) {
       <div className="px-6 py-4">
         <MyVideosPanel />
       </div>
-      <Navigation />
     </div>
   )
 }

@@ -83,6 +83,12 @@
   }
 }
 
+@layer components {
+  html.is-fullscreen .global-footer {
+    display: none;
+  }
+}
+
 /* Optimize offscreen rendering for supported browsers */
 @supports (content-visibility: auto) {
   .reel {
