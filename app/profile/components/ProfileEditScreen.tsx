@@ -44,7 +44,7 @@ export function ProfileEditScreen({
   const [isUploadingProfile, setIsUploadingProfile] = useState(false)
   const [profileUploadProgress, setProfileUploadProgress] = useState<number>(0)
 
-  const PROFILE_MAX_LENGTH = 150
+  const PROFILE_MAX_LENGTH = 200
 
   useEffect(() => {
     if (userProfile) {
