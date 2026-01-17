@@ -24,4 +24,3 @@ export function UploadScreen({ onClose }: UploadScreenProps) {
     </div>
   )
 }
-

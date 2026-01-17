@@ -24,6 +24,13 @@ const MAX_VIDEO_BYTES = 1024 * 1024 * 1024
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const STORE_INPUT_COUNT = 3
 const createDefaultStores = () => Array.from({ length: STORE_INPUT_COUNT }, () => ({ name: "", tel: "", tabelog: "" }))
+const FILE_NAME_MAX = 40
+
+const clampFileName = (name: string, max = FILE_NAME_MAX) => {
+  if (name.length <= max) return name
+  if (max <= 3) return name.slice(0, max)
+  return `${name.slice(0, max - 3)}...`
+}
 
 type PhotoUploadState = "idle" | "uploading" | "success" | "error"
 
@@ -660,13 +667,13 @@ export default function VideoUploader() {
                               : "クリックまたはドラッグ＆ドロップで写真/動画を選択（複数可）"}
                         </p>
                         {photoFiles.length > 0 && (
-                          <ul className="space-y-2 text-left w-full max-w-full">
+                          <ul className="space-y-2 text-left w-full max-w-full overflow-hidden">
                             {photoFiles.map((file, index) => (
                               <li
                                 key={`${file.name}-${index}`}
-                                className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 w-full max-w-full overflow-hidden"
+                                className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 w-full max-w-full overflow-hidden min-w-0"
                               >
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                                   <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden flex-shrink-0">
                                     {photoPreviews[index] ? (
                                       file.type.toLowerCase().startsWith("video/") ? (
@@ -684,29 +691,14 @@ export default function VideoUploader() {
                                       <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Preview</div>
                                     )}
                                   </div>
-                                  <span className="truncate text-sm font-medium text-gray-700 block">{index + 1}. {file.name}</span>
+                                  <span
+                                    className="min-w-0 truncate text-sm font-medium text-gray-700 block"
+                                    title={file.name}
+                                  >
+                                    {index + 1}. {clampFileName(file.name)}
+                                  </span>
                                 </div>
                                 <div className="flex items-center gap-1 flex-shrink-0">
-                                  <button
-                                    type="button"
-                                    disabled={index === 0 || isUploading}
-                                    onClick={(e) => { e.stopPropagation(); movePhotoFile(index, index - 1) }}
-                                    className="inline-flex items-center rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-                                    aria-label="上へ"
-                                    title="上へ"
-                                  >
-                                    ↑
-                                  </button>
-                                  <button
-                                    type="button"
-                                    disabled={index === photoFiles.length - 1 || isUploading}
-                                    onClick={(e) => { e.stopPropagation(); movePhotoFile(index, index + 1) }}
-                                    className="inline-flex items-center rounded-md border border-gray-200 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-40"
-                                    aria-label="下へ"
-                                    title="下へ"
-                                  >
-                                    ↓
-                                  </button>
                                   <button
                                     type="button"
                                     onClick={(e) => {

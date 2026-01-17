@@ -15,11 +15,28 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json().catch(() => ({}))
   const coverPath: string | undefined = body?.coverPath
-  if (!coverPath) return NextResponse.json({ error: "coverPath required" }, { status: 400 })
+  const title = typeof body?.title === "string" ? body.title.trim() : undefined
+  const caption = typeof body?.caption === "string" ? body.caption.trim() : undefined
+  const description = typeof body?.description === "string" ? body.description.trim() : undefined
+  const categories =
+    Array.isArray(body?.categories)
+      ? body.categories.map((c: any) => String(c).trim()).filter(Boolean)
+      : undefined
+
+  const updatePayload: Record<string, any> = {}
+  if (coverPath) updatePayload.cover_path = coverPath
+  if (title !== undefined) updatePayload.title = title || null
+  if (caption !== undefined) updatePayload.caption = caption || null
+  if (description !== undefined) updatePayload.description = description || null
+  if (categories !== undefined) updatePayload.categories = categories
+
+  if (Object.keys(updatePayload).length === 0) {
+    return NextResponse.json({ error: "No fields to update" }, { status: 400 })
+  }
 
   const { data, error } = await sb
     .from("photo_albums")
-    .update({ cover_path: coverPath })
+    .update(updatePayload)
     .eq("id", params.id)
     .eq("owner_id", me.user.id)
     .select("id")

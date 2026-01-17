@@ -93,3 +93,80 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
   }
 }
 
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const supabase = await createServerClient()
+    const userId = await getUserId(request, supabase)
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+
+    const id = params.id
+    if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 })
+
+    const body = await request.json().catch(() => ({}))
+    const title = typeof body?.title === "string" ? body.title.trim() : null
+    const caption = typeof body?.caption === "string" ? body.caption.trim() : null
+
+    let categories: string[] | null = null
+    if (Array.isArray(body?.categories)) {
+      categories = body.categories.map((c: any) => String(c).trim()).filter(Boolean)
+    } else if (typeof body?.category === "string") {
+      const single = body.category
+        .split(/[,、]/)
+        .map((c: string) => c.trim())
+        .filter(Boolean)
+      categories = single.length > 0 ? single : []
+    }
+
+    const { data: row, error: selErr } = await supabase
+      .from("videos")
+      .select("owner_id, storage_path")
+      .eq("id", id)
+      .single()
+    if (selErr) return NextResponse.json({ error: selErr.message }, { status: 400 })
+    if (!row || row.owner_id !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+
+    const updatePayload: Record<string, any> = {}
+    if (title !== null) updatePayload.title = title || null
+    if (caption !== null) updatePayload.caption = caption || null
+    if (categories !== null) updatePayload.categories = categories
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json({ error: "No fields to update" }, { status: 400 })
+    }
+
+    const { error: upErr } = await supabase
+      .from("videos")
+      .update(updatePayload)
+      .eq("id", id)
+      .eq("owner_id", userId)
+    if (upErr) return NextResponse.json({ error: upErr.message }, { status: 400 })
+
+    // Best effort: keep user_videos in sync
+    const categoryForUser = categories && categories.length > 0 ? categories[0] : null
+    try {
+      if (row?.storage_path) {
+        await supabase
+          .from("user_videos")
+          .update({
+            title: updatePayload.title ?? undefined,
+            description: updatePayload.caption ?? undefined,
+            category: categoryForUser,
+          })
+          .eq("path", row.storage_path)
+      } else {
+        await supabase
+          .from("user_videos")
+          .update({
+            title: updatePayload.title ?? undefined,
+            description: updatePayload.caption ?? undefined,
+            category: categoryForUser,
+          })
+          .eq("id", id)
+      }
+    } catch {}
+
+    return NextResponse.json({ ok: true })
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || "Unexpected error" }, { status: 500 })
+  }
+}
