@@ -1,9 +1,12 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Loader2, Upload as UploadIcon, Trash2 } from "lucide-react"
+import { DndContext, PointerSensor, TouchSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core"
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { GripVertical, Loader2, Upload as UploadIcon, Trash2 } from "lucide-react"
 import { useVideoUpload, type VideoCategory } from "@/hooks/useVideoUpload"
 import { supabase } from "@/lib/supabase"
 
@@ -24,15 +27,111 @@ const MAX_VIDEO_BYTES = 1024 * 1024 * 1024
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const STORE_INPUT_COUNT = 3
 const createDefaultStores = () => Array.from({ length: STORE_INPUT_COUNT }, () => ({ name: "", tel: "", tabelog: "" }))
-const FILE_NAME_MAX = 40
+type PhotoUploadState = "idle" | "uploading" | "success" | "error"
+type PhotoItem = { id: string; file: File }
 
-const clampFileName = (name: string, max = FILE_NAME_MAX) => {
-  if (name.length <= max) return name
-  if (max <= 3) return name.slice(0, max)
-  return `${name.slice(0, max - 3)}...`
+const createPhotoId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID()
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
-type PhotoUploadState = "idle" | "uploading" | "success" | "error"
+type SortablePhotoRowProps = {
+  item: PhotoItem
+  index: number
+  previewUrl?: string
+  isUploading: boolean
+  onRemove: (index: number) => void
+}
+
+function SortablePhotoRow({ item, index, previewUrl, isUploading, onRemove }: SortablePhotoRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+  const isVideo = item.file.type.toLowerCase().startsWith("video/")
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-2 py-1.5 w-full max-w-full overflow-hidden min-w-0 ${
+        isDragging ? "opacity-70 shadow-sm" : ""
+      }`}
+    >
+      <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          disabled={isUploading}
+          className="inline-flex items-center gap-1 rounded-md border border-transparent px-1 py-1 text-xs text-gray-500 hover:bg-gray-50 disabled:opacity-40 cursor-grab active:cursor-grabbing touch-none"
+          aria-label="ドラッグして並べ替え"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+        <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden flex-shrink-0">
+          {previewUrl ? (
+            isVideo ? (
+              <video
+                src={previewUrl}
+                className="w-full h-full object-cover"
+                muted
+                playsInline
+                preload="metadata"
+                controls={false}
+                autoPlay={false}
+                loop={false}
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                }}
+                onPlay={(e) => {
+                  const video = e.currentTarget
+                  try {
+                    video.pause()
+                    video.currentTime = 0
+                  } catch {}
+                }}
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={previewUrl} alt={item.file.name} className="w-full h-full object-cover" />
+            )
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Preview</div>
+          )}
+        </div>
+        <span
+          className="min-w-0 text-sm font-medium text-gray-700 block break-all"
+          title={item.file.name}
+          style={{
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
+          }}
+        >
+          {index + 1}. {item.file.name}
+        </span>
+      </div>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onRemove(index)
+          }}
+          disabled={isUploading}
+          className="inline-flex items-center gap-1 rounded-md border border-transparent px-1.5 py-1 text-xs text-red-500 hover:bg-red-50 disabled:opacity-40"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          削除
+        </button>
+      </div>
+    </li>
+  )
+}
 
 export default function VideoUploader() {
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -48,12 +147,13 @@ export default function VideoUploader() {
   const [dragOver, setDragOver] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [title, setTitle] = useState("")
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>("")
 
   const [categories, setCategories] = useState<VideoCategory[]>([])
   const [caption, setCaption] = useState("")
   const [stores, setStores] = useState(createDefaultStores)
 
-  const [photoFiles, setPhotoFiles] = useState<File[]>([])
+  const [photoItems, setPhotoItems] = useState<PhotoItem[]>([])
   const [photoError, setPhotoError] = useState("")
   const [photoState, setPhotoState] = useState<PhotoUploadState>("idle")
   const [photoResult, setPhotoResult] = useState<string[]>([])
@@ -115,35 +215,45 @@ export default function VideoUploader() {
       ALBUM_MIME_TYPES.includes(file.type.toLowerCase()),
     )
     if (!accepted.length) return
-    setPhotoFiles((prev) => [...prev, ...accepted])
+    const nextItems = accepted.map((file) => ({ id: createPhotoId(), file }))
+    setPhotoItems((prev) => [...prev, ...nextItems])
   }, [])
 
   const removePhotoFile = (index: number) => {
-    setPhotoFiles((prev) => prev.filter((_, i) => i !== index))
-  }
-
-  const movePhotoFile = (fromIndex: number, toIndex: number) => {
-    setPhotoFiles((prev) => {
-      if (toIndex < 0 || toIndex >= prev.length) return prev
-      const next = prev.slice()
-      const [moved] = next.splice(fromIndex, 1)
-      next.splice(toIndex, 0, moved)
-      return next
-    })
+    setPhotoItems((prev) => prev.filter((_, i) => i !== index))
   }
 
   const resetVideo = () => {
     reset()
     setSelectedFile(null)
+    setVideoPreviewUrl("")
   }
 
   const resetPhoto = () => {
-    setPhotoFiles([])
+    setPhotoItems([])
     setPhotoState("idle")
     setPhotoError("")
     setPhotoResult([])
     setAlbumId(null)
   }
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+  )
+
+  const handlePhotoDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setPhotoItems((items) => {
+      const oldIndex = items.findIndex((item) => item.id === active.id)
+      const newIndex = items.findIndex((item) => item.id === over.id)
+      if (oldIndex === -1 || newIndex === -1) return items
+      return arrayMove(items, oldIndex, newIndex)
+    })
+  }, [])
+
+  const photoItemIds = useMemo(() => photoItems.map((item) => item.id), [photoItems])
 
   const handleModeChange = (value: UploadMode) => {
     if (!hasPermission) return
@@ -166,16 +276,28 @@ export default function VideoUploader() {
 
   // Generate/revoke local preview URLs for selected album images
   useEffect(() => {
-    if (!photoFiles || photoFiles.length === 0) {
+    if (!photoItems || photoItems.length === 0) {
       setPhotoPreviews([])
       return
     }
-    const urls = photoFiles.map((f) => URL.createObjectURL(f))
+    const urls = photoItems.map((item) => URL.createObjectURL(item.file))
     setPhotoPreviews(urls)
     return () => {
       urls.forEach((u) => URL.revokeObjectURL(u))
     }
-  }, [photoFiles])
+  }, [photoItems])
+
+  useEffect(() => {
+    if (!selectedFile) {
+      setVideoPreviewUrl("")
+      return
+    }
+    const url = URL.createObjectURL(selectedFile)
+    setVideoPreviewUrl(url)
+    return () => {
+      URL.revokeObjectURL(url)
+    }
+  }, [selectedFile])
 
   useEffect(() => {
     const preventWindowDrop = (event: DragEvent) => {
@@ -231,7 +353,7 @@ export default function VideoUploader() {
     setPhotoError("")
     setPhotoResult([])
 
-    if (!photoFiles.length) {
+    if (!photoItems.length) {
       setPhotoError("アップロードする写真/動画を選択してください")
       setPhotoState("error")
       return
@@ -277,7 +399,7 @@ export default function VideoUploader() {
       const uploadedPaths: string[] = []
       let coverCandidate: string | null = null
 
-      for (const file of photoFiles) {
+      for (const { file } of photoItems) {
         const lowerType = file.type.toLowerCase()
         const isVideo = VIDEO_MIME_TYPES.includes(lowerType)
         if (!ALBUM_MIME_TYPES.includes(lowerType)) {
@@ -411,7 +533,7 @@ export default function VideoUploader() {
     isVideoMode
       ? Boolean(title.trim() && categories.length > 0 && selectedFile)
       : isAlbumMode
-        ? Boolean(title.trim() && photoFiles.length > 0)
+        ? Boolean(title.trim() && photoItems.length > 0)
         : false
 
   const uploadButtonLabel = isUploading
@@ -643,6 +765,33 @@ export default function VideoUploader() {
                               ? "ここにドロップしてください"
                               : "クリックまたはドラッグ＆ドロップで動画を選択"}
                         </p>
+                        {videoPreviewUrl && (
+                          <div className="w-full max-w-full flex justify-center">
+                            <div className="w-12 h-12 overflow-hidden rounded-md bg-black/5">
+                              <video
+                                src={videoPreviewUrl}
+                                className="h-full w-full object-cover"
+                                muted
+                                playsInline
+                                preload="metadata"
+                                controls={false}
+                                autoPlay={false}
+                                loop={false}
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                }}
+                                onPlay={(e) => {
+                                  const video = e.currentTarget
+                                  try {
+                                    video.pause()
+                                    video.currentTime = 0
+                                  } catch {}
+                                }}
+                              />
+                            </div>
+                          </div>
+                        )}
                         <Button
                           type="button"
                           onClick={(e) => {
@@ -660,56 +809,33 @@ export default function VideoUploader() {
                     {isAlbumMode && (
                       <div className="w-full space-y-3">
                         <p className="text-sm text-gray-700 text-center">
-                          {photoFiles.length
+                          {photoItems.length
                             ? "追加で写真/動画を選択するにはクリックまたはドロップしてください"
                             : dragOver
                               ? "ここにドロップしてください"
                               : "クリックまたはドラッグ＆ドロップで写真/動画を選択（複数可）"}
                         </p>
-                        {photoFiles.length > 0 && (
-                          <ul className="space-y-2 text-left w-full max-w-full overflow-hidden">
-                            {photoFiles.map((file, index) => {
-                              const isVideo = file.type.toLowerCase().startsWith("video/")
-                              return (
-                                <li
-                                  key={`${file.name}-${index}`}
-                                  className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-3 py-2 w-full max-w-full overflow-hidden min-w-0"
-                                >
-                                  <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-                                    {!isVideo && (
-                                      <div className="w-12 h-12 rounded bg-gray-100 overflow-hidden flex-shrink-0">
-                                        {photoPreviews[index] ? (
-                                          // eslint-disable-next-line @next/next/no-img-element
-                                          <img src={photoPreviews[index]} alt={file.name} className="w-full h-full object-cover" />
-                                        ) : (
-                                          <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">No Preview</div>
-                                        )}
-                                      </div>
-                                    )}
-                                    <span
-                                      className="min-w-0 text-sm font-medium text-gray-700 block break-all"
-                                      title={file.name}
-                                    >
-                                      {index + 1}. {file.name}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-1 flex-shrink-0">
-                                    <button
-                                      type="button"
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        removePhotoFile(index)
-                                      }}
-                                      className="inline-flex items-center gap-1 rounded-md border border-transparent px-2 py-1 text-sm text-red-500 hover:bg-red-50"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                      削除
-                                    </button>
-                                  </div>
-                                </li>
-                              )
-                            })}
-                          </ul>
+                        {photoItems.length > 0 && (
+                          <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragEnd={handlePhotoDragEnd}
+                          >
+                            <SortableContext items={photoItemIds} strategy={verticalListSortingStrategy}>
+                              <ul className="space-y-2 text-left w-full max-w-full overflow-hidden">
+                                {photoItems.map((item, index) => (
+                                  <SortablePhotoRow
+                                    key={item.id}
+                                    item={item}
+                                    index={index}
+                                    previewUrl={photoPreviews[index]}
+                                    isUploading={isUploading}
+                                    onRemove={removePhotoFile}
+                                  />
+                                ))}
+                              </ul>
+                            </SortableContext>
+                          </DndContext>
                         )}
                       </div>
                     )}
