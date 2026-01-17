@@ -65,8 +65,6 @@ export function ReviewsScreen({ onClose, visitHistory }: ReviewsScreenProps) {
           )}
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

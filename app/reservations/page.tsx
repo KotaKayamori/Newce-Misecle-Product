@@ -48,8 +48,6 @@ export default function ReservationsPage() {
           </Tabs>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

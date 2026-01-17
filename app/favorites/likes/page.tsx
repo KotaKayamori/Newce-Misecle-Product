@@ -33,20 +33,17 @@ export default function FavoritesLikesPage() {
   if (needLogin) return (
     <div className="min-h-screen bg-white pb-20 px-6 pt-8">
       <p className="text-gray-700">ログインしてください</p>
-      <Navigation />
     </div>
   )
   if (!items) return (
     <div className="min-h-screen bg-white pb-20 px-6 pt-8">
       <p className="text-gray-500">読み込み中…</p>
-      <Navigation />
     </div>
   )
   if (items.length === 0)
     return (
       <div className="min-h-screen bg-white pb-20 px-6 pt-8">
         <p className="text-gray-700">まだお気に入りがありません</p>
-        <Navigation />
       </div>
     )
 
@@ -66,7 +63,6 @@ export default function FavoritesLikesPage() {
           </div>
         ))}
       </div>
-      <Navigation />
     </div>
   )
 }

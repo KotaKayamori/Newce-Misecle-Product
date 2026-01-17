@@ -41,8 +41,6 @@ export function NotificationsScreen({ onClose, notifications }: NotificationsScr
           )}
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

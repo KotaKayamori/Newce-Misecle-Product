@@ -76,8 +76,6 @@ export function NotificationPermissionScreen({ onClose, onEnable }: Notification
           </p>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

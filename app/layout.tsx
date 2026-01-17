@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { GeistSans } from "geist/font/sans"
 import { GeistMono } from "geist/font/mono"
 import { AuthProvider } from "@/components/auth-provider"
+import Navigation from "@/components/navigation"
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css"
 
@@ -37,7 +38,10 @@ export default function RootLayout({
       </head>
       <body className={GeistSans.className}>
         {gaId && <GoogleAnalytics gaId={gaId} />}
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          {children}
+          <Navigation />
+        </AuthProvider>
       </body>
     </html>
   )

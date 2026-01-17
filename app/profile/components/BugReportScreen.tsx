@@ -110,8 +110,6 @@ export function BugReportScreen({ onClose, onSuccess, onShowFAQ }: BugReportScre
           </form>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

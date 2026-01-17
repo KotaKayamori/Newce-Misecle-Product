@@ -26,7 +26,6 @@ export function PasswordSuccessScreen({ onClose }: PasswordSuccessScreenProps) {
           閉じる
         </Button>
       </div>
-      <Navigation />
     </div>
   )
 }

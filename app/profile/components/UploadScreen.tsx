@@ -20,7 +20,6 @@ export function UploadScreen({ onClose }: UploadScreenProps) {
       <div className="px-6 py-4">
         <VideoUploader />
       </div>
-      <Navigation />
     </div>
   )
 }

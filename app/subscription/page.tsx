@@ -170,8 +170,6 @@ export default function SubscriptionPage() {
           </Button>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

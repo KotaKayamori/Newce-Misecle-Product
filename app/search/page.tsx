@@ -402,7 +402,6 @@ export default function SearchPage() {
   const likeMutationRef = useRef<Set<string>>(new Set())
   const { bookmarkedVideoIds, toggleBookmark } = useBookmark()
 
-
   async function toggleVideoLike(videoId: string) {
     if (likeMutationRef.current.has(videoId)) return
     const wasLiked = likedVideoIds.has(videoId)
@@ -916,8 +915,6 @@ export default function SearchPage() {
         bookmarked={albums.openAlbumId ? albums.albumBookmarkedSet.has(albums.openAlbumId) : false}
         onToggleBookmark={() => { if (albums.openAlbumId) albums.toggleAlbumBookmark(albums.openAlbumId) } } 
       />
-      
-      <Navigation />
    </div>
   )
 }

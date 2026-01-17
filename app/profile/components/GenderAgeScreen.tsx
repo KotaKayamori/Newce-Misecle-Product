@@ -106,8 +106,6 @@ export function GenderAgeScreen({
           </Button>
         </div>
       </div>
-
-      <Navigation />
     </div>
   )
 }

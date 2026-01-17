@@ -89,6 +89,15 @@ export default function ReelsScreen({ categorySlug, startVideoId, onClose }: Ree
   })
 
   useEffect(() => {
+    if (typeof document === "undefined") return
+    const root = document.documentElement
+    root.classList.add("is-fullscreen")
+    return () => {
+      root.classList.remove("is-fullscreen")
+    }
+  }, [])
+
+  useEffect(() => {
     if (typeof window === "undefined") return
     let rafId = 0
     const update = () => {
@@ -390,6 +399,15 @@ function ReelItem({
   useEffect(() => {
     if (wrapperRef.current) registerObserver(wrapperRef.current, index)
   }, [registerObserver, index])
+
+  // useEffect(() => {
+  //   if (typeof document === "undefined") return
+  //   const root = document.documentElement
+  //   root.classList.add("is-fullscreen")
+  //   return () => {
+  //     root.classList.remove("is-fullscreen")
+  //   }
+  // }, [])
 
   return (
     <div
