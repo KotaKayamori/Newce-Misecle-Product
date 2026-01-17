@@ -106,11 +106,7 @@ export function MediaCarousel({
 
   const handleVideoTap = (video: HTMLVideoElement | null) => {
     if (!video || isDragging) return
-    if (video.paused) {
-      void video.play().catch(() => {})
-    } else {
-      video.pause()
-    }
+    video.muted = !video.muted
   }
 
   const trackStyle: React.CSSProperties = hasItems
@@ -151,6 +147,9 @@ export function MediaCarousel({
                     fit === "cover" ? "h-full w-full object-cover" : "h-full w-full object-contain",
                     mediaClassName,
                   )}
+                  muted
+                  autoPlay
+                  loop
                   playsInline
                   preload="metadata"
                   onClick={() => handleVideoTap(videoRefs.current[idx])}

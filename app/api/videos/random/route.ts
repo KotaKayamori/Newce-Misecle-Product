@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
       '人気急上昇中のお店': 'popular_now',
       'SNSで人気のお店': 'sns_popular',
       '若年層に人気のお店': 'gen_z_popular',
-      'デートにおすすめのお店': 'date_recommended'
+      'デートにおすすめのお店': 'date_recommended',
+      '1人でも行ける': 'solo_ok',
+      '記念日におすすめ': 'anniversary_recommended'
     }
     const knownSlugs = new Set(Object.values(categoryMap))
     const resolveCategorySlug = (value?: string | null) => {
