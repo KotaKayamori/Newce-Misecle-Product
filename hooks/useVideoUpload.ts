@@ -11,6 +11,8 @@ export type VideoCategory =
   | "sns_popular" 
   | "gen_z_popular" 
   | "date_recommended"
+  | "solo_ok"
+  | "anniversary_recommended"
 
 const STORE_INPUT_COUNT = 3
 

@@ -17,6 +17,8 @@ const CATEGORY_OPTIONS: { value: VideoCategory; label: string }[] = [
   { value: "sns_popular", label: "SNSで人気のお店" },
   { value: "gen_z_popular", label: "若年層に人気のお店" },
   { value: "date_recommended", label: "デートでおすすめのお店" },
+  { value: "solo_ok", label: "1人でも行ける" },
+  { value: "anniversary_recommended", label: "記念日におすすめ" },
 ]
 
 type Item = {

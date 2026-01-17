@@ -57,6 +57,8 @@ const CATEGORY_SLUG_MAP: Record<string, string> = {
   "SNSで人気のお店": "sns_popular",
   "若年層に人気のお店": "gen_z_popular",
   "デートにおすすめのお店": "date_recommended",
+  "1人でも行ける": "solo_ok",
+  "記念日におすすめ": "anniversary_recommended",
 }
 
 function resolveCategorySlug(category?: string | null) {
@@ -86,6 +88,8 @@ export default function SearchPage() {
     "SNSで人気のお店",
     "若年層に人気のお店",
     "デートにおすすめのお店",
+    "1人でも行ける",
+    "記念日におすすめ",
     // "最新動画",
     // "ガイドブック",
   ]
