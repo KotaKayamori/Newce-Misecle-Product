@@ -9,7 +9,7 @@ export default function UploadPage() {
   const router = useRouter()
 
   return (
-    <div className="min-h-screen bg-white pb-20 px-6 pt-8">
+    <div className="min-h-screen bg-white pb-20 px-6 pt-8 overflow-x-hidden">
       <div className="flex items-center gap-4 mb-4">
         <Button
           variant="ghost"

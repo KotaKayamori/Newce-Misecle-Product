@@ -53,10 +53,12 @@ type SupabaseVideoRow = {
 
 const CATEGORY_SLUG_MAP: Record<string, string> = {
   "あなたにおすすめ": "today_recommended",
-  "人気急上昇中": "popular_now",
-  "SNSで人気": "sns_popular",
-  "若年層に人気": "gen_z_popular",
-  "デートにおすすめ": "date_recommended",
+  "人気急上昇中のお店": "popular_now",
+  "SNSで人気のお店": "sns_popular",
+  "若年層に人気のお店": "gen_z_popular",
+  "デートにおすすめのお店": "date_recommended",
+  "1人でも行ける": "solo_ok",
+  "記念日におすすめ": "anniversary_recommended",
 }
 
 function resolveCategorySlug(category?: string | null) {
@@ -82,10 +84,12 @@ export default function SearchPage() {
   const [_expandedCategory, _setExpandedCategory] = useState<string | null>(null) // TODO: 未使用
   const categoryTabs = [
     "あなたにおすすめ",
-    "人気急上昇中",
-    "SNSで人気",
-    "若年層に人気",
-    "デートにおすすめ",
+    "人気急上昇中のお店",
+    "SNSで人気のお店",
+    "若年層に人気のお店",
+    "デートにおすすめのお店",
+    "1人でも行ける",
+    "記念日におすすめ",
     // "最新動画",
     // "ガイドブック",
   ]

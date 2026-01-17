@@ -8,7 +8,18 @@ import VideoFullscreenOverlay from "@/components/VideoFullscreenOverlay"
 import AlbumCard from "@/components/AlbumCard"
 import AlbumViewerOverlay from "@/components/AlbumViewerOverlay"
 import { derivePosterUrl, deriveAlbumCoverUrl } from "@/lib/media"
+import type { VideoCategory } from "@/hooks/useVideoUpload"
 import type { AssetItem } from "@/app/search/types"
+
+const CATEGORY_OPTIONS: { value: VideoCategory; label: string }[] = [
+  { value: "today_recommended", label: "あなたにおすすめ" },
+  { value: "popular_now", label: "人気急上昇中のお店" },
+  { value: "sns_popular", label: "SNSで人気のお店" },
+  { value: "gen_z_popular", label: "若年層に人気のお店" },
+  { value: "date_recommended", label: "デートでおすすめのお店" },
+  { value: "solo_ok", label: "1人でも行ける" },
+  { value: "anniversary_recommended", label: "記念日におすすめ" },
+]
 
 type Item = {
   id: string
@@ -19,6 +30,7 @@ type Item = {
   created_at: string
   title?: string | null
   description?: string | null
+  categories?: string[] | null
 }
 
 type Album = {
@@ -27,6 +39,7 @@ type Album = {
   title: string | null
   description: string | null
   caption: string | null
+  categories?: string[] | null
   cover_path: string | null
   created_at: string
 }
@@ -50,6 +63,18 @@ export default function MyVideosPanel() {
   const [albumOwnerLabel, setAlbumOwnerLabel] = useState<string | null>(null)
   const [albumOwnerAvatar, setAlbumOwnerAvatar] = useState<string | null>(null)
   const [albumLoading, setAlbumLoading] = useState(false)
+  const [editAlbum, setEditAlbum] = useState<Album | null>(null)
+  const [editAlbumTitle, setEditAlbumTitle] = useState("")
+  const [editAlbumCaption, setEditAlbumCaption] = useState("")
+  const [editAlbumCategories, setEditAlbumCategories] = useState<VideoCategory[]>([])
+  const [editAlbumSaving, setEditAlbumSaving] = useState(false)
+  const [editAlbumError, setEditAlbumError] = useState("")
+  const [editItem, setEditItem] = useState<Item | null>(null)
+  const [editTitle, setEditTitle] = useState("")
+  const [editCaption, setEditCaption] = useState("")
+  const [editCategories, setEditCategories] = useState<VideoCategory[]>([])
+  const [editSaving, setEditSaving] = useState(false)
+  const [editError, setEditError] = useState("")
 
   const load = async () => {
     setLoading(true)
@@ -75,20 +100,25 @@ export default function MyVideosPanel() {
         .single()
       setProfile(prof ?? null)
       const { data, error } = await supabase
-        .from("user_videos")
-        .select("id, path, public_url, content_type, size, created_at, title, description")
-        .eq("user_id", user.id)
+        .from("videos")
+        .select("id, storage_path, playback_url, created_at, title, caption, categories")
+        .eq("owner_id", user.id)
         .order("created_at", { ascending: false })
       if (error) {
-        const fb = await supabase
-          .from("user_videos")
-          .select("id, path, public_url, content_type, size, created_at")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false })
-        const fallbackData = fb.data as any // TODO: 型を詰める
-        setItems(fallbackData || [])
+        setItems([])
       } else {
-        setItems((data as any) || []) // TODO: 型を詰める
+        const mapped = ((data as any) || []).map((row: any) => ({
+          id: row.id,
+          path: row.storage_path || row.playback_url || "",
+          public_url: row.playback_url || "",
+          content_type: null,
+          size: null,
+          created_at: row.created_at,
+          title: row.title ?? null,
+          description: row.caption ?? null,
+          categories: Array.isArray(row.categories) ? row.categories : null,
+        })) as Item[]
+        setItems(mapped)
       }
     } catch (e: any) {
       setError(e?.message || "読み込みに失敗しました")
@@ -111,7 +141,7 @@ export default function MyVideosPanel() {
       }
       const { data, error } = await supabase
         .from("photo_albums")
-        .select("id, owner_id, title, description, caption, cover_path, created_at")
+        .select("id, owner_id, title, description, caption, categories, cover_path, created_at")
         .eq("owner_id", user.id)
         .order("created_at", { ascending: false })
       if (error) throw error
@@ -130,7 +160,7 @@ export default function MyVideosPanel() {
   }, [])
 
   const handleDelete = async (item: Item) => {
-    if (!confirm("この動画を削除しますか？")) return
+    if (!confirm("この動画を削除しますか？")) return false
     try {
       const {
         data: { session },
@@ -145,18 +175,82 @@ export default function MyVideosPanel() {
         throw new Error(j?.error || `削除に失敗しました (${res.status})`)
       }
       setItems((prev) => prev.filter((x) => x.id !== item.id))
+      return true
     } catch (e: any) {
       alert(e?.message || "削除に失敗しました")
+      return false
+    }
+  }
+
+  const openEdit = (item: Item) => {
+    const validCategories = new Set(CATEGORY_OPTIONS.map((opt) => opt.value))
+    setEditItem(item)
+    setEditTitle(item.title ?? "")
+    setEditCaption(item.description ?? "")
+    setEditCategories(
+      Array.isArray(item.categories)
+        ? (item.categories.filter((c) => validCategories.has(c as VideoCategory)) as VideoCategory[])
+        : [],
+    )
+    setEditError("")
+  }
+
+  const handleEditSave = async () => {
+    if (!editItem) return
+    if (editCategories.length === 0) {
+      setEditError("カテゴリを1つ以上選択してください")
+      return
+    }
+    setEditSaving(true)
+    setEditError("")
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const res = await fetch(`/api/videos/${editItem.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title: editTitle,
+          caption: editCaption,
+          categories: editCategories,
+        }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j?.error || `更新に失敗しました (${res.status})`)
+      }
+      setItems((prev) =>
+        prev.map((item) =>
+          item.id === editItem.id
+            ? {
+                ...item,
+                title: editTitle.trim() || null,
+                description: editCaption.trim() || null,
+                categories: editCategories,
+              }
+            : item,
+        ),
+      )
+      setEditItem(null)
+    } catch (e: any) {
+      setEditError(e?.message || "更新に失敗しました")
+    } finally {
+      setEditSaving(false)
     }
   }
 
   const handleDeleteAlbum = async (album: Album) => {
-    if (!confirm("このアルバムを削除しますか？\n（アルバム内の写真も削除される場合があります）")) return
+    if (!confirm("このアルバムを削除しますか？\n（アルバム内の写真も削除される場合があります）")) return false
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         alert("ログインが必要です")
-        return
+        return false
       }
       // 所有者チェックを兼ねてowner_id一致で削除
       const { error } = await supabase
@@ -166,8 +260,10 @@ export default function MyVideosPanel() {
         .eq("owner_id", user.id)
       if (error) throw error
       setAlbums((prev) => prev.filter((a) => a.id !== album.id))
+      return true
     } catch (e: any) {
       alert(e?.message || "アルバムの削除に失敗しました")
+      return false
     }
   }
 
@@ -193,6 +289,66 @@ export default function MyVideosPanel() {
       setAlbumOpen(false)
     } finally {
       setAlbumLoading(false)
+    }
+  }
+
+  const openEditAlbum = (album: Album) => {
+    const validCategories = new Set(CATEGORY_OPTIONS.map((opt) => opt.value))
+    setEditAlbum(album)
+    setEditAlbumTitle(album.title ?? "")
+    setEditAlbumCaption(album.caption ?? album.description ?? "")
+    setEditAlbumCategories(
+      Array.isArray(album.categories)
+        ? (album.categories.filter((c) => validCategories.has(c as VideoCategory)) as VideoCategory[])
+        : [],
+    )
+    setEditAlbumError("")
+  }
+
+  const handleAlbumEditSave = async () => {
+    if (!editAlbum) return
+    setEditAlbumSaving(true)
+    setEditAlbumError("")
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const res = await fetch(`/api/guidebook/albums/${editAlbum.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title: editAlbumTitle,
+          caption: editAlbumCaption,
+          description: editAlbumCaption,
+          categories: editAlbumCategories,
+        }),
+      })
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j?.error || `更新に失敗しました (${res.status})`)
+      }
+      setAlbums((prev) =>
+        prev.map((album) =>
+          album.id === editAlbum.id
+            ? {
+                ...album,
+                title: editAlbumTitle.trim() || null,
+                caption: editAlbumCaption.trim() || null,
+                description: editAlbumCaption.trim() || null,
+                categories: editAlbumCategories,
+              }
+            : album,
+        ),
+      )
+      setEditAlbum(null)
+    } catch (e: any) {
+      setEditAlbumError(e?.message || "更新に失敗しました")
+    } finally {
+      setEditAlbumSaving(false)
     }
   }
 
@@ -243,8 +399,8 @@ export default function MyVideosPanel() {
                   {item.description && <p className="text-gray-700 text-xs mb-1 line-clamp-2">{item.description}</p>}
                   <div className="flex items-center justify-between">
                     <span className="text-gray-500">{new Date(item.created_at).toLocaleDateString()}</span>
-                    <Button variant="outline" className="h-8 px-3 rounded-full" onClick={() => handleDelete(item)}>
-                      削除
+                    <Button variant="outline" className="h-8 px-3 rounded-full" onClick={() => openEdit(item)}>
+                      編集
                     </Button>
                   </div>
                 </div>
@@ -279,10 +435,10 @@ export default function MyVideosPanel() {
                     </span>
                     <Button
                       variant="outline"
-                      className="flex-1 h-9 rounded-full"
-                      onClick={() => handleDeleteAlbum(a)}
+                      className="h-9 px-4 rounded-full"
+                      onClick={() => openEditAlbum(a)}
                     >
-                      削除
+                      編集
                     </Button>
                   </div>
                 </div>
@@ -291,6 +447,99 @@ export default function MyVideosPanel() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {editItem && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[75vh] overflow-y-auto scrollbar-hide">
+            <div className="flex items-center justify-between p-4 border-b">
+              <button
+                onClick={() => setEditItem(null)}
+                className="text-lg text-gray-800 hover:text-gray-900"
+              >
+                ＜
+              </button>
+              <h2 className="text-lg font-semibold">動画情報を編集</h2>
+              <div className="w-8"></div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">タイトル</label>
+                <input
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="タイトルを入力"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">キャプション</label>
+                <textarea
+                  value={editCaption}
+                  onChange={(e) => setEditCaption(e.target.value)}
+                  rows={5}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                  placeholder="キャプションを入力"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  カテゴリー <span className="ml-1 text-xs text-gray-500">(複数選択可)</span>
+                </label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {CATEGORY_OPTIONS.map((opt) => {
+                    const checked = editCategories.includes(opt.value)
+                    return (
+                      <label key={opt.value} className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={checked}
+                          onChange={(e) => {
+                            setEditCategories((prev) => {
+                              if (e.target.checked) {
+                                return Array.from(new Set([...prev, opt.value]))
+                              }
+                              return prev.filter((v) => v !== opt.value)
+                            })
+                          }}
+                        />
+                        <span className="text-sm text-gray-800">{opt.label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {editError && <p className="text-sm text-red-600">{editError}</p>}
+
+              <Button
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-lg font-semibold"
+                onClick={handleEditSave}
+                disabled={editSaving}
+              >
+                {editSaving ? "更新中..." : "更新する"}
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                onClick={async () => {
+                  if (!editItem) return
+                  const deleted = await handleDelete(editItem)
+                  if (deleted) setEditItem(null)
+                }}
+                disabled={editSaving}
+              >
+                削除する
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {previewIndex != null && previewIndex >= 0 && previewIndex < items.length && (
         <VideoFullscreenOverlay
@@ -349,6 +598,99 @@ export default function MyVideosPanel() {
             } catch {}
           }}
         />
+      )}
+
+      {editAlbum && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg w-full max-w-md max-h-[75vh] overflow-y-auto scrollbar-hide">
+            <div className="flex items-center justify-between p-4 border-b">
+              <button
+                onClick={() => setEditAlbum(null)}
+                className="text-lg text-gray-800 hover:text-gray-900"
+              >
+                ＜
+              </button>
+              <h2 className="text-lg font-semibold">アルバム情報を編集</h2>
+              <div className="w-8"></div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">タイトル</label>
+                <input
+                  type="text"
+                  value={editAlbumTitle}
+                  onChange={(e) => setEditAlbumTitle(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="タイトルを入力"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">キャプション</label>
+                <textarea
+                  value={editAlbumCaption}
+                  onChange={(e) => setEditAlbumCaption(e.target.value)}
+                  rows={5}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none"
+                  placeholder="キャプションを入力"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  カテゴリー <span className="ml-1 text-xs text-gray-500">(複数選択可)</span>
+                </label>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {CATEGORY_OPTIONS.map((opt) => {
+                    const checked = editAlbumCategories.includes(opt.value)
+                    return (
+                      <label key={opt.value} className="flex items-center gap-2 rounded-md border border-gray-300 px-3 py-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={checked}
+                          onChange={(e) => {
+                            setEditAlbumCategories((prev) => {
+                              if (e.target.checked) {
+                                return Array.from(new Set([...prev, opt.value]))
+                              }
+                              return prev.filter((v) => v !== opt.value)
+                            })
+                          }}
+                        />
+                        <span className="text-sm text-gray-800">{opt.label}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {editAlbumError && <p className="text-sm text-red-600">{editAlbumError}</p>}
+
+              <Button
+                className="w-full bg-orange-600 hover:bg-orange-700 text-white py-4 text-lg font-semibold"
+                onClick={handleAlbumEditSave}
+                disabled={editAlbumSaving}
+              >
+                {editAlbumSaving ? "更新中..." : "更新する"}
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                onClick={async () => {
+                  if (!editAlbum) return
+                  const deleted = await handleDeleteAlbum(editAlbum)
+                  if (deleted) setEditAlbum(null)
+                }}
+                disabled={editAlbumSaving}
+              >
+                削除する
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

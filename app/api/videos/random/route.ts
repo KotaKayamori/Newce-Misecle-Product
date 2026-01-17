@@ -10,10 +10,12 @@ export async function GET(request: NextRequest) {
     // カテゴリフィルタリング
     const categoryMap: Record<string, string> = {
       'あなたにおすすめ': 'today_recommended',
-      '人気急上昇中': 'popular_now',
-      'SNSで人気': 'sns_popular',
-      '若年層に人気': 'gen_z_popular',
-      'デートにおすすめ': 'date_recommended'
+      '人気急上昇中のお店': 'popular_now',
+      'SNSで人気のお店': 'sns_popular',
+      '若年層に人気のお店': 'gen_z_popular',
+      'デートにおすすめのお店': 'date_recommended',
+      '1人でも行ける': 'solo_ok',
+      '記念日におすすめ': 'anniversary_recommended'
     }
     const knownSlugs = new Set(Object.values(categoryMap))
     const resolveCategorySlug = (value?: string | null) => {
