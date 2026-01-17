@@ -10,7 +10,7 @@ interface UploadScreenProps {
 
 export function UploadScreen({ onClose }: UploadScreenProps) {
   return (
-    <div className="min-h-screen bg-white pb-20">
+    <div className="min-h-screen bg-white pb-20 overflow-x-hidden">
       <div className="px-6 py-4 flex items-center gap-4">
         <Button variant="ghost" onClick={onClose} className="text-black">
           ＜
