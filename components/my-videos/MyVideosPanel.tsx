@@ -243,12 +243,12 @@ export default function MyVideosPanel() {
   }
 
   const handleDeleteAlbum = async (album: Album) => {
-    if (!confirm("このアルバムを削除しますか？\n（アルバム内の写真も削除される場合があります）")) return
+    if (!confirm("このアルバムを削除しますか？\n（アルバム内の写真も削除される場合があります）")) return false
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         alert("ログインが必要です")
-        return
+        return false
       }
       // 所有者チェックを兼ねてowner_id一致で削除
       const { error } = await supabase
@@ -258,8 +258,10 @@ export default function MyVideosPanel() {
         .eq("owner_id", user.id)
       if (error) throw error
       setAlbums((prev) => prev.filter((a) => a.id !== album.id))
+      return true
     } catch (e: any) {
       alert(e?.message || "アルバムの削除に失敗しました")
+      return false
     }
   }
 
@@ -429,22 +431,13 @@ export default function MyVideosPanel() {
                     <span className="text-gray-500 whitespace-nowrap">
                       {new Date(a.created_at).toLocaleDateString()}
                     </span>
-                    <div className="flex items-center gap-2 flex-1">
-                      <Button
-                        variant="outline"
-                        className="h-9 px-4 rounded-full"
-                        onClick={() => openEditAlbum(a)}
-                      >
-                        編集
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="h-9 px-4 rounded-full"
-                        onClick={() => handleDeleteAlbum(a)}
-                      >
-                        削除
-                      </Button>
-                    </div>
+                    <Button
+                      variant="outline"
+                      className="h-9 px-4 rounded-full"
+                      onClick={() => openEditAlbum(a)}
+                    >
+                      編集
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -679,6 +672,19 @@ export default function MyVideosPanel() {
                 disabled={editAlbumSaving}
               >
                 {editAlbumSaving ? "更新中..." : "更新する"}
+              </Button>
+
+              <Button
+                variant="outline"
+                className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                onClick={async () => {
+                  if (!editAlbum) return
+                  const deleted = await handleDeleteAlbum(editAlbum)
+                  if (deleted) setEditAlbum(null)
+                }}
+                disabled={editAlbumSaving}
+              >
+                削除する
               </Button>
             </div>
           </div>
