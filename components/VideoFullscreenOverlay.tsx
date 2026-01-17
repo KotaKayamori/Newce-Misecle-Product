@@ -442,10 +442,10 @@ export default function VideoFullscreenOverlay(props: VideoFullscreenOverlayProp
       <div className="absolute left-0 right-0 px-4 z-30 bottom-[calc(env(safe-area-inset-bottom)+var(--vvb)+var(--footer-h,57px)+32px)]">
         <div className="flex gap-2">
           <button type="button" onClick={handleReserveClick} className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
-            今すぐ予約する
+            予約に進む
           </button>
           <button type="button" onClick={handleMoreClick} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-full text-sm font-bold transition-colors">
-            もっと見る…
+            キャプションを見る
           </button>
         </div>
       </div>
